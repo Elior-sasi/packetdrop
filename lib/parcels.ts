@@ -22,7 +22,7 @@ const NOT_PARCEL=/cinema|yesplanet|רב[- ]?חן|lev\.co\.il|eventim|leaan|לא�
 // Physical shipping words; unknown senders must mention one of these to count as a parcel.
 const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נקודת (?:ה)?חלוקה|כתובת למשלוח|shipping|shipped|shipment|delivery|tracking|מעקב|parcel|package/i;
 const STAGE_RULES:[number,RegExp][]=[
- [4,/נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
+ [4,/איך הלך|לכתוב ביקורת|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
  [3,/מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|טרם נאסף|יצאה למסירה|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
  [2,/במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|במרכז המיון|in transit|customs|arrived at/i],
  [1,/נשלחה|נשלח|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
@@ -68,7 +68,7 @@ export function parseMessage(m:Message):Parcel|null{
  let name='',image='';
  // Product block: the link to the order/package details, not the "you may also like" grid.
  $('a').each((_,el)=>{if(name)return;const a=$(el),href=a.attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;
-  const bits=a.find('*').addBack().contents().toArray().filter(n=>n.type==='text').map(n=>$(n).text().replace(/\s+/g,' ').trim()).filter(t=>t.length>6&&!/^[₪$€]|\d+[.,]\d{2}\s*$|^x\d+$|משלוח אל|סך הכל|לפרטי|order details/i.test(t));
+  const bits=a.find('*').addBack().contents().toArray().filter(n=>n.type==='text').map(n=>$(n).text().replace(/\s+/g,' ').trim()).filter(t=>t.length>6&&!/^[₪$€]|\d+[.,]\d{2}\s*$|^x\d+$|משלוח אל|סך הכל|לפרטי|פרטי ה(?:חבילה|הזמנה|משלוח)|order details|package details/i.test(t));
   if(bits[0]){name=bits[0].replace(/\s+x\d+$/i,'').trim();}});
  // The photo often sits in its own anchor next to the title anchor; take the first real product photo from those links (skip tiny badge icons).
  const productImg=(el:any)=>{const src=$(el).attr('src')||$(el).attr('data-src')||'';const u=secureUrl(src.startsWith('//')?'https:'+src:src.replace(/^http:\/\/(?=[^/]*(?:alicdn|aliexpress-media|media-amazon|ssl-images-amazon|temu|shein|ebayimg))/i,'https://'));const w=Number($(el).attr('width')||0);

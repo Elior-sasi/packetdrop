@@ -4,7 +4,7 @@ import {parseMessage,mergeParcels,type Message} from '@/lib/parcels';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
 // Subjects plus common shop/carrier senders and body phrases, so orders whose subject lacks a keyword are not missed.
-const QUERY='newer_than:180d -in:spam -in:trash -category:promotions -subject:פרסומת -from:wolt.com {'+[
+const QUERY='-in:spam -in:trash -category:promotions -subject:פרסומת -from:wolt.com {'+[
  'subject:order','subject:shipped','subject:shipment','subject:delivery','subject:delivered','subject:tracking','subject:package','subject:parcel','subject:dispatched',
  'subject:הזמנה','subject:הזמנתך','subject:משלוח','subject:חבילה','subject:איסוף','subject:נשלח','subject:נמסר',
  'from:aliexpress.com','from:amazon.com','from:temu.com','from:shein.com','from:ebay.com','from:iherb.com','from:israelpost.co.il','from:ups.com','from:dhl.com','from:fedex.com','from:cainiao.com','from:hfd.co.il','from:chita-il.com','from:tapuzdelivery.co.il','from:ksp.co.il','from:urbanica-wh.com',
@@ -13,7 +13,8 @@ const QUERY='newer_than:180d -in:spam -in:trash -category:promotions -subject:פ
 class GmailError extends Error{}
 export async function GET(req:NextRequest){try{
  const {accessToken}=await identity(req);const cursor=req.nextUrl.searchParams.get('cursor');if(cursor&&cursor.length>2048)return Response.json({error:'סמן סריקה לא תקין'},{status:400});
- const params=new URLSearchParams({maxResults:'40',q:QUERY});if(cursor)params.set('pageToken',cursor);
+ const since=req.nextUrl.searchParams.get('since');const window=since&&/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(since)?'after:'+since:'newer_than:180d';
+ const params=new URLSearchParams({maxResults:'50',q:window+' '+QUERY});if(cursor)params.set('pageToken',cursor);
  async function gmail(path:string,attempt=0):Promise<any>{const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{headers:{Authorization:'Bearer '+accessToken},cache:'no-store',signal:AbortSignal.timeout(18000)});
   if(r.ok)return r.json();
   const detail=await r.text().catch(()=>'');
