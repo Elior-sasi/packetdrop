@@ -134,7 +134,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {user&&view!=='account'&&progress&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
   {user&&view!=='account'&&!progress&&<p className="sub" role="status">{busy?'בודק את Gmail…':error?(!gmail||errorCode==='NO_GMAIL'?'קריאת Gmail לא אושרה':'הסריקה לא הושלמה'):data?ago(data.updated):'ממתין לסריקה'}</p>}
  </header>
- {user&&view!=='account'&&<div className="tiles" role="tablist" aria-label="סינון חבילות">{([['active','all','בדרך',active.length],['active','pickup','לאיסוף',pickup],['done','all','נמסרו',done.length]] as const).map(([key,f,label,n])=>{const on=view===key&&(key==='done'||filter===f);return <button key={label} role="tab" aria-selected={on} className={'tile'+(on?' on':'')+(f==='pickup'?' p':'')} onClick={()=>{setFilter(f);go(key);}}><b>{data?n:'–'}</b><span>{label}</span></button>;})}</div>}
+ {user&&view!=='account'&&data&&!busy&&<div className="tiles" role="tablist" aria-label="סינון חבילות">{([['active','all','בדרך',active.length],['active','pickup','לאיסוף',pickup],['done','all','נמסרו',done.length]] as const).map(([key,f,label,n])=>{const on=view===key&&(key==='done'||filter===f);return <button key={label} role="tab" aria-selected={on} className={'tile'+(on?' on':'')+(f==='pickup'?' p':'')} onClick={()=>{setFilter(f);go(key);}}><b>{data?n:'–'}</b><span>{label}</span></button>;})}</div>}
 
  {view==='account'?<div className="settings">
   <section className="set"><h3>תצוגה</h3>
