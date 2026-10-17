@@ -36,11 +36,18 @@ const STAGE_RULES:[number,RegExp][]=[
 const CANCEL=/is closed|בוטלה|ביטול ההזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי/i;
 function stageOf(s:string){for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
 
+// Final touch on any title: no dangling connector word, no lone fragment after the last comma.
+export function polishName(n:string){let t=n.trim();
+ for(let i=0;i<3;i++){const before=t;
+  t=t.replace(/(?:\s+(?:בסגנון|בעל|בעלת|עם|של|עבור|מתאים|מתאימה|לשימוש|חדש|חדשה|for|with|and|of|the|ל|ב|ו|מ|ה))+$/i,'').trim();
+  const m=t.match(/^(.{8,}?)[,،]\s*([^,،\s]+)$/);if(m&&m[2].length<=10)t=m[1].trim();
+  t=t.replace(/[\s,،\-–(]+$/,'');if(t===before)break;}
+ return t.length>=4?t:n.trim();}
 export function tidyName(raw:string){let n=raw.replace(/\s+x\d+$/i,'').trim();
  if(/(\.\.\.|…)\s*$/.test(n)){n=n.replace(/(\.\.\.|…)\s*$/,'').trim();const cut=n.replace(/[\s,،\-–(]+\S+$/,'').replace(/[\s,،\-–(]+$/,'').trim();if(cut.length>=8)n=cut;n=n.replace(/(?:\s+(?:עם|של|עבור|את|for|with|and|of|the|ל|ב|ו|מ))+$/i,'').trim();}
  // Store titles are keyword lists; keep the part before the second comma so the card reads like a name.
  if(n.length>42){const parts=n.split(/\s*[,،|]\s*/);let out=parts[0];for(const p of parts.slice(1)){if((out+', '+p).length>42)break;out+=', '+p;}n=out.length>=12?out:n.slice(0,42).replace(/\s+\S*$/,'');}
- return n;}
+ return polishName(n);}
 const MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
 // Keep only the date part of "arriving September 6 Elior - ..." and write it the Israeli way (6.9).
 export function etaOf(raw:string){const t=raw.trim();

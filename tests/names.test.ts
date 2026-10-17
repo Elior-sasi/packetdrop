@@ -1,7 +1,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {tidyName,etaOf} from '../lib/parcels';
 test('shop-truncated names lose the dots and the half word',()=>{
  assert.equal(tidyName('דפי כביסה לוכדי צבעים, בד לא ארוג, ט...'),'דפי כביסה לוכדי צבעים, בד לא ארוג');
- assert.equal(tidyName('כיסוי אוזניות מגנטי בסגנון חד...'),'כיסוי אוזניות מגנטי בסגנון');
+ assert.equal(tidyName('כיסוי אוזניות מגנטי בסגנון חד...'),'כיסוי אוזניות מגנטי');
  assert.equal(tidyName('בקבוק מים טריטן x1'),'בקבוק מים טריטן');
  assert.ok(tidyName('שקע חכם WiFi 16A שקע ישראל שקע חשמל חכם, שלט קולי, אלקסה, גוגל הום').length<=42);});
 test('arrival estimate keeps only the date',()=>{

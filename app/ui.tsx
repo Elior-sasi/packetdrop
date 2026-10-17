@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2} from 'lucide-react';
-import {mergeParcels,brandDomains,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
+import {mergeParcels,brandDomains,polishName,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean};
 type Geo=Record<string,{lat:number;lon:number}|null>;
@@ -17,11 +17,11 @@ const bidi=(t:string)=>t.replace(/[A-Za-z0-9][A-Za-z0-9 .\/()+&'"-]*[A-Za-z0-9)]
 // "Out for delivery" only means today; after a day without news the courier is just holding it.
 const lastAt=(p:Parcel)=>new Date(p.events.at(-1)?.time||0).getTime();
 const outToday=(p:Parcel)=>p.stage===3&&!p.cancelled&&!isPickup(p)&&new Date(lastAt(p)).toDateString()===new Date().toDateString();
-const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.got?'התקבלה':p.stale?'כנראה התקבלה':p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
+const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.got?'התקבלה':p.stale?'בלי עדכון מ־'+day(p.events.at(-1)?.time):p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
 const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|הזמנתך|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^(?:תודה|אישור (?:ה)?הזמנה|order confirm|thank you for your order|thanks for your order)/i.test(name)||/^\S*\d{8,}/.test(name);
-const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):p.name;
+const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):polishName(p.name);
 // Bump when mail parsing changes: mail from the last 180 days is then read again with the new rules.
 const PARSER=4;
 const keepOld=(list:MailParcel[])=>list.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()>175*864e5);
@@ -253,7 +253,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <Thumb p={open} big/>
   <div className="dt"><h2>{bidi(open.name)}</h2><Meta p={open}/></div>
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled&&<span className="eta">הגעה <b>{open.eta}</b></span>}</div>
-   {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':open.stage/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<open.stage?'d':i===open.stage?'c':'')}><span/>{s}</div>)}</div>}</section>
+   {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':open.stage/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<open.stage?'d':i===open.stage?'c':'')}><span/>{i===3&&open.stage>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
   {open.pickup&&open.stage<4&&!open.cancelled&&<section className="box pickup"><h3><MapPin size={18}/> נקודת איסוף</h3>
    {open.pickup.place&&<p className="place">{open.pickup.place}</p>}{open.pickup.address&&<p className="addr">{open.pickup.address}</p>}{open.pickup.hours&&<p className="addr">שעות: {open.pickup.hours}</p>}
    {open.pickup.code&&<button className="code" onClick={()=>copy(open.pickup!.code)} aria-label={'קוד איסוף '+open.pickup.code.split('').join(' ')+', העתקה'}><KeyRound size={20}/><span>קוד איסוף</span><b dir="ltr">{open.pickup.code}</b>{copied===open.pickup.code?' ✓':<Copy size={17}/>}</button>}
