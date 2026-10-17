@@ -12,7 +12,7 @@ const tone=(p:Parcel)=>p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test
 const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&p.carrierStatus==='OutForDelivery'?'יצאה למסירה':p.stage===3?(p.events.some(e=>/איסוף|pickup|collection/i.test(e.label))?'מוכנה לאיסוף':'במסירה'):STATUS[p.stage];
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
-const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|your order|order)(?=[\s:'׳]|$)/i.test(name)||/^\S*\d{8,}/.test(name);
+const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^\S*\d{8,}/.test(name);
 const displayName=(p:Parcel)=>isGeneric(p.name)?(p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):p.name;
 const when=(iso:string)=>{const d=new Date(iso);return d.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})+' · '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
 const ago=(iso:string)=>{const m=Math.round((Date.now()-new Date(iso).getTime())/60000);return m<1?'עודכן עכשיו':m<60?'עודכן לפני '+m+' דק׳':'עודכן ב־'+new Date(iso).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
@@ -92,7 +92,7 @@ export default function Dashboard({user,gmail,configured,login}:{user:User|null;
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled&&<span className="eta">הגעה <b>{open.eta}</b></span>}</div>
    {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':open.stage/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<open.stage?'d':i===open.stage?'c':'')}><span/>{s}</div>)}</div>}</section>
   {open.pickup&&open.stage<4&&!open.cancelled&&<section className="box pickup"><h3><MapPin size={18}/> נקודת איסוף</h3>
-   {open.pickup.place&&<p className="place">{open.pickup.place}</p>}{open.pickup.address&&<p className="addr">{open.pickup.address}</p>}
+   {open.pickup.place&&<p className="place">{open.pickup.place}</p>}{open.pickup.address&&<p className="addr">{open.pickup.address}</p>}{open.pickup.hours&&<p className="addr">שעות: {open.pickup.hours}</p>}
    {open.pickup.code&&<button className="code" onClick={()=>copy(open.pickup!.code)} aria-label={'קוד איסוף '+open.pickup.code.split('').join(' ')+', העתקה'}><KeyRound size={20}/><span>קוד איסוף</span><b dir="ltr">{open.pickup.code}</b>{copied===open.pickup.code?' ✓':<Copy size={17}/>}</button>}
    <div className="pickActions">{open.pickup.address&&<a className="ghost" href={'https://waze.com/ul?navigate=yes&q='+encodeURIComponent(open.pickup.place+' '+open.pickup.address)} target="_blank" rel="noopener noreferrer"><Navigation size={18}/> ניווט</a>}
     {open.pickup.url&&<a className="ghost" href={open.pickup.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/> שעות פתיחה</a>}</div></section>}
