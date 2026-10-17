@@ -7,8 +7,28 @@ export const STATUS_STAGE:Record<string,number>={InfoReceived:1,InTransit:2,Avai
 export const STATUS_HE:Record<string,string>={InfoReceived:'פרטי המשלוח נקלטו',InTransit:'בדרך',AvailableForPickup:'מוכנה לאיסוף',OutForDelivery:'יצאה למסירה',Delivered:'נמסרה',DeliveryFailure:'המסירה נכשלה',Exception:'בעיה במשלוח',Expired:'אין עדכונים זמן רב',NotFound:'עדיין אין מידע מחברת השילוח'};
 type Raw={number:string;track_info?:{latest_status?:{status?:string};time_metrics?:{estimated_delivery_date?:{from?:string|null;to?:string|null}};tracking?:{providers?:{provider?:{name?:string};events?:{time_iso?:string;time_utc?:string;description?:string;description_translation?:{description?:string}|null;location?:string|null}[]}[]}}};
 async function call(path:string,body:unknown,key:string){const r=await fetch(BASE+path,{method:'POST',headers:{'17token':key,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('TRACK_HTTP_'+r.status);return r.json();}
+// Carrier events usually arrive in English; common phrasings are translated here (no translation quota, no outside service).
+const HE:[RegExp,string][]=[
+ [/delivery (?:attempt|failed|unsuccessful)|unable to deliver|failed (?:delivery )?attempt|addressee not available/i,'ניסיון מסירה לא הצליח'],
+ [/return(?:ed)? to (?:sender|shipper)|being returned/i,'החבילה מוחזרת לשולח'],
+ [/\bdelivered\b|delivery completed|signed (?:for|by)/i,'נמסרה'],
+ [/out for delivery|with (?:the )?(?:courier|driver)|on (?:its|the) way to (?:you|recipient)/i,'יצאה למסירה'],
+ [/(?:available|ready|awaiting) (?:for )?(?:pick ?up|collection)|arrived at (?:the )?(?:pick ?up|collection|parcel) (?:point|locker|station)|at pick-?up point/i,'מוכנה לאיסוף'],
+ [/(?:released|cleared) (?:from|by) customs|customs clearance (?:completed|finished|successful)/i,'שוחררה מהמכס'],
+ [/customs|import clearance/i,'בתהליך שחרור מהמכס'],
+ [/(?:arrived|arrival) (?:at|in) (?:the )?destination (?:country|region)|arrived in (?:the )?(?:destination|israel)|inbound (?:in|into) (?:country|destination)/i,'הגיעה לארץ היעד'],
+ [/(?:flight|airline) (?:arrived|landed)|arrived at (?:the )?(?:destination )?airport/i,'נחתה בארץ היעד'],
+ [/(?:flight|airline) departed|handed (?:over )?to (?:the )?airline|departed (?:from )?(?:the )?airport|export (?:customs )?clear/i,'יצאה בטיסה'],
+ [/(?:left|departed|departure from) (?:the )?(?:origin|country of origin|warehouse|sorting|facility|hub)|leaving (?:the )?origin/i,'יצאה ממרכז המיון'],
+ [/(?:arrived|arrival) at (?:the )?(?:sorting|processing|distribution|transit)? ?(?:center|centre|facility|hub|warehouse)|processed at|sorting (?:center|centre)/i,'הגיעה למרכז מיון'],
+ [/received by (?:the )?(?:local|last.?mile|domestic|delivery)(?: delivery| shipping)? (?:carrier|company|courier|partner)|handed (?:over )?to (?:the )?(?:local|last.?mile|delivery)/i,'הועברה לחברת המסירה המקומית'],
+ [/received by|accepted by|picked up by|collected by|pick-?up (?:completed|successful)|parcel (?:collected|picked up)/i,'נאספה על ידי חברת השילוח'],
+ [/shipping (?:information|info) received|electronic (?:information|notification)|order information received|label (?:created|printed)|shipment information|pre-?advice/i,'פרטי המשלוח נקלטו אצל חברת השילוח'],
+ [/in transit|on the way|in progress/i,'בדרך'],
+];
+export function heEvent(text:string){if(!text||/[֐-׿]/.test(text))return text;for(const [r,he] of HE)if(r.test(text))return he;return text;}
 export function toInfo(a:Raw):TrackInfo{const t=a.track_info||{};const status=t.latest_status?.status||'NotFound';const providers=t.tracking?.providers||[];
- const events=providers.flatMap(p=>(p.events||[]).map(e=>({time:e.time_utc||e.time_iso||'',text:(e.description_translation?.description||e.description||'').trim(),location:(e.location||'').trim()}))).filter(e=>e.time&&e.text);
+ const events=providers.flatMap(p=>(p.events||[]).map(e=>({time:e.time_utc||e.time_iso||'',text:heEvent((e.description_translation?.description||e.description||'').trim()),location:(e.location||'').trim()}))).filter(e=>e.time&&e.text);
  const seen=new Set<string>();const uniq=events.filter(e=>{const k=e.time+e.text;if(seen.has(k))return false;seen.add(k);return true;}).sort((x,y)=>x.time.localeCompare(y.time));
  const ed=t.time_metrics?.estimated_delivery_date;
  return {number:a.number,status,stage:STATUS_STAGE[status]??-1,carrier:providers.at(-1)?.provider?.name||'',eta:ed&&(ed.from||ed.to)?{from:ed.from||undefined,to:ed.to||undefined}:null,events:uniq.slice(-40),pending:!t.latest_status};}
