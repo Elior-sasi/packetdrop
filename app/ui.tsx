@@ -86,7 +86,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
- useEffect(()=>{document.body.style.overflow=openId?'hidden':'';},[openId]);
+ // While a sheet or menu is open the page behind it must not scroll (iOS needs the body pinned in place).
+ const locked=!!(openId||menu||adding);
+ useEffect(()=>{if(!locked)return;const y=window.scrollY;const b=document.body.style;b.position='fixed';b.top=-y+'px';b.left='0';b.right='0';b.overflow='hidden';
+  return()=>{b.position='';b.top='';b.left='';b.right='';b.overflow='';window.scrollTo(0,y);};},[locked]);
  // Refresh again whenever the app comes back to the screen (iPhone keeps home-screen apps alive in the background).
  // A home-screen app can stay open for days; when a newer version is live, reload once to pick it up.
  useEffect(()=>{const mine=process.env.NEXT_PUBLIC_BUILD;if(!mine)return;const check=()=>{if(document.visibilityState!=='visible')return;fetch('/api/version',{cache:'no-store'}).then(r=>r.json()).then(d=>{if(d.build&&d.build!==mine)location.reload();}).catch(()=>{});};check();document.addEventListener('visibilitychange',check);return()=>document.removeEventListener('visibilitychange',check);},[]);

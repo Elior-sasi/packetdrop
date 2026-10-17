@@ -174,3 +174,4 @@ nav.none:before{opacity:0}
 .statsWrap .box{margin:0}
 nav button span.ni{overflow:visible;max-width:none}
 .addForm .primary:disabled,.addForm .primary[disabled]{opacity:.45;color:#05182b;background:#4aa8ff}
+.menuWrap,.sheet{overscroll-behavior:contain}.menuWrap{touch-action:none}.menu{touch-action:auto}
