@@ -1,0 +1,14 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {diff} from '../lib/notify';
+import type {Parcel} from '../lib/parcels';
+const now=Date.parse('2026-10-18T10:00:00Z');const t=(d:number)=>new Date(now-d*864e5).toISOString();
+const P=(o:Partial<Parcel>):Parcel=>({id:'a',keys:['order:1'],name:'שקע חכם',shop:'AliExpress',carrier:'',image:'',url:'',tracking:'',order:'1',eta:'',stage:1,cancelled:false,pickup:null,events:[{id:'m1',label:'נשלחה',time:t(1)}],...o});
+test('new order',()=>{const r=diff({parcels:[],stuck:[]},[P({stage:0})],now);assert.equal(r.notes[0].kind,'new');});
+test('pickup with code',()=>{const r=diff({parcels:[P({})],stuck:[]},[P({stage:3,pickup:{place:'סופר יודה',address:'',code:'4821',url:''},events:[{id:'m2',label:'ממתינה לאיסוף',time:t(0)}]})],now);
+ assert.equal(r.notes[0].kind,'pickup');assert.match(r.notes[0].title,/סופר יודה/);assert.match(r.notes[0].body,/4821/);});
+test('out for delivery',()=>{const r=diff({parcels:[P({stage:2})],stuck:[]},[P({stage:3,events:[{id:'m3',label:'יצאה למסירה',time:t(0)}]})],now);assert.equal(r.notes[0].kind,'out');});
+test('delivered',()=>{const r=diff({parcels:[P({stage:3})],stuck:[]},[P({stage:4,events:[{id:'m4',label:'נמסרה',time:t(0)}]})],now);assert.equal(r.notes[0].kind,'delivered');});
+test('no repeat',()=>{const p=P({stage:3,events:[{id:'m3',label:'יצאה למסירה',time:t(0)}]});assert.equal(diff({parcels:[p],stuck:[]},[p],now).notes.length,0);});
+test('stuck once',()=>{const p=P({events:[{id:'m1',label:'נשלחה',time:t(12)}]});const r=diff({parcels:[p],stuck:[]},[p],now);assert.equal(r.notes[0].kind,'stuck');
+ assert.equal(diff({parcels:[p],stuck:r.stuck},[p],now).notes.length,0);});
+test('old mail not announced',()=>{assert.equal(diff({parcels:[],stuck:[]},[P({stage:4,events:[{id:'x',label:'נמסרה',time:t(40)}]})],now).notes.length,0);});

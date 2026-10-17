@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {signOut} from 'next-auth/react';
-import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload} from 'lucide-react';
+import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell} from 'lucide-react';
 import {mergeParcels,brandDomains,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean};
@@ -33,7 +33,7 @@ const domainOf=(name:string)=>brandDomains[name]||(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/
 // Same white Google sign-in button as TAB: official four-colour G, dark label, white pill.
 function GoogleButton({label,disabled}:{label:string;disabled?:boolean}){return <button className="gbtn" disabled={disabled}><svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg><span>{label}</span></button>;}
 function Favicon({name,size=18}:{name:string;size?:number}){const [failed,setFailed]=useState(false);const d=domainOf(name);if(!d||failed)return null;return <img className="fav" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=64'} alt="" width={size} height={size} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>;}
-function Mark({cls}:{cls?:string}){return <svg className={cls} viewBox="100 76 312 386" aria-hidden="true"><defs><linearGradient id="ug" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug)" strokeWidth="58" strokeLinecap="round"/><rect className="lid" x="112" y="112" width="288" height="48" rx="16" fill="#4aa8ff" transform="rotate(-10 112 160)"/></svg>;}
+function Mark({cls}:{cls?:string}){return <svg className={cls} viewBox="100 76 312 386" aria-hidden="true"><defs><linearGradient id="ug" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug)" strokeWidth="58" strokeLinecap="round"/><g className="lid"><rect x="112" y="112" width="288" height="48" rx="16" fill="#4aa8ff" transform="rotate(-10 112 160)"/></g></svg>;}
 function Thumb({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop);
  return <div className={big?'hero':'thumb'}>{p.image&&!failed?<>{big&&<img className="backdrop" src={p.image} alt="" aria-hidden="true" referrerPolicy="no-referrer"/>}<img className="photo" src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
 function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop}/><span dir="auto">{p.shop}</span>{p.carrier&&<><span className="sep">·</span><span dir="auto">{p.carrier}</span></>}</div>;}
@@ -59,7 +59,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
      if(!r2.ok){if(['NO_GMAIL','RECONNECT','UNAUTHORIZED','GMAIL_API_DISABLED'].includes(d2.code)){setErrorCode(d2.code);throw Error(d2.error);}failed+=ch.length;done+=ch.length;step();continue;}
      for(const id of d2.read as string[])seen.current.add(id);failed+=(d2.failed as string[]).length;done+=ch.length;acc={...acc,scanned:acc.scanned+(d2.read as string[]).length,failed,parcels:mergeParcels([...acc.parcels,...d2.parcels])};saved.current=acc.parcels;setData(acc);step();}};
    await Promise.all([worker(),worker(),worker(),worker()]);acc={...acc,updated:new Date().toISOString()};setData(acc);
-   if(!c.signal.aborted){setProgress({pct:92,label:'בודק מול חברות השילוח…'});await loadTracks(acc.parcels);setProgress({pct:96,label:'שומר גיבוי בענן…'});await saveBackup(acc.parcels);setProgress({pct:100,label:'הסתיים'});}
+   if(!c.signal.aborted){setProgress({pct:92,label:'בודק מול חברות השילוח…'});await loadTracks(acc.parcels);setProgress({pct:96,label:'שומר גיבוי בענן…'});await saveBackup(acc.parcels);if(pushOn.current)void pushPost({parcels:acc.parcels}).catch(()=>{});setProgress({pct:100,label:'הסתיים'});}
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
@@ -95,6 +95,23 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4||p.cancelled);
  const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(p=>p.stage===3):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  const pickup=active.filter(p=>p.stage===3).length;const open=parcels.find(p=>p.id===openId)||null;
+ // Phone notifications (Web Push through the service worker).
+ const [push,setPush]=useState<'checking'|'install'|'unsupported'|'nodb'|'denied'|'off'|'on'|'busy'>('checking'),[pushMsg,setPushMsg]=useState('');const pushKey=useRef('');const pushOn=useRef(false);pushOn.current=push==='on';
+ useEffect(()=>{if(!user)return;void (async()=>{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=matchMedia('(display-mode: standalone)').matches||(navigator as {standalone?:boolean}).standalone===true;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){setPush(ios&&!standalone?'install':'unsupported');return;}
+  try{const reg=await navigator.serviceWorker.register('/sw.js');const s=await fetch('/api/push',{cache:'no-store'}).then(r=>r.json()).catch(()=>({enabled:false}));pushKey.current=s.publicKey||'';
+   if(!s.enabled){setPush('nodb');return;}if(Notification.permission==='denied'){setPush('denied');return;}
+   const sub=await reg.pushManager.getSubscription();setPush(sub&&Notification.permission==='granted'?'on':'off');}catch{setPush('unsupported');}})();},[user?.id]);
+ async function pushPost(b:object){const r=await fetch('/api/push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'הפעולה נכשלה');return d;}
+ async function enablePush(){setPushMsg('');const perm=await Notification.requestPermission();if(perm!=='granted'){setPush(perm==='denied'?'denied':'off');return;}setPush('busy');
+  try{const reg=await navigator.serviceWorker.ready;const key=Uint8Array.from(atob(pushKey.current.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+   const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+   await pushPost({subscription:sub.toJSON(),parcels:saved.current});setPush('on');}catch(e){setPush('off');setPushMsg(e instanceof Error?e.message:'לא ניתן להפעיל התראות');}}
+ async function disablePush(){setPush('busy');setPushMsg('');try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(sub){await pushPost({remove:sub.endpoint}).catch(()=>{});await sub.unsubscribe();}}finally{setPush('off');}}
+ async function testPush(){setPushMsg('');try{await pushPost({test:true});setPushMsg('נשלחה התראת בדיקה.');}catch(e){setPushMsg(e instanceof Error?e.message:'השליחה נכשלה');}}
+ // Opening a notification lands on that parcel.
+ const want=useRef<string|null>(null);useEffect(()=>{try{want.current=new URLSearchParams(location.search).get('p');}catch{}},[]);
+ useEffect(()=>{const id=want.current;if(id&&data?.parcels.some(p=>p.id===id)){want.current=null;setOpenId(id);history.replaceState(null,'','/');}},[data]);
  const go=(v:typeof view)=>{setView(v);setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
 
  return <main className={['app','app large','app xlarge'][size]}>
@@ -120,10 +137,18 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {backup.state==='off'?<><p className="setNote">החבילות והשמות שערכת יישמרו בתיקייה נסתרת ב־Google Drive שלך, ויחזרו בכל מכשיר.</p><form action={login}><GoogleButton label="הפעל גיבוי עם Google" disabled={!configured}/></form></>
    :<><p className="setNote">{backup.msg||('נשמר בתיקייה נסתרת ב־Google Drive שלך.'+(backup.updated?' גיבוי אחרון: '+new Date(backup.updated).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''))}</p>
     <button className="ghost" disabled={backup.state==='saving'||busy} onClick={()=>saveBackup(data?.parcels||[])}><CloudUpload size={18}/> גבה עכשיו</button></>}</section>}
+  {user&&<section className="set"><div className="row"><h3><Bell size={20}/> התראות</h3><span className={'bstate '+(push==='on'?'on':'off')}>{push==='on'?'פעיל ✓':push==='busy'||push==='checking'?'…':'כבוי'}</span></div>
+   <p className="setNote">מוכנה לאיסוף עם הקוד, יצאה למסירה, נמסרה, הזמנה חדשה, וחבילה בלי עדכון 10 ימים. נבדק כל חצי שעה בערך, גם כשהאפליקציה סגורה.</p>
+   {push==='install'?<p className="setNote">באייפון התראות עובדות רק מהאפליקציה במסך הבית. פתח את Unbox מהאייקון ונסה שוב.</p>
+   :push==='unsupported'?<p className="setNote">המכשיר או הדפדפן לא תומכים בהתראות.</p>
+   :push==='nodb'?<p className="setNote">ההתראות עוד לא הוגדרו בשרת.</p>
+   :push==='denied'?<p className="setNote">ההתראות חסומות. אפשר לאפשר ב: הגדרות האייפון ← התראות ← Unbox.</p>
+   :push==='on'?<><button className="ghost" onClick={testPush}><Bell size={18}/> שלח התראת בדיקה</button><button className="ghost" onClick={disablePush}>כבה התראות</button></>
+   :<button className="primary wide" disabled={push!=='off'} onClick={enablePush}><Bell size={18}/> הפעל התראות</button>}
+   {pushMsg&&<p className="setNote" role="status">{pushMsg}</p>}</section>}
   <section className="set"><h3>חשבון</h3>
    {user?<><div className="setRow"><span>{user.name||'Google'}</span></div><p className="setNote mono" dir="ltr">{user.email}</p>
     <p className="setNote">קריאה בלבד מ־Gmail. תוכן המיילים לא נשמר.</p>
-    <form action={login}><button className="ghost" disabled={!configured}>חידוש הרשאת Google</button></form>
     <button className="ghost" onClick={()=>signOut({callbackUrl:'/'})}>יציאה מהחשבון</button></>
    :<form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form>}</section>
   <section className="set"><h3>אודות</h3>

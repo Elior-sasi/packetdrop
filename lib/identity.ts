@@ -23,3 +23,11 @@ export async function driveIdentity(req:NextRequest){
  if(!String(token.scope||'').includes('drive.appdata'))throw new Error('NO_DRIVE');
  return {id:String(token.googleId),accessToken:await fresh(token)};
 }
+// Notifications run while the app is closed, so they need the long-lived Google refresh token.
+export async function pushIdentity(req:NextRequest){
+ const token=await load(req);
+ if(!String(token.scope||'gmail.readonly').includes('gmail.readonly'))throw new Error('NO_GMAIL');
+ if(!token.refreshToken)throw new Error('RECONNECT');
+ return {id:String(token.googleId),email:String(token.email||''),refreshToken:String(token.refreshToken)};
+}
+export {fresh as freshAccess};
