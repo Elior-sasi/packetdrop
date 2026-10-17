@@ -175,3 +175,4 @@ nav.none:before{opacity:0}
 nav button span.ni{overflow:visible;max-width:none}
 .addForm .primary:disabled,.addForm .primary[disabled]{opacity:.45;color:#05182b;background:#4aa8ff}
 .menuWrap,.sheet{overscroll-behavior:contain}.menuWrap{touch-action:none}.menu{touch-action:auto}
+html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webkit-scrollbar,body::-webkit-scrollbar,.sheet::-webkit-scrollbar,.menu::-webkit-scrollbar,*::-webkit-scrollbar{display:none;width:0;height:0}
