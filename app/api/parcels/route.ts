@@ -14,17 +14,18 @@ class GmailError extends Error{}
 export async function GET(req:NextRequest){try{
  const {accessToken}=await identity(req);const cursor=req.nextUrl.searchParams.get('cursor');if(cursor&&cursor.length>2048)return Response.json({error:'סמן סריקה לא תקין'},{status:400});
  const params=new URLSearchParams({maxResults:'40',q:QUERY});if(cursor)params.set('pageToken',cursor);
- async function gmail(path:string){const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{headers:{Authorization:'Bearer '+accessToken},cache:'no-store',signal:AbortSignal.timeout(18000)});
+ async function gmail(path:string,attempt=0):Promise<any>{const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{headers:{Authorization:'Bearer '+accessToken},cache:'no-store',signal:AbortSignal.timeout(18000)});
   if(r.ok)return r.json();
   const detail=await r.text().catch(()=>'');
   if(r.status===403&&/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(detail))throw new GmailError('GMAIL_API_DISABLED');
   if(r.status===403&&/insufficient|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(detail))throw new GmailError('NO_GMAIL');
   if(r.status===401)throw new GmailError('RECONNECT');
+  if((r.status===429||(r.status===403&&/rateLimitExceeded|userRateLimitExceeded/i.test(detail)))&&attempt<3){await new Promise(res=>setTimeout(res,600*2**attempt));return gmail(path,attempt+1);}
   if(r.status===429)throw new GmailError('RATE');
   throw new GmailError('GMAIL');}
  const list=await gmail('messages?'+params);const ids:{id:string}[]=list.messages||[];const messages:Message[]=[];let failed=0;
  // Bounded concurrency; one broken message does not fail the whole scan.
- for(let i=0;i<ids.length;i+=8){const got=await Promise.allSettled(ids.slice(i,i+8).map(m=>gmail('messages/'+encodeURIComponent(m.id)+'?format=full')));for(const g of got){if(g.status==='fulfilled')messages.push(g.value);else{if(g.reason instanceof GmailError&&g.reason.message!=='GMAIL')throw g.reason;failed++;}}}
+ for(let i=0;i<ids.length;i+=5){const got=await Promise.allSettled(ids.slice(i,i+5).map(m=>gmail('messages/'+encodeURIComponent(m.id)+'?format=full')));for(const g of got){if(g.status==='fulfilled')messages.push(g.value);else{if(g.reason instanceof GmailError&&!['GMAIL','RATE'].includes(g.reason.message))throw g.reason;failed++;}}}
  const parcels=mergeParcels(messages.map(parseMessage).filter((p):p is NonNullable<typeof p>=>!!p));
  return Response.json({parcels,nextCursor:list.nextPageToken,scanned:messages.length,failed,updated:new Date().toISOString()},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){const code=e instanceof Error?e.message:'';
