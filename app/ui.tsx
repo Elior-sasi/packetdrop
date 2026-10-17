@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {signOut} from 'next-auth/react';
-import {Package,CheckCircle2,UserRound,RefreshCw,Type,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload} from 'lucide-react';
+import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload} from 'lucide-react';
 import {mergeParcels,brandDomains,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean};
@@ -40,10 +40,13 @@ function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
 
 export default function Dashboard({user,gmail,drive,configured,login}:{user:User|null;gmail:boolean;drive?:boolean;configured:boolean;login:()=>Promise<void>}){
- const [view,setView]=useState<'active'|'done'|'account'>('active'),[large,setLarge]=useState(false),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[filter,setFilter]=useState<'all'|'pickup'>('all'),[backup,setBackup]=useState<{state:'off'|'on'|'error'|'saving';updated?:string;msg?:string}>({state:drive?'on':'off'}),saved=useRef<MailParcel[]>([]),backupOn=useRef(!!drive),seen=useRef<Set<string>>(new Set()),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off');
+ const [view,setView]=useState<'active'|'done'|'account'>('active'),[size,setSize]=useState(0),[auto,setAuto]=useState(true),[splash,setSplash]=useState<'on'|'out'|'off'>('on'),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[filter,setFilter]=useState<'all'|'pickup'>('all'),[backup,setBackup]=useState<{state:'off'|'on'|'error'|'saving';updated?:string;msg?:string}>({state:drive?'on':'off'}),saved=useRef<MailParcel[]>([]),backupOn=useRef(!!drive),seen=useRef<Set<string>>(new Set()),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off');
  const controller=useRef<AbortController|null>(null);const dialog=useRef<HTMLDialogElement>(null);
- useEffect(()=>{try{setLarge(localStorage.getItem('pd_large')==='1');}catch{}},[]);
- useEffect(()=>{try{localStorage.setItem('pd_large',large?'1':'0');}catch{}},[large]);
+ useEffect(()=>{try{const v=localStorage.getItem('pd_size');setSize(v?Math.min(2,+v||0):localStorage.getItem('pd_large')==='1'?1:0);setAuto(localStorage.getItem('pd_auto')!=='0');}catch{}},[]);
+ const setPref=(k:string,v:string)=>{try{localStorage.setItem(k,v);}catch{}};
+ const autoRef=useRef(true);autoRef.current=auto;
+ // Opening screen: shown on launch, then fades out.
+ useEffect(()=>{const a=setTimeout(()=>setSplash('out'),1400),b=setTimeout(()=>setSplash('off'),1800);return()=>{clearTimeout(a);clearTimeout(b);};},[]);
  async function sync(){if(!user||controller.current)return;lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   try{const r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});const d=await r.json();if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
@@ -63,7 +66,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  useEffect(()=>{document.body.style.overflow=openId?'hidden':'';},[openId]);
  // Refresh again whenever the app comes back to the screen (iPhone keeps home-screen apps alive in the background).
  const lastSync=useRef(0);const syncRef=useRef(sync);syncRef.current=sync;
- useEffect(()=>{if(!user)return;const onShow=()=>{if(document.visibilityState==='visible'&&Date.now()-lastSync.current>60000)void syncRef.current();};document.addEventListener('visibilitychange',onShow);window.addEventListener('pageshow',onShow);return()=>{document.removeEventListener('visibilitychange',onShow);window.removeEventListener('pageshow',onShow);};},[user?.id]);
+ useEffect(()=>{if(!user)return;const onShow=()=>{if(autoRef.current&&document.visibilityState==='visible'&&Date.now()-lastSync.current>60000)void syncRef.current();};document.addEventListener('visibilitychange',onShow);window.addEventListener('pageshow',onShow);return()=>{document.removeEventListener('visibilitychange',onShow);window.removeEventListener('pageshow',onShow);};},[user?.id]);
  // Pull down at the top of the list to refresh.
  const [pull,setPull]=useState(0);const pullStart=useRef<number|null>(null);const pullRef=useRef(0);
  useEffect(()=>{if(!user)return;const PULL=80;
@@ -94,37 +97,47 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const pickup=active.filter(p=>p.stage===3).length;const open=parcels.find(p=>p.id===openId)||null;
  const go=(v:typeof view)=>{setView(v);setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
 
- return <main className={large?'app large':'app'}>
+ return <main className={['app','app large','app xlarge'][size]}>
+ {splash!=='off'&&<div className={'splash'+(splash==='out'?' out':'')} aria-hidden="true"><Mark cls="smark"/><div className="sname" dir="ltr">Unbox</div></div>}
  {user&&pull>0&&view!=='account'&&<div className={'ptr'+(pull>=80?' ready':'')} style={{transform:'translate(-50%,'+Math.max(0,pull-46)+'px)',opacity:Math.min(1,pull/80)}} aria-hidden="true"><RefreshCw style={{transform:'rotate('+pull*3+'deg)'}}/></div>}
  <header className="top">
   <div className="row"><span className="brand" dir="ltr" aria-label="Unbox"><Mark/><span aria-hidden="true">nbox</span></span>
-   <div className="actions"><button className="ib" aria-label="הגדלת טקסט" aria-pressed={large} onClick={()=>setLarge(!large)}><Type/></button></div></div>
-  <h1>{view==='account'?'החשבון':view==='done'?'נמסרו':'החבילות שלי'}</h1>
+</div>
+  <h1>{view==='account'?'הגדרות':view==='done'?'נמסרו':'החבילות שלי'}</h1>
   {user&&view!=='account'&&progress&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
   {user&&view!=='account'&&!progress&&<p className="sub" role="status">{busy?'בודק את Gmail…':error?(!gmail||errorCode==='NO_GMAIL'?'קריאת Gmail לא אושרה':'הסריקה לא הושלמה'):data?ago(data.updated):'ממתין לסריקה'}</p>}
  </header>
 
- {view==='account'?<section className="panel account">
-  <h2>{user?.name||'ברוך הבא'}</h2>{user&&<p className="mono" dir="ltr">{user.email}</p>}
-  <p>הכניסה וקריאת עדכוני המשלוח נעשות דרך Google, בהרשאת קריאה בלבד.</p>
-  <p>תוכן המיילים לא נשמר. בגיבוי נשמרים רק פרטי החבילות שזוהו ושמות שערכת.</p>
-  {user&&<div className="backupCard"><div className="row"><h3><Cloud size={22}/> גיבוי בענן</h3><span className={'bstate '+backup.state}>{backup.state==='on'?'פעיל ✓':backup.state==='saving'?'שומר…':backup.state==='error'?'שגיאה':'כבוי'}</span></div>
-   {backup.state==='off'?<><p>החבילות והשמות שערכת יישמרו בתיקייה נסתרת ב־Google Drive שלך. כך הם יחזרו בכל מכשיר, גם אחרי שמיילים נמחקים.</p><form action={login}><GoogleButton label="הפעל גיבוי עם Google" disabled={!configured}/></form></>
-   :<><p>{backup.msg||('נשמר ב־Google Drive שלך, בתיקייה נסתרת שרק Unbox רואה.'+(backup.updated?' גיבוי אחרון: '+new Date(backup.updated).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''))}</p>
-    <button className="ghost" disabled={backup.state==='saving'||busy} onClick={()=>saveBackup(data?.parcels||[])}><CloudUpload size={18}/> גבה עכשיו</button></>}</div>}
-  {user?<button className="ghost" onClick={()=>signOut({callbackUrl:'/'})}>יציאה מהחשבון</button>:<form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form>}
-  {user&&<form action={login}><button className="textBtn" disabled={!configured}>חידוש הרשאת Google</button></form>}
-  <p className="hint">להתקנה: Safari ← שיתוף ← הוספה למסך הבית.</p>
-  <p className="hint"><a href="/privacy">מדיניות פרטיות</a></p>
- </section>:<>
+ {view==='account'?<div className="settings">
+  <section className="set"><h3>תצוגה</h3>
+   <div className="setRow"><span>גודל טקסט</span></div>
+   <div className="seg" role="radiogroup" aria-label="גודל טקסט">{['רגיל','גדול','גדול מאוד'].map((l,i)=><button key={i} role="radio" aria-checked={size===i} className={size===i?'on':''} onClick={()=>{setSize(i);setPref('pd_size',String(i));}}>{l}</button>)}</div></section>
+  {user&&<section className="set"><h3>סנכרון</h3>
+   <label className="setRow"><span>רענון אוטומטי בכל כניסה</span><input type="checkbox" className="sw" checked={auto} onChange={e=>{setAuto(e.target.checked);setPref('pd_auto',e.target.checked?'1':'0');}}/></label>
+   <p className="setNote">{data?ago(data.updated):'עדיין לא נסרק'}. אפשר גם למשוך את הרשימה למטה.</p>
+   <button className="ghost" disabled={busy} onClick={()=>{seen.current=new Set();saved.current=[];setData(null);go('active');void sync();}}><RefreshCw size={18}/> סריקה מחדש של כל המיילים</button></section>}
+  {user&&<section className="set backupCard"><div className="row"><h3><Cloud size={20}/> גיבוי בענן</h3><span className={'bstate '+backup.state}>{backup.state==='on'?'פעיל ✓':backup.state==='saving'?'שומר…':backup.state==='error'?'שגיאה':'כבוי'}</span></div>
+   {backup.state==='off'?<><p className="setNote">החבילות והשמות שערכת יישמרו בתיקייה נסתרת ב־Google Drive שלך, ויחזרו בכל מכשיר.</p><form action={login}><GoogleButton label="הפעל גיבוי עם Google" disabled={!configured}/></form></>
+   :<><p className="setNote">{backup.msg||('נשמר בתיקייה נסתרת ב־Google Drive שלך.'+(backup.updated?' גיבוי אחרון: '+new Date(backup.updated).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''))}</p>
+    <button className="ghost" disabled={backup.state==='saving'||busy} onClick={()=>saveBackup(data?.parcels||[])}><CloudUpload size={18}/> גבה עכשיו</button></>}</section>}
+  <section className="set"><h3>חשבון</h3>
+   {user?<><div className="setRow"><span>{user.name||'Google'}</span></div><p className="setNote mono" dir="ltr">{user.email}</p>
+    <p className="setNote">קריאה בלבד מ־Gmail. תוכן המיילים לא נשמר.</p>
+    <form action={login}><button className="ghost" disabled={!configured}>חידוש הרשאת Google</button></form>
+    <button className="ghost" onClick={()=>signOut({callbackUrl:'/'})}>יציאה מהחשבון</button></>
+   :<form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form>}</section>
+  <section className="set"><h3>אודות</h3>
+   <p className="setNote">להתקנה: Safari ← שיתוף ← הוספה למסך הבית.</p>
+   <p className="setNote"><a href="/privacy">מדיניות פרטיות</a></p></section>
+ </div>:<>
   {!configured&&<section className="notice"><h2>Unbox מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
-   {busy&&<div className="loader" role="status"><Mark cls="lmark"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p></div>}
+   {(busy||(!data&&!error))&&<div className="loader" role="status"><Mark cls="lmark"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p></div>}
    {data&&!busy&&<div className="chips" role="tablist" aria-label="סינון חבילות">
     <button role="tab" aria-selected={view==='active'&&filter==='all'} className={'chip'+(view==='active'&&filter==='all'?' on':'')} onClick={()=>{setFilter('all');go('active');}}>בדרך <b>{active.length}</b></button>
     {pickup>0&&<button role="tab" aria-selected={view==='active'&&filter==='pickup'} className={'chip warn'+(view==='active'&&filter==='pickup'?' on':'')} onClick={()=>{setFilter('pickup');go('active');}}>לאיסוף <b>{pickup}</b></button>}
     <button role="tab" aria-selected={view==='done'} className={'chip'+(view==='done'?' on':'')} onClick={()=>{setFilter('all');go('done');}}>נמסרו <b>{done.length}</b></button></div>}
-   {!busy&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+   {!(busy||(!data&&!error))&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
    {error&&<div className="error" role="alert"><span>{error}</span>{['NO_GMAIL','RECONNECT','UNAUTHORIZED'].includes(errorCode)?<form action={login}><button className="primary">חידוש הרשאת Google</button></form>:<button className="ghost" onClick={()=>sync()}>נסה שוב</button>}</div>}
    <div className="list">{shown.map(p=><button key={p.id} className={'card '+(p.stage===3&&!p.cancelled?'focus':'')} onClick={()=>setOpenId(p.id)} aria-label={p.name+', '+statusText(p)}>
     <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{p.name}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span>{p.stage===3&&p.pickup?.place&&!p.cancelled?<span className="eta">איסוף ב<b>{p.pickup.place}</b></span>:p.eta&&!p.cancelled&&<span className="eta">הגעה <b>{p.eta}</b></span>}</div></div></div>
@@ -156,7 +169,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   </section>}
  </div>}
 
- {!open&&<nav aria-label="ניווט ראשי" style={{'--tab':view==='account'?2:view==='done'?1:0} as React.CSSProperties}>{([['active','החבילות',Package],['done','נמסרו',CheckCircle2],['account','החשבון',UserRound]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'selected':''} aria-current={view===key?'page':undefined} onClick={()=>{setFilter('all');go(key);}}><Icon size={20}/><span>{label}</span></button>)}</nav>}
+ {!open&&<nav aria-label="ניווט ראשי" style={{'--tab':view==='account'?2:view==='done'?1:0} as React.CSSProperties}>{([['active','החבילות',Package],['done','נמסרו',CheckCircle2],['account','הגדרות',Settings]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'selected':''} aria-current={view===key?'page':undefined} onClick={()=>{setFilter('all');go(key);}}><Icon size={20}/><span>{label}</span></button>)}</nav>}
  <dialog ref={dialog} onCancel={e=>{e.preventDefault();if(!saving)setEdit(null);}} onClose={()=>setEdit(null)}><form onSubmit={e=>{e.preventDefault();void save();}}><h2>שם החבילה</h2><label htmlFor="title" className="sr">שם החבילה</label><input id="title" autoFocus maxLength={180} value={draft} onChange={e=>setDraft(e.target.value)} disabled={saving}/>{editError&&<p className="error" role="alert">{editError}</p>}<div className="dialogActions"><button className="primary" disabled={saving||!draft.trim()}>{saving?'שומר…':'שמירה'}</button><button type="button" className="ghost" disabled={saving} onClick={()=>setEdit(null)}>ביטול</button></div><button type="button" className="textBtn" disabled={saving} onClick={()=>save(true)}>חזרה לשם המקורי</button></form></dialog>
  </main>;
 }
