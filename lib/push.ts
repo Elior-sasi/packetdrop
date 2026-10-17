@@ -12,9 +12,10 @@ export type Sub={endpoint:string;keys:{p256dh:string;auth:string}};
 export async function send(sub:Sub,payload:object){const k=vapid();
  try{await webpush.sendNotification(sub,JSON.stringify(payload),{vapidDetails:{subject:'https://packetdrop.vercel.app/privacy',publicKey:k.publicKey,privateKey:k.privateKey},TTL:86400,urgency:'high'});return true;}
  catch(e){const code=(e as {statusCode?:number}).statusCode;if(code===404||code===410)return false;throw e;}}
-export const dbOn=()=>!!process.env.DATABASE_URL;
+const DB_URL=()=>process.env.DATABASE_URL||process.env.STORAGE_URL||process.env.POSTGRES_URL||'';
+export const dbOn=()=>!!DB_URL();
 let ready:Promise<unknown>|null=null;
-export function db(){const sql=neon(process.env.DATABASE_URL!);
+export function db(){const sql=neon(DB_URL());
  ready??=sql`create table if not exists push_users(
   user_id text primary key,email text not null default '',refresh text not null,subs jsonb not null default '[]',
   state jsonb not null default '{"parcels":[],"stuck":[]}',seen jsonb not null default '[]',
