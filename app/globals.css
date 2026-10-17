@@ -136,3 +136,6 @@ dialog input{width:100%;min-height:52px;padding:0 14px;border-radius:14px;backgr
 .backupCard{margin:18px 0 6px;padding:18px;border-radius:20px;background:#0d141b;border:1px solid var(--line)}.backupCard h3{display:flex;align-items:center;gap:8px;margin:0;font-size:calc(19px*var(--fs))}.backupCard p{margin:10px 0 0}.backupCard .ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .bstate{font-weight:700;font-size:calc(15px*var(--fs));color:var(--mut)}.bstate.on{color:var(--ok)}.bstate.saving{color:var(--acc)}.bstate.error{color:var(--bad)}
 .ptr{position:fixed;top:calc(4px + env(safe-area-inset-top));left:50%;z-index:25;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#16314d;border:1px solid #3b6fa3;color:#9fd2ff;box-shadow:0 6px 18px #0008;transition:opacity .15s}.ptr svg{width:22px;height:22px}html,body{overscroll-behavior-y:contain}.ptr.ready{background:#2ed3c6;color:#05222a;border-color:#7ff0e6}.set.backupCard{margin:0}
+nav.none:before{opacity:0}
+.ni{position:relative;display:inline-flex}.nb{position:absolute;top:-7px;left:-12px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#2b5f93;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}.nb.warn{background:#1c8f87}
+.ib.on{background:#16314d;color:#fff;border-color:#3b6fa3}

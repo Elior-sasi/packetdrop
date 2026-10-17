@@ -102,8 +102,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  {user&&pull>0&&view!=='account'&&<div className={'ptr'+(pull>=80?' ready':'')} style={{transform:'translate(-50%,'+Math.max(0,pull-46)+'px)',opacity:Math.min(1,pull/80)}} aria-hidden="true"><RefreshCw style={{transform:'rotate('+pull*3+'deg)'}}/></div>}
  <header className="top">
   <div className="row"><span className="brand" dir="ltr" aria-label="Unbox"><Mark/><span aria-hidden="true">nbox</span></span>
-</div>
-  <h1>{view==='account'?'הגדרות':view==='done'?'נמסרו':'החבילות שלי'}</h1>
+   <div className="actions"><button className="ib" aria-label="הגדרות" aria-pressed={view==='account'} onClick={()=>go(view==='account'?'active':'account')}><Settings/></button></div></div>
+  <h1>{view==='account'?'הגדרות':view==='done'?'נמסרו':filter==='pickup'?'לאיסוף':'החבילות שלי'}</h1>
   {user&&view!=='account'&&progress&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
   {user&&view!=='account'&&!progress&&<p className="sub" role="status">{busy?'בודק את Gmail…':error?(!gmail||errorCode==='NO_GMAIL'?'קריאת Gmail לא אושרה':'הסריקה לא הושלמה'):data?ago(data.updated):'ממתין לסריקה'}</p>}
  </header>
@@ -133,10 +133,6 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {!configured&&<section className="notice"><h2>Unbox מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
    {(busy||(!data&&!error))&&<div className="loader" role="status"><Mark cls="lmark"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p></div>}
-   {data&&!busy&&<div className="chips" role="tablist" aria-label="סינון חבילות">
-    <button role="tab" aria-selected={view==='active'&&filter==='all'} className={'chip'+(view==='active'&&filter==='all'?' on':'')} onClick={()=>{setFilter('all');go('active');}}>בדרך <b>{active.length}</b></button>
-    {pickup>0&&<button role="tab" aria-selected={view==='active'&&filter==='pickup'} className={'chip warn'+(view==='active'&&filter==='pickup'?' on':'')} onClick={()=>{setFilter('pickup');go('active');}}>לאיסוף <b>{pickup}</b></button>}
-    <button role="tab" aria-selected={view==='done'} className={'chip'+(view==='done'?' on':'')} onClick={()=>{setFilter('all');go('done');}}>נמסרו <b>{done.length}</b></button></div>}
    {!(busy||(!data&&!error))&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
    {error&&<div className="error" role="alert"><span>{error}</span>{['NO_GMAIL','RECONNECT','UNAUTHORIZED'].includes(errorCode)?<form action={login}><button className="primary">חידוש הרשאת Google</button></form>:<button className="ghost" onClick={()=>sync()}>נסה שוב</button>}</div>}
    <div className="list">{shown.map(p=><button key={p.id} className={'card '+(p.stage===3&&!p.cancelled?'focus':'')} onClick={()=>setOpenId(p.id)} aria-label={p.name+', '+statusText(p)}>
@@ -169,7 +165,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   </section>}
  </div>}
 
- {!open&&<nav aria-label="ניווט ראשי" style={{'--tab':view==='account'?2:view==='done'?1:0} as React.CSSProperties}>{([['active','החבילות',Package],['done','נמסרו',CheckCircle2],['account','הגדרות',Settings]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'selected':''} aria-current={view===key?'page':undefined} onClick={()=>{setFilter('all');go(key);}}><Icon size={20}/><span>{label}</span></button>)}</nav>}
+ {!open&&<nav aria-label="ניווט ראשי" className={view==='account'?'none':''} style={{'--tab':view==='done'?2:view==='active'&&filter==='pickup'?1:0} as React.CSSProperties}>{([['active','all','בדרך',Package,active.length],['active','pickup','לאיסוף',MapPin,pickup],['done','all','נמסרו',CheckCircle2,0]] as const).map(([key,f,label,Icon,n])=>{const on=view===key&&(key==='done'||filter===f);return <button key={label} className={on?'selected':''} aria-current={on?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setFilter(f);go(key);}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className={'nb'+(f==='pickup'?' warn':'')}>{n}</b>}</span><span>{label}</span></button>;})}</nav>}
  <dialog ref={dialog} onCancel={e=>{e.preventDefault();if(!saving)setEdit(null);}} onClose={()=>setEdit(null)}><form onSubmit={e=>{e.preventDefault();void save();}}><h2>שם החבילה</h2><label htmlFor="title" className="sr">שם החבילה</label><input id="title" autoFocus maxLength={180} value={draft} onChange={e=>setDraft(e.target.value)} disabled={saving}/>{editError&&<p className="error" role="alert">{editError}</p>}<div className="dialogActions"><button className="primary" disabled={saving||!draft.trim()}>{saving?'שומר…':'שמירה'}</button><button type="button" className="ghost" disabled={saving} onClick={()=>setEdit(null)}>ביטול</button></div><button type="button" className="textBtn" disabled={saving} onClick={()=>save(true)}>חזרה לשם המקורי</button></form></dialog>
  </main>;
 }
