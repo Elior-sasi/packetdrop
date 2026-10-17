@@ -36,7 +36,7 @@ h1{font-size:calc(32px*var(--fs));font-weight:700;letter-spacing:-.4px;margin:14
 .card:active{transform:scale(.985)}.card.focus{border-color:#1f5c58;box-shadow:inset 0 1px 0 #ffffff12,0 0 0 1px #2ed3c61f}
 .c{display:flex;gap:13px;align-items:flex-start}
 .thumb{width:80px;height:80px;border-radius:16px;flex-shrink:0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#232b37,#171c24);color:#8ea3bf;border:1px solid #ffffff0a}
-.thumb{position:relative}.thumb img:not(.brandThumb){position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}.thumb .brandThumb,.hero .brandThumb{width:46%;height:46%;object-fit:contain;background:#fff;border-radius:12px;padding:6px}
+.thumb{position:relative}.thumb img.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.thumb .brandThumb,.hero .brandThumb{width:46%;height:46%;object-fit:contain;background:#fff;border-radius:12px;padding:6px}
 .info{flex:1;min-width:0}
 .nm{font-size:calc(17px*var(--fs));font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .meta{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:calc(15px*var(--fs));margin-top:4px;min-width:0;flex-wrap:wrap}.meta .sep{opacity:.6}
@@ -68,7 +68,7 @@ h1{font-size:calc(32px*var(--fs));font-weight:700;letter-spacing:-.4px;margin:14
 .sheet>*{max-width:608px;margin-inline:auto}
 .sheetTop{display:flex;justify-content:space-between;align-items:center}
 .hero{margin-top:12px;height:min(56vw,300px);border-radius:26px;display:grid;place-items:center;overflow:hidden;background:radial-gradient(70% 70% at 50% 40%,#2a3a52,#141a22);border:1px solid var(--line);color:#8ea3bf}
-.hero{position:relative}.hero>img:not(.brandThumb){position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
+.hero{position:relative}.hero>img.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}.hero>img.backdrop{position:absolute;inset:-30px;width:calc(100% + 60px);height:calc(100% + 60px);object-fit:cover;filter:blur(28px) saturate(1.2) brightness(.75);transform:scale(1.1)}
 .dt{padding:16px 4px 0}.dt h2{font-size:calc(23px*var(--fs));font-weight:700;line-height:1.35;margin:0;overflow-wrap:anywhere}
 .box{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px}
 .box h3{margin:0 0 6px;font-size:calc(16px*var(--fs));color:var(--mut);font-weight:500}
