@@ -38,7 +38,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const controller=useRef<AbortController|null>(null);const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{try{setLarge(localStorage.getItem('pd_large')==='1');}catch{}},[]);
  useEffect(()=>{try{localStorage.setItem('pd_large',large?'1':'0');}catch{}},[large]);
- async function sync(){if(!user||controller.current)return;const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
+ async function sync(){if(!user||controller.current)return;lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   try{const r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});const d=await r.json();if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
    const known=new Set([...seen.current,...saved.current.flatMap(p=>p.events.map(e=>e.id))]);
@@ -55,6 +55,17 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
  useEffect(()=>{document.body.style.overflow=openId?'hidden':'';},[openId]);
+ // Refresh again whenever the app comes back to the screen (iPhone keeps home-screen apps alive in the background).
+ const lastSync=useRef(0);const syncRef=useRef(sync);syncRef.current=sync;
+ useEffect(()=>{if(!user)return;const onShow=()=>{if(document.visibilityState==='visible'&&Date.now()-lastSync.current>60000)void syncRef.current();};document.addEventListener('visibilitychange',onShow);window.addEventListener('pageshow',onShow);return()=>{document.removeEventListener('visibilitychange',onShow);window.removeEventListener('pageshow',onShow);};},[user?.id]);
+ // Pull down at the top of the list to refresh.
+ const [pull,setPull]=useState(0);const pullStart=useRef<number|null>(null);const pullRef=useRef(0);
+ useEffect(()=>{if(!user)return;const PULL=80;
+  const start=(e:TouchEvent)=>{pullStart.current=window.scrollY<=0&&!document.body.style.overflow?e.touches[0].clientY:null;};
+  const move=(e:TouchEvent)=>{if(pullStart.current===null)return;const dy=e.touches[0].clientY-pullStart.current;if(dy<=0||window.scrollY>0){pullRef.current=0;setPull(0);return;}pullRef.current=Math.min(130,dy*.55);setPull(pullRef.current);};
+  const end=()=>{if(pullStart.current!==null&&pullRef.current>=PULL&&!controller.current)void syncRef.current();pullStart.current=null;pullRef.current=0;setPull(0);};
+  window.addEventListener('touchstart',start,{passive:true});window.addEventListener('touchmove',move,{passive:true});window.addEventListener('touchend',end);window.addEventListener('touchcancel',end);
+  return()=>{window.removeEventListener('touchstart',start);window.removeEventListener('touchmove',move);window.removeEventListener('touchend',end);window.removeEventListener('touchcancel',end);};},[user?.id]);
  async function save(reset=false){if(!edit)return;setSaving(true);setEditError('');try{const r=await fetch('/api/titles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:edit.id,title:reset?'':draft.trim()})});const d=await r.json();if(!r.ok)throw Error(d.error);setTitles(old=>({...old,[d.key]:d.title}));setEdit(null);}catch(e){setEditError(e instanceof Error?e.message:'שמירת השם נכשלה');}finally{setSaving(false);}}
  function loadLocal(){try{const c=JSON.parse(localStorage.getItem('pd_cache')||'null');if(c&&Array.isArray(c.parcels)){saved.current=c.parcels;seen.current=new Set(c.seen||[]);setData(old=>old||{parcels:c.parcels,scanned:0,updated:c.updated||new Date().toISOString()});}}catch{}}
  async function loadBackup(){loadLocal();try{const r=await fetch('/api/backup',{cache:'no-store'});const d=await r.json();
@@ -75,9 +86,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const go=(v:typeof view)=>{setView(v);setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
 
  return <main className={large?'app large':'app'}>
+ {user&&pull>0&&view!=='account'&&<div className={'ptr'+(pull>=80?' ready':'')} style={{transform:'translate(-50%,'+Math.max(0,pull-46)+'px)',opacity:Math.min(1,pull/80)}} aria-hidden="true"><RefreshCw style={{transform:'rotate('+pull*3+'deg)'}}/></div>}
  <header className="top">
   <div className="row"><span className="brand" dir="ltr"><img src="/brand.png" alt=""/>PacketDrop</span>
-   <div className="actions"><button className="ib" aria-label="הגדלת טקסט" aria-pressed={large} onClick={()=>setLarge(!large)}><Type/></button>{user&&view!=='account'&&<button className="ib" aria-label="רענון חבילות" disabled={busy} onClick={()=>sync()}><RefreshCw className={busy?'spin':''}/></button>}</div></div>
+   <div className="actions"><button className="ib" aria-label="הגדלת טקסט" aria-pressed={large} onClick={()=>setLarge(!large)}><Type/></button></div></div>
   <h1>{view==='account'?'החשבון':view==='done'?'נמסרו':'החבילות שלי'}</h1>
   {user&&view!=='account'&&progress&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
   {user&&view!=='account'&&!progress&&<p className="sub" role="status">{busy?'בודק את Gmail…':error?(!gmail||errorCode==='NO_GMAIL'?'קריאת Gmail לא אושרה':'הסריקה לא הושלמה'):data?ago(data.updated):'ממתין לסריקה'}</p>}
