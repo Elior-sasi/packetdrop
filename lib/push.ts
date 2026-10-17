@@ -1,5 +1,5 @@
 // Web Push for Unbox. All keys are derived from AUTH_SECRET on the server, so no extra secret has to be configured.
-import {createECDH,createCipheriv,createDecipheriv,hkdfSync,randomBytes} from 'node:crypto';
+import {createECDH,createCipheriv,createDecipheriv,hkdfSync,randomBytes,createHmac,timingSafeEqual} from 'node:crypto';
 import webpush from 'web-push';
 import {neon} from '@neondatabase/serverless';
 const b64u=(b:Buffer)=>b.toString('base64url');
@@ -19,5 +19,10 @@ export function db(){const sql=neon(DB_URL());
  ready??=sql`create table if not exists push_users(
   user_id text primary key,email text not null default '',refresh text not null,subs jsonb not null default '[]',
   state jsonb not null default '{"parcels":[],"stuck":[]}',seen jsonb not null default '[]',
-  checked_at timestamptz,updated_at timestamptz not null default now())`.then(()=>sql`create table if not exists push_meta(k text primary key,v timestamptz not null)`);
+  checked_at timestamptz,updated_at timestamptz not null default now())`.then(()=>sql`create table if not exists push_meta(k text primary key,v timestamptz not null)`).then(()=>sql`create table if not exists sms_inbox(id bigserial primary key,user_id text not null,text text not null,created_at timestamptz not null default now())`);
  return {sql,ready};}
+
+// Personal link for the iPhone Shortcut that forwards delivery SMS: user id + signature, nothing stored.
+export function smsToken(userId:string){return b64u(Buffer.from(userId))+'.'+b64u(createHmac('sha256',derive('sms-link')).update(userId).digest()).slice(0,22);}
+export function smsUser(token:string){const [a,sig]=token.split('.');if(!a||!sig)return null;let id='';try{id=Buffer.from(a,'base64url').toString('utf8');}catch{return null;}
+ const want=smsToken(id).split('.')[1];return want.length===sig.length&&timingSafeEqual(Buffer.from(want),Buffer.from(sig))?id:null;}

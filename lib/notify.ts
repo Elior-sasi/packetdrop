@@ -2,7 +2,7 @@
 import type {Parcel} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
 export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck';title:string;body:string;tag:string};
-export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>};
+export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>;reminded?:Record<string,number[]>;weekly?:string};
 const DAY=864e5;
 const PICKUP=/לאיסוף|איסוף|pick ?up|collection/i;
 const OUT=/יצאה למסירה|בדרך למסירה|השליח בדרך|out for delivery/i;
@@ -47,3 +47,23 @@ function pickupOrOut(p:Parcel,name:string):Note{
   return {id:p.id,kind:'pickup',title:'מוכנה לאיסוף'+where,body:name+code,tag:'p:'+p.id};}
  return {id:p.id,kind:'out',title:'יצאה למסירה היום',body:name,tag:'o:'+p.id};
 }
+
+// Pickup points send parcels back after about two weeks: nudge after 2 days, and again at day 10.
+const waitingAtPickup=(p:Parcel)=>p.stage===3&&!p.cancelled&&(!!p.pickup?.place||/לאיסוף|איסוף|pick ?up|collection/i.test(latestLabel(p))&&!OUT.test(latestLabel(p)));
+const pickupSince=(p:Parcel)=>{const e=[...p.events].find(e=>/לאיסוף|איסוף|pick ?up|collection/i.test(e.label));return new Date((e||p.events.at(-1))?.time||0).getTime();};
+export function reminders(state:State,now=Date.now()):{notes:Note[];reminded:Record<string,number[]>}{
+ const reminded={...(state.reminded||{})};const notes:Note[]=[];const marks=state.marks||{};
+ for(const p of state.parcels){if(!waitingAtPickup(p)||p.keys.some(k=>marks[k])||marks[p.id])continue;
+  const days=Math.floor((now-pickupSince(p))/DAY);const done=reminded[p.id]||[];const where=p.pickup?.place?' ב'+p.pickup.place:'';const code=p.pickup?.code?' · קוד '+p.pickup.code:'';
+  for(const d of [2,10])if(days>=d&&days<16&&!done.includes(d)){reminded[p.id]=[...done,d];
+   notes.push(d===2?{id:p.id,kind:'pickup',title:'מחכה לך'+where+' כבר יומיים',body:nameOf(p)+code,tag:'r2:'+p.id}:{id:p.id,kind:'pickup',title:'בקרוב החבילה חוזרת לשולח',body:nameOf(p)+where+code,tag:'r10:'+p.id});break;}}
+ for(const id of Object.keys(reminded))if(!state.parcels.some(p=>p.id===id&&waitingAtPickup(p)))delete reminded[id];
+ return {notes,reminded};}
+// Sunday morning (Israel time) summary, once a week.
+export function weekly(state:State,now=new Date()):{note:Note|null;week:string}{
+ const il=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Jerusalem'}));const week=il.getFullYear()+'-'+Math.floor((il.getTime()-new Date(il.getFullYear(),0,1).getTime())/(7*DAY));
+ if(il.getDay()!==0||il.getHours()<8||il.getHours()>=11||state.weekly===week)return {note:null,week:state.weekly||''};
+ const marks=state.marks||{};const live=state.parcels.filter(p=>p.stage<4&&!p.cancelled&&!marks[p.id]&&!p.keys.some(k=>marks[k])&&now.getTime()-last(p)<30*DAY);
+ const pick=live.filter(waitingAtPickup);if(!live.length)return {note:null,week};
+ const body=[live.length-pick.length?(live.length-pick.length)+' בדרך':'',pick.length?pick.length+' מחכות לאיסוף'+(pick[0].pickup?.place?' ('+pick[0].pickup.place+')':''):''].filter(Boolean).join(' · ');
+ return {note:{id:'weekly',kind:'new',title:'החבילות שלך השבוע',body,tag:'w:'+week},week};}

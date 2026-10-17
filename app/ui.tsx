@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2} from 'lucide-react';
-import {mergeParcels,brandDomains,polishName,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
+import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean};
 type Geo=Record<string,{lat:number;lon:number}|null>;
@@ -54,7 +54,7 @@ function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
 
 export default function Dashboard({user,gmail,drive,configured,login}:{user:User|null;gmail:boolean;drive?:boolean;configured:boolean;login:()=>Promise<void>}){
- const [view,setView]=useState<'active'|'done'|'account'>('active'),[size,setSize]=useState(0),[auto,setAuto]=useState(true),[splash,setSplash]=useState<'on'|'out'|'off'>('on'),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[filter,setFilter]=useState<'all'|'pickup'>('all'),[backup,setBackup]=useState<{state:'off'|'on'|'error'|'saving';updated?:string;msg?:string}>({state:drive?'on':'off'}),saved=useRef<MailParcel[]>([]),backupOn=useRef(!!drive),seen=useRef<Set<string>>(new Set()),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off'),[sources,setSources]=useState<{t17:boolean;cainiao:string}|null>(null),[section,setSection]=useState<'list'|'today'|'map'|'stats'>('list'),[marks,setMarks]=useState<Record<string,'got'|'hide'>>({}),[manual,setManual]=useState<MailParcel[]>([]),[adding,setAdding]=useState(false),[addNum,setAddNum]=useState(''),[addName,setAddName]=useState(''),[addErr,setAddErr]=useState(''),[menu,setMenu]=useState<Parcel|null>(null),[geo,setGeo]=useState<Geo>({}),[month,setMonth]=useState(0),[reading,setReading]=useState(false);
+ const [view,setView]=useState<'active'|'done'|'account'>('active'),[size,setSize]=useState(0),[auto,setAuto]=useState(true),[splash,setSplash]=useState<'on'|'out'|'off'>('on'),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[filter,setFilter]=useState<'all'|'pickup'>('all'),[backup,setBackup]=useState<{state:'off'|'on'|'error'|'saving';updated?:string;msg?:string}>({state:drive?'on':'off'}),saved=useRef<MailParcel[]>([]),backupOn=useRef(!!drive),seen=useRef<Set<string>>(new Set()),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off'),[sources,setSources]=useState<{t17:boolean;cainiao:string}|null>(null),[section,setSection]=useState<'list'|'today'|'map'|'stats'>('list'),[marks,setMarks]=useState<Record<string,'got'|'hide'>>({}),[manual,setManual]=useState<MailParcel[]>([]),[adding,setAdding]=useState(false),[addNum,setAddNum]=useState(''),[addName,setAddName]=useState(''),[addErr,setAddErr]=useState(''),[menu,setMenu]=useState<Parcel|null>(null),[geo,setGeo]=useState<Geo>({}),[month,setMonth]=useState(0),[reading,setReading]=useState(false),[addSms,setAddSms]=useState(''),[smsLink,setSmsLink]=useState(''),[toast,setToast]=useState('');
  const marksRef=useRef(marks);marksRef.current=marks;const manualRef=useRef(manual);manualRef.current=manual;
  const controller=useRef<AbortController|null>(null);const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{try{const v=localStorage.getItem('pd_size');setSize(v?Math.min(2,+v||0):localStorage.getItem('pd_large')==='1'?1:0);setAuto(localStorage.getItem('pd_auto')!=='0');setMarks(JSON.parse(localStorage.getItem('pd_marks')||'{}'));setManual(JSON.parse(localStorage.getItem('pd_manual')||'[]'));setGeo(JSON.parse(localStorage.getItem('pd_geo')||'{}'));}catch{}},[]);
@@ -62,7 +62,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const autoRef=useRef(true);autoRef.current=auto;
  // Opening screen: shown on launch, then fades out.
  useEffect(()=>{const a=setTimeout(()=>setSplash('out'),1400),b=setTimeout(()=>setSplash('off'),1800);return()=>{clearTimeout(a);clearTimeout(b);};},[]);
- async function sync(){if(!user||controller.current)return;lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
+ async function sync(){if(!user||controller.current)return;void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   try{let r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
    // One-time repair: parcels whose shop was saved as a web address are read again to pick up the shop's real name.
@@ -107,7 +107,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  function loadLocal(){try{const c=JSON.parse(localStorage.getItem('pd_cache')||'null');if(c&&Array.isArray(c.parcels)){const fresh=c.parser===PARSER;saved.current=fresh?c.parcels:keepOld(c.parcels);seen.current=new Set(fresh?c.seen||[]:[]);setData(old=>old||{parcels:c.parcels,scanned:0,updated:c.updated||new Date().toISOString()});}}catch{}}
  async function loadBackup(){loadLocal();try{const r=await fetch('/api/backup',{cache:'no-store'});const d=await r.json();
    if(!r.ok){backupOn.current=d.code!=='NO_DRIVE';setBackup({state:d.code==='NO_DRIVE'?'off':'error',msg:d.code==='NO_DRIVE'?undefined:d.error});return;}
-   backupOn.current=true;const fresh=d.parser===PARSER;seen.current=new Set(fresh&&Array.isArray(d.seen)?d.seen:[]);saved.current=Array.isArray(d.parcels)?(fresh?d.parcels:keepOld(d.parcels)):[];setBackup({state:'on',updated:d.updated});if(d.titles)setTitles(t=>({...d.titles,...t}));if(d.marks)setMarks(m=>({...d.marks,...m}));if(Array.isArray(d.manual)&&d.manual.length)setManual(m=>m.length?m:d.manual);
+   backupOn.current=true;const fresh=d.parser===PARSER;seen.current=new Set(fresh&&Array.isArray(d.seen)?d.seen:[]);saved.current=Array.isArray(d.parcels)?(fresh?d.parcels:keepOld(d.parcels)):[];setBackup({state:'on',updated:d.updated});if(d.titles)setTitles(t=>({...d.titles,...t}));if(d.marks)setMarks(m=>({...d.marks,...m}));if(Array.isArray(d.manual)&&d.manual.length)setManual(m=>{const have=new Set(m.flatMap(x=>x.keys));return [...m,...(d.manual as MailParcel[]).filter(x=>!x.keys.some(k=>have.has(k)))];});
    // Open instantly with the last backup while Gmail is being read.
    setData(old=>old||(saved.current.length?{parcels:saved.current,scanned:0,updated:d.updated||new Date().toISOString()}:old));}catch{setBackup({state:'error',msg:'הגיבוי לא זמין כרגע'});}}
  async function saveBackup(list:MailParcel[]){try{localStorage.setItem('pd_cache',JSON.stringify({parser:PARSER,parcels:list.slice(0,300),seen:[...seen.current].slice(-4000),updated:new Date().toISOString()}));}catch{}
@@ -152,6 +152,17 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   if(parcels.some(p=>p.tracking===num||p.keys.includes('tracking:'+num))){setAddErr('החבילה הזו כבר ברשימה');return;}
   const now=new Date().toISOString();const p:MailParcel={id:'tracking:'+num,keys:['tracking:'+num],name:addName.trim()||'חבילה '+num,shop:'',carrier:'',image:'',url:'',tracking:num,order:'',eta:'',stage:0,cancelled:false,pickup:null,events:[{id:'manual:'+num,label:'נוספה ידנית',time:now}]};
   const nextManual=[p,...manual].slice(0,100);const nextMarks={...marks};for(const m of data?.parcels||[])if(m.keys.includes('tracking:'+num))for(const k of [m.id,...m.keys])delete nextMarks[k];setMarks(nextMarks);setManual(nextManual);persist(nextMarks,nextManual);if(pushOn.current)void pushPost({parcels:[...saved.current,...nextManual],marks:nextMarks}).catch(()=>{});setAdding(false);setAddNum('');setAddName('');setAddErr('');void loadTracks([p]);}
+ // SMS from the post office or a courier: pasted in the add form, or forwarded by the iPhone Shortcut.
+ function applySms(texts:string[]){let cur=manualRef.current,curMarks=marksRef.current,added=0;let lastP:MailParcel|null=null;
+  for(const t of texts){const p=parseSms(t);if(!p)continue;added++;lastP=p;const key=p.keys[0];
+   const old=cur.find(m=>m.keys.includes(key));const base=(data?.parcels||[]).find(m=>m.keys.includes(key));
+   const next=old?mergeParcels([old,p])[0]:base?{...p,name:base.name}:p;cur=[next,...cur.filter(m=>m!==old)].slice(0,100);
+   curMarks={...curMarks};for(const m of [...(data?.parcels||[]),...cur])if(m.keys.includes(key))for(const k of [m.id,...m.keys])delete curMarks[k];}
+  if(!added)return false;setManual(cur);setMarks(curMarks);persist(curMarks,cur);if(pushOn.current)void pushPost({parcels:[...saved.current,...cur],marks:curMarks}).catch(()=>{});
+  if(lastP){void loadTracks([lastP]);setToast(added>1?'נוספו '+added+' עדכונים מ־SMS':'נקלט SMS: '+(lastP.pickup?.code?'קוד '+lastP.pickup.code:lastP.tracking));setTimeout(()=>setToast(''),4000);}return true;}
+ async function pullSms(){try{const r=await fetch('/api/sms',{cache:'no-store'});if(!r.ok)return;const d=await r.json();if(d.link)setSmsLink(d.link);if(d.items?.length)applySms(d.items.map((x:{text:string})=>x.text));}catch{}}
+ const smsRef=useRef(pullSms);smsRef.current=pullSms;
+ useEffect(()=>{if(!user||!data)return;void smsRef.current();let t='';try{t=new URLSearchParams(location.search).get('sms')||'';}catch{}if(t){applySms([t]);history.replaceState(null,'','/');}},[user?.id,!!data]);
  // Long press on a card opens quick actions.
  const press=useRef<{t:ReturnType<typeof setTimeout>|null;fired:boolean}>({t:null,fired:false});
  const longPress=(p:Parcel)=>({onTouchStart:()=>{press.current.fired=false;press.current.t=setTimeout(()=>{press.current.fired=true;try{navigator.vibrate?.(15);}catch{}setMenu(p);},480);},
@@ -213,6 +224,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    :push==='on'?<><button className="ghost" onClick={testPush}><Bell size={18}/> שלח התראת בדיקה</button><button className="ghost" onClick={disablePush}>כבה התראות</button></>
    :<button className="primary wide" disabled={push!=='off'} onClick={enablePush}><Bell size={18}/> הפעל התראות</button>}
    {pushMsg&&<p className="setNote" role="status">{pushMsg}</p>}</section>}
+  {user&&smsLink&&<section className="set"><h3>SMS אוטומטי</h3>
+   <p className="setNote">הודעות מהדואר, HFD, צ'יטה ושאר השליחים ייכנסו לבד, עם מספר המעקב וקוד האיסוף. מגדירים פעם אחת באפליקציית קיצורי הדרך:</p>
+   <ol className="steps2"><li>קיצורים ← אוטומציה ← אוטומציה חדשה ← <b>הודעה</b>.</li><li>"ההודעה מכילה": <b>חבילה</b> (אפשר עוד אוטומציה ל"משלוח" ו"איסוף"). בחר <b>הרץ מיד</b>.</li><li>פעולה: <b>קבל תוכן של URL</b>. בכתובת הדבק את הקישור האישי, שיטה <b>POST</b>, גוף בקשה <b>טקסט</b> = תוכן ההודעה.</li></ol>
+   <button className="ghost" onClick={()=>copy(smsLink)}><Copy size={18}/> {copied===smsLink?'הקישור הועתק ✓':'העתקת הקישור האישי'}</button>
+   <p className="setNote">הקישור אישי. אל תשתף אותו.</p></section>}
   {user&&hiddenCount>0&&<section className="set"><h3>חבילות מוסתרות</h3><p className="setNote">הסתרת {hiddenCount} פריטים שזוהו בטעות כחבילות.</p><button className="ghost" onClick={()=>{const next=Object.fromEntries(Object.entries(marks).filter(([,v])=>v!=='hide')) as Record<string,'got'|'hide'>;setMarks(next);persist(next,manual);}}><Undo2 size={18}/> החזר את כולם</button></section>}
   <section className="set"><h3>חשבון</h3>
    {user?<><div className="setRow"><span>{user.name||'Google'}</span></div><p className="setNote mono" dir="ltr">{user.email}</p>
@@ -277,6 +293,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
 
 
  <dialog ref={dialog} onCancel={e=>{e.preventDefault();if(!saving)setEdit(null);}} onClose={()=>setEdit(null)}><form onSubmit={e=>{e.preventDefault();void save();}}><h2>שם החבילה</h2><label htmlFor="title" className="sr">שם החבילה</label><input id="title" autoFocus maxLength={180} value={draft} onChange={e=>setDraft(e.target.value)} disabled={saving}/>{editError&&<p className="error" role="alert">{editError}</p>}<div className="dialogActions"><button className="primary" disabled={saving||!draft.trim()}>{saving?'שומר…':'שמירה'}</button><button type="button" className="ghost" disabled={saving} onClick={()=>setEdit(null)}>ביטול</button></div><button type="button" className="textBtn" disabled={saving} onClick={()=>save(true)}>חזרה לשם המקורי</button></form></dialog>
+ {toast&&<div className="toast" role="status">{toast}</div>}
  {menu&&<div className="menuWrap" onClick={()=>setMenu(null)}><div className="menu" role="dialog" aria-modal="true" aria-label={'פעולות: '+menu.name} onClick={e=>e.stopPropagation()}>
   <p className="menuTitle">{bidi(menu.name)}</p>
   {menu.pickup?.code&&<button onClick={()=>{void copy(menu.pickup!.code);setMenu(null);}}><KeyRound size={20}/> העתק קוד איסוף <b dir="ltr">{menu.pickup.code}</b></button>}
@@ -287,10 +304,13 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <button className="menuCancel" onClick={()=>setMenu(null)}>ביטול</button></div></div>}
  {adding&&<div className="menuWrap" onClick={()=>setAdding(false)}><form className="menu addForm" onClick={e=>e.stopPropagation()} onSubmit={e=>{e.preventDefault();addManual();}}>
   <p className="menuTitle">הוספת חבילה</p>
+  <label htmlFor="addSms">הדבקת SMS מהדואר או מהשליח</label><textarea id="addSms" rows={3} value={addSms} onChange={e=>setAddSms(e.target.value)} placeholder="המספר והקוד יזוהו לבד"/>
+  {addSms.trim()?<><button type="button" className="primary" onClick={()=>{if(applySms([addSms])){setAddSms('');setAdding(false);setAddErr('');}else setAddErr('לא נמצא מספר מעקב בהודעה');}}>הוספה מה־SMS</button>{addErr&&<p className="error" role="alert">{addErr}</p>}</>:<>
+  <p className="orLine">או לפי מספר מעקב</p>
   <label htmlFor="addNum">מספר מעקב</label><input id="addNum" dir="ltr" autoFocus autoCapitalize="characters" autoComplete="off" value={addNum} onChange={e=>setAddNum(e.target.value)} placeholder="RR123456789IL"/>
   <label htmlFor="addName">שם (לא חובה)</label><input id="addName" value={addName} onChange={e=>setAddName(e.target.value)} placeholder="למשל: אוזניות"/>
   {addErr&&<p className="error" role="alert">{addErr}</p>}
-  <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button><button type="button" className="menuCancel" onClick={()=>setAdding(false)}>ביטול</button></form></div>}
+  <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button></>}<button type="button" className="menuCancel" onClick={()=>setAdding(false)}>ביטול</button></form></div>}
  {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" style={{'--tab':['list','today','map','stats'].indexOf(section)} as React.CSSProperties}>{([['list','חבילות',Package,0],['today','היום',CalendarCheck,today.length],['map','מפה',MapIcon,pickPoints.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
  </main>;
 }

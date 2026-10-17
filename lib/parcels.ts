@@ -147,3 +147,18 @@ export function mergeParcels(rows:Parcel[]){
  }
  return out.sort((a,b)=>b.events.at(-1)!.time.localeCompare(a.events.at(-1)!.time));
 }
+// An SMS from the post office or a courier (pasted, or sent by an iPhone Shortcut) turned into a parcel update.
+export function parseSms(raw:string,now=new Date()):Parcel|null{
+ const text=raw.replace(/\s+/g,' ').trim().slice(0,1200);if(text.length<8)return null;
+ const tracking=(text.match(/(?:מספר\s*(?:ה?מעקב|ה?משלוח|ה?חבילה|פריט)|מס['׳]?\s*(?:מעקב|משלוח|חבילה)|tracking(?:\s*(?:number|no\.?))?|פריט)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{7,34})/i)?.[1]
+  ||text.match(/\b([A-Z]{2}\d{9}[A-Z]{2}|1Z[0-9A-Z]{16}|RS\d{9,}Y?|LP\d{10,}|AP\d{8,}|AE\d{8,})\b/i)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
+ if(!tracking)return null;
+ const code=text.match(/(?:קוד(?:\s*(?:ה?איסוף|ה?משיכה|לקבלת\s*ה?חבילה|אישור|סודי))?|code)\s*[:\-]?\s*(\d{4,8})\b/i)?.[1]||'';
+ const place=(text.match(/(?:לאיסוף|ממתינה|ממתין|מחכה)[^.]{0,30}?\s(?:בנקודת איסוף|בנקודת|בסניף|בחנות|ב)\s*([^.,\n]{3,40}?)(?=[,.]|\s+(?:ב?כתובת|ברחוב|עד|קוד|לפרטים|שעות)|$)/)?.[1]||'').trim();
+ const address=(text.match(/(?:בכתובת|כתובת:?|ברחוב)\s*([^.\n]{4,60}?)(?=[.]|\s+(?:עד|קוד|לפרטים|שעות)|$)/)?.[1]||'').trim();
+ const hours=(text.match(/שעות(?:\s*פתיחה)?\s*:?\s*([^.\n]{4,60})/)?.[1]||'').trim();
+ let stage=stageOf(text);if((code||place)&&stage<3)stage=3;if(stage<0)stage=2;
+ const carrier=carrierFrom(text,'');
+ const pickup=place||code?{place,address,code,url:'',hours:hours||undefined}:null;
+ const label=stage===3&&pickup?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===4?'נמסרה':stage===3?'יצאה למסירה':'עדכון מ־SMS';
+ return {id:'tracking:'+tracking,keys:['tracking:'+tracking],name:'חבילה '+tracking,shop:'',carrier,image:'',url:'',tracking,order:'',eta:'',stage,cancelled:false,pickup,events:[{id:'sms:'+tracking+':'+stage+':'+now.toISOString().slice(0,13),label,time:now.toISOString()}]};}
