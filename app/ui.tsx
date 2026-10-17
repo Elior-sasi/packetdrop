@@ -96,7 +96,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  return <main className={large?'app large':'app'}>
  {user&&pull>0&&view!=='account'&&<div className={'ptr'+(pull>=80?' ready':'')} style={{transform:'translate(-50%,'+Math.max(0,pull-46)+'px)',opacity:Math.min(1,pull/80)}} aria-hidden="true"><RefreshCw style={{transform:'rotate('+pull*3+'deg)'}}/></div>}
  <header className="top">
-  <div className="row"><span className="brand" dir="ltr"><img src="/brand.png" alt=""/>PacketDrop</span>
+  <div className="row"><span className="brand" dir="ltr"><img src="/brand.png" alt=""/>Unbox</span>
    <div className="actions"><button className="ib" aria-label="הגדלת טקסט" aria-pressed={large} onClick={()=>setLarge(!large)}><Type/></button></div></div>
   <h1>{view==='account'?'החשבון':view==='done'?'נמסרו':'החבילות שלי'}</h1>
   {user&&view!=='account'&&progress&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
@@ -109,14 +109,14 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <p>תוכן המיילים לא נשמר. בגיבוי נשמרים רק פרטי החבילות שזוהו ושמות שערכת.</p>
   {user&&<div className="backupCard"><div className="row"><h3><Cloud size={22}/> גיבוי בענן</h3><span className={'bstate '+backup.state}>{backup.state==='on'?'פעיל ✓':backup.state==='saving'?'שומר…':backup.state==='error'?'שגיאה':'כבוי'}</span></div>
    {backup.state==='off'?<><p>החבילות והשמות שערכת יישמרו בתיקייה נסתרת ב־Google Drive שלך. כך הם יחזרו בכל מכשיר, גם אחרי שמיילים נמחקים.</p><form action={login}><GoogleButton label="הפעל גיבוי עם Google" disabled={!configured}/></form></>
-   :<><p>{backup.msg||('נשמר ב־Google Drive שלך, בתיקייה נסתרת שרק PacketDrop רואה.'+(backup.updated?' גיבוי אחרון: '+new Date(backup.updated).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''))}</p>
+   :<><p>{backup.msg||('נשמר ב־Google Drive שלך, בתיקייה נסתרת שרק Unbox רואה.'+(backup.updated?' גיבוי אחרון: '+new Date(backup.updated).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''))}</p>
     <button className="ghost" disabled={backup.state==='saving'||busy} onClick={()=>saveBackup(data?.parcels||[])}><CloudUpload size={18}/> גבה עכשיו</button></>}</div>}
   {user?<button className="ghost" onClick={()=>signOut({callbackUrl:'/'})}>יציאה מהחשבון</button>:<form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form>}
   {user&&<form action={login}><button className="textBtn" disabled={!configured}>חידוש הרשאת Google</button></form>}
   <p className="hint">להתקנה: Safari ← שיתוף ← הוספה למסך הבית.</p>
   <p className="hint"><a href="/privacy">מדיניות פרטיות</a></p>
  </section>:<>
-  {!configured&&<section className="notice"><h2>PacketDrop מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
+  {!configured&&<section className="notice"><h2>Unbox מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
    {data&&!busy&&<div className="chips" role="tablist" aria-label="סינון חבילות">
     <button role="tab" aria-selected={view==='active'&&filter==='all'} className={'chip'+(view==='active'&&filter==='all'?' on':'')} onClick={()=>{setFilter('all');go('active');}}>בדרך <b>{active.length}</b></button>
