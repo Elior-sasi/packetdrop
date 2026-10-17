@@ -24,23 +24,26 @@ function withCarrier(p:MailParcel,t?:TrackInfo):Parcel{if(!t||!p.tracking)return
  const stage=p.cancelled?p.stage:Math.max(p.stage,t.stage);
  const events:Event[]=[...p.events,...t.events.map(e=>({id:'trk:'+e.time+e.text,label:e.text+(e.location?' · '+e.location:''),time:new Date(e.time).toISOString(),src:t.carrier||'חברת השילוח'}))].sort((a,b)=>a.time.localeCompare(b.time));
  return {...p,stage,carrier:p.carrier||t.carrier,eta:stage>=4?'':p.eta||etaText(t.eta),events,carrierStatus:t.status,trackPending:t.pending};}
-function Favicon({name,size=18}:{name:string;size?:number}){const [failed,setFailed]=useState(false);const d=brandDomains[name];if(!d||failed)return null;return <img className="fav" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=64'} alt="" width={size} height={size} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>;}
-function Thumb({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=brandDomains[p.shop];
+const domainOf=(name:string)=>brandDomains[name]||(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(name)?name:'');
+function Favicon({name,size=18}:{name:string;size?:number}){const [failed,setFailed]=useState(false);const d=domainOf(name);if(!d||failed)return null;return <img className="fav" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=64'} alt="" width={size} height={size} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>;}
+function Thumb({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop);
  return <div className={big?'hero':'thumb'}>{p.image&&!failed?<img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
 function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop}/><span dir="auto">{p.shop}</span>{p.carrier&&<><span className="sep">·</span><span dir="auto">{p.carrier}</span></>}</div>;}
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
 
 export default function Dashboard({user,gmail,configured,login}:{user:User|null;gmail:boolean;configured:boolean;login:()=>Promise<void>}){
- const [view,setView]=useState<'active'|'done'|'account'>('active'),[large,setLarge]=useState(false),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off');
+ const [view,setView]=useState<'active'|'done'|'account'>('active'),[large,setLarge]=useState(false),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off');
  const controller=useRef<AbortController|null>(null);const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{try{setLarge(localStorage.getItem('pd_large')==='1');}catch{}},[]);
  useEffect(()=>{try{localStorage.setItem('pd_large',large?'1':'0');}catch{}},[large]);
- async function sync(){if(!user||controller.current)return;const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');const timeout=setTimeout(()=>c.abort(),170000);
+ async function sync(){if(!user||controller.current)return;const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),170000);
   try{const r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});const d=await r.json();if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}let acc:Scan=d;setData(acc);
+   // Real progress: messages read out of Gmail's own estimate (capped at the 7 pages we read), mail is 90%, carriers the rest.
+   const total=Math.max(1,Math.min(Number(d.estimate)||40,280));const step=(n:number)=>setProgress({pct:Math.min(90,Math.round(5+85*n/total)),label:'נסרקו '+n+' מתוך כ־'+total+' מיילים'});step(acc.scanned);
    // Keep reading older pages in the background so the 180-day window is covered without extra taps.
-   for(let page=0;page<6&&acc.nextCursor&&!c.signal.aborted;page++){const r2=await fetch('/api/parcels?cursor='+encodeURIComponent(acc.nextCursor),{signal:c.signal,cache:'no-store'});const d2=await r2.json();if(!r2.ok)break;acc={...d2,scanned:acc.scanned+d2.scanned,failed:(acc.failed||0)+(d2.failed||0),parcels:mergeParcels([...acc.parcels,...d2.parcels])};setData(acc);}
-   if(!c.signal.aborted)void loadTracks(acc.parcels);
-  }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);}}
+   for(let page=0;page<6&&acc.nextCursor&&!c.signal.aborted;page++){const r2=await fetch('/api/parcels?cursor='+encodeURIComponent(acc.nextCursor),{signal:c.signal,cache:'no-store'});const d2=await r2.json();if(!r2.ok)break;acc={...d2,scanned:acc.scanned+d2.scanned,failed:(acc.failed||0)+(d2.failed||0),parcels:mergeParcels([...acc.parcels,...d2.parcels])};setData(acc);step(acc.scanned);}
+   if(!c.signal.aborted){setProgress({pct:92,label:'בודק מול חברות השילוח…'});await loadTracks(acc.parcels);setProgress({pct:100,label:'הסתיים'});}
+  }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void sync();fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
  useEffect(()=>{document.body.style.overflow=openId?'hidden':'';},[openId]);
@@ -59,7 +62,8 @@ export default function Dashboard({user,gmail,configured,login}:{user:User|null;
   <div className="row"><span className="brand" dir="ltr"><img src="/brand.png" alt=""/>PacketDrop</span>
    <div className="actions"><button className="ib" aria-label="הגדלת טקסט" aria-pressed={large} onClick={()=>setLarge(!large)}><Type/></button>{user&&view!=='account'&&<button className="ib" aria-label="רענון חבילות" disabled={busy} onClick={()=>sync()}><RefreshCw className={busy?'spin':''}/></button>}</div></div>
   <h1>{view==='account'?'החשבון':view==='done'?'נמסרו':'החבילות שלי'}</h1>
-  {user&&view!=='account'&&<p className="sub" role="status">{busy?'בודק את Gmail…':error?(!gmail||errorCode==='NO_GMAIL'?'קריאת Gmail לא אושרה':'הסריקה לא הושלמה'):data?ago(data.updated):'ממתין לסריקה'}</p>}
+  {user&&view!=='account'&&progress&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
+  {user&&view!=='account'&&!progress&&<p className="sub" role="status">{busy?'בודק את Gmail…':error?(!gmail||errorCode==='NO_GMAIL'?'קריאת Gmail לא אושרה':'הסריקה לא הושלמה'):data?ago(data.updated):'ממתין לסריקה'}</p>}
  </header>
 
  {view==='account'?<section className="panel account">

@@ -27,7 +27,7 @@ export async function GET(req:NextRequest){try{
  // Bounded concurrency; one broken message does not fail the whole scan.
  for(let i=0;i<ids.length;i+=5){const got=await Promise.allSettled(ids.slice(i,i+5).map(m=>gmail('messages/'+encodeURIComponent(m.id)+'?format=full')));for(const g of got){if(g.status==='fulfilled')messages.push(g.value);else{if(g.reason instanceof GmailError&&!['GMAIL','RATE'].includes(g.reason.message))throw g.reason;failed++;}}}
  const parcels=mergeParcels(messages.map(parseMessage).filter((p):p is NonNullable<typeof p>=>!!p));
- return Response.json({parcels,nextCursor:list.nextPageToken,scanned:messages.length,failed,updated:new Date().toISOString()},{headers:{'Cache-Control':'private, no-store'}});
+ return Response.json({parcels,nextCursor:list.nextPageToken,estimate:list.resultSizeEstimate,scanned:messages.length,failed,updated:new Date().toISOString()},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){const code=e instanceof Error?e.message:'';
   const messages:Record<string,string>={
    UNAUTHORIZED:'יש להיכנס עם Google',
