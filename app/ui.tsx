@@ -9,12 +9,15 @@ type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
 const STATUS=['ההזמנה התקבלה','נשלחה','בדרך ליעד','מוכנה לאיסוף / במסירה','נמסרה'];
 const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
-const tone=(p:Parcel)=>p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3?'warn':'';
+const tone=(p:Parcel)=>p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3&&(isPickup(p)||outToday(p))?'warn':'';
 // Waiting at a pickup point (as opposed to a courier bringing it to the door).
 const isPickup=(p:Parcel)=>p.stage===3&&!p.cancelled&&(p.carrierStatus==='AvailableForPickup'||p.carrierStatus!=='OutForDelivery'&&(!!p.pickup?.place||p.events.some(e=>/איסוף|pickup|collection/i.test(e.label))));
 // Latin runs (model names, sizes) are isolated so a Hebrew title does not scramble them, e.g. "AirPods 5/4/Pro (2026)".
 const bidi=(t:string)=>t.replace(/[A-Za-z0-9][A-Za-z0-9 .\/()+&'"-]*[A-Za-z0-9)]/g,m=>'\u2066'+m+'\u2069');
-const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.got?'התקבלה':p.stale?'כנראה התקבלה':p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&p.carrierStatus==='OutForDelivery'?'יצאה למסירה':p.stage===3?(isPickup(p)?'מוכנה לאיסוף':'במסירה'):STATUS[p.stage];
+// "Out for delivery" only means today; after a day without news the courier is just holding it.
+const lastAt=(p:Parcel)=>new Date(p.events.at(-1)?.time||0).getTime();
+const outToday=(p:Parcel)=>p.stage===3&&!p.cancelled&&!isPickup(p)&&new Date(lastAt(p)).toDateString()===new Date().toDateString();
+const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.got?'התקבלה':p.stale?'כנראה התקבלה':p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
 const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|הזמנתך|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^(?:תודה|אישור (?:ה)?הזמנה|order confirm|thank you for your order|thanks for your order)/i.test(name)||/^\S*\d{8,}/.test(name);
@@ -115,7 +118,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const stale=p.stage<4&&!p.cancelled&&Date.now()-last>(p.stage===3?14:30)*864e5;
   return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};})
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
-  .sort((a,b)=>{const urgent=(p:{stage:number;cancelled:boolean})=>p.stage===3&&!p.cancelled?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual]);
+  .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual]);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled);
  const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(isPickup):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  const pickup=active.filter(isPickup).length;const open=parcels.find(p=>p.id===openId)||null;
@@ -157,7 +160,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   void Promise.all(need.map(q=>fetch('/api/geo?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>[q,d.found?{lat:d.lat,lon:d.lon}:null] as const).catch(()=>[q,null] as const))).then(rows=>setGeo(g=>{const n={...g,...Object.fromEntries(rows)};try{localStorage.setItem('pd_geo',JSON.stringify(n));}catch{}return n;}));},[pickPoints.length,open?.id]);
  // Today: pickups waiting and couriers on the way.
  const todayStr=(()=>{const d=new Date();return d.getDate()+'.'+(d.getMonth()+1);})();
- const today=active.filter(p=>p.stage===3||p.eta.split('-').includes(todayStr));
+ const today=active.filter(p=>isPickup(p)||outToday(p)||p.eta.split('-').includes(todayStr));
  // Monthly summary from the parcels themselves.
  const stats=useMemo(()=>{const d=new Date();const ref=new Date(d.getFullYear(),d.getMonth()-month,1);const end=new Date(ref.getFullYear(),ref.getMonth()+1,1);
   const inMonth=(t:string)=>{const x=new Date(t);return x>=ref&&x<end;};const first=(p:Parcel)=>p.events[0]?.time||'';
@@ -219,7 +222,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
    {(busy||(!data&&!error))&&<div className="loader" role="status"><Mark cls="lmark" anim="bob"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p></div>}
    {!(busy||(!data&&!error))&&section==='today'&&<div className="list">{today.length?today.map(p=><button key={p.id} className="card focus" {...longPress(p)} aria-label={p.name+', '+statusText(p)}>
-    <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><div className="st"><span className={'pill '+tone(p)}>{p.stage===3?statusText(p):'צפויה היום'}</span></div>
+    <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><div className="st"><span className={'pill '+tone(p)}>{isPickup(p)||outToday(p)?statusText(p):'צפויה היום'}</span></div>
      {isPickup(p)&&p.pickup?.place&&<p className="todayWhere">איסוף ב<b>{p.pickup.place}</b></p>}{isPickup(p)&&p.pickup?.code&&<p className="todayCode">קוד <b dir="ltr">{p.pickup.code}</b></p>}</div></div></button>)
     :<section className="panel empty"><CalendarCheck size={40}/><h2>אין מה לאסוף היום</h2><p>חבילות שמחכות לך או שהשליח מביא היום יופיעו כאן.</p></section>}</div>}
    {!(busy||(!data&&!error))&&section==='map'&&<div className="list">{pickPoints.length?pickPoints.map(p=>{const pk=p.pickup!;const q=placeQuery(pk);return <section key={p.id} className="box mapCard">
@@ -236,7 +239,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
     {!stats.ordered&&!stats.delivered&&<section className="panel empty"><ChartColumn size={40}/><h2>אין הזמנות ב{stats.label}</h2></section>}</div>}
    {!(busy||(!data&&!error))&&section==='list'&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
    {error&&<div className="error" role="alert"><span>{error}</span>{['NO_GMAIL','RECONNECT','UNAUTHORIZED'].includes(errorCode)?<form action={login}><button className="primary">חידוש הרשאת Google</button></form>:<button className="ghost" onClick={()=>sync()}>נסה שוב</button>}</div>}
-   <div className="list">{shown.map(p=><button key={p.id} className={'card '+(p.stage===3&&!p.cancelled?'focus':'')} {...longPress(p)} aria-label={p.name+', '+statusText(p)}>
+   <div className="list">{shown.map(p=><button key={p.id} className={'card '+(isPickup(p)||outToday(p)?'focus':'')} {...longPress(p)} aria-label={p.name+', '+statusText(p)}>
     <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span>{p.stage===3&&p.pickup?.place&&!p.cancelled?<span className="eta">איסוף ב<b>{p.pickup.place}</b></span>:p.eta&&!p.cancelled&&<span className="eta">הגעה <b>{p.eta}</b></span>}</div></div></div>
     <Bar p={p}/></button>)}</div>
 
