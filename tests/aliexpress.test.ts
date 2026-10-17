@@ -21,7 +21,7 @@ import {mergeParcels as mp2} from '../lib/parcels';
 import {test as t2} from 'node:test';import assert2 from 'node:assert/strict';
 t2('orders shipped together from one checkout merge with the package',()=>{
  const base={name:'',shop:'AliExpress',carrier:'',image:'',url:'',eta:'',cancelled:false,pickup:null,tracking:''};
- const chessShip={...base,id:'order:1123351833026914',keys:['order:1123351833026914'],order:'1123351833026914',name:'שחמט',stage:1,events:[{id:'a',label:'נשלחה',time:'2026-10-09T00:44:24.000Z'}]};
+ const chessShip={...base,id:'order:1123351833026914',keys:['order:1123351833026914'],order:'1123351833026914',name:'שחמט',stage:1,events:[{id:'a',label:"הזמנה מס' 1123351833026914: נשלחה",time:'2026-10-09T00:44:24.000Z'}]};
  const alarmShip={...base,id:'order:1123351833046914',keys:['order:1123351833046914'],order:'1123351833046914',name:'אזעקה',stage:1,events:[{id:'b',label:'נשלחה',time:'2026-10-09T00:44:24.000Z'}]};
  const delivered={...base,id:'order:1123351833026914',keys:['order:1123351833026914','tracking:RS1343135466Y'],order:'1123351833026914',tracking:'RS1343135466Y',stage:4,events:[{id:'c',label:'נמסרה',time:'2026-10-15T04:18:28.000Z'}]};
  const other={...base,id:'order:1122868352196914',keys:['order:1122868352196914'],order:'1122868352196914',stage:1,events:[{id:'d',label:'נשלחה',time:'2026-10-09T00:44:24.000Z'}]};
