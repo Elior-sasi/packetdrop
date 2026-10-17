@@ -31,7 +31,7 @@ const CANCEL=/is closed|בוטלה|ביטול ההזמנה|הזמנה בוטלה
 function stageOf(s:string){for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
 
 export function tidyName(raw:string){let n=raw.replace(/\s+x\d+$/i,'').trim();
- if(/(\.\.\.|…)\s*$/.test(n)){n=n.replace(/(\.\.\.|…)\s*$/,'').trim();n=n.replace(/[\s,،\-–(]+\S{0,3}$/,'').replace(/[\s,،\-–(]+$/,'').trim();}
+ if(/(\.\.\.|…)\s*$/.test(n)){n=n.replace(/(\.\.\.|…)\s*$/,'').trim();const cut=n.replace(/[\s,،\-–(]+\S+$/,'').replace(/[\s,،\-–(]+$/,'').trim();if(cut.length>=8)n=cut;n=n.replace(/(?:\s+(?:עם|של|עבור|את|for|with|and|of|the|ל|ב|ו|מ))+$/i,'').trim();}
  // Store titles are keyword lists; keep the part before the second comma so the card reads like a name.
  if(n.length>42){const parts=n.split(/\s*[,،|]\s*/);let out=parts[0];for(const p of parts.slice(1)){if((out+', '+p).length>42)break;out+=', '+p;}n=out.length>=12?out:n.slice(0,42).replace(/\s+\S*$/,'');}
  return n;}

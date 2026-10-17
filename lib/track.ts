@@ -45,7 +45,7 @@ type CnEvent={time?:number;timeStr?:string;desc?:string;standerdDesc?:string;act
 type CnMod={mailNo?:string;status?:string;statusDesc?:string;detailList?:CnEvent[];globalEtaInfo?:{deliveryMinTime?:number;deliveryMaxTime?:number}};
 export function cnStage(status:string,latest:string,action:string){const s=(status+' '+action).toUpperCase();
  if(/SIGN(?!.*FAIL)|DELIVERED/.test(s)||/\bdelivered\b|signed/i.test(latest))return 4;
- if(/PICKUP|STA_|WAIT4|DELIVERING|OUT_FOR/.test(s)||/out for delivery|ready for (?:pick ?up|collection)|available for pick/i.test(latest))return 3;
+ if(/WAIT_?4_?PICK|WAIT_?FOR_?PICK|READY_?FOR_?PICK|DELIVERING|OUT_?FOR_?DELIVERY/.test(s)||/out for delivery|ready for (?:pick ?up|collection)|available for pick/i.test(latest))return 3;
  if(/NOT_?FOUND|^\s*$/.test(s))return -1;return 2;}
 export function fromCainiao(m:CnMod):TrackInfo|null{if(!m.mailNo)return null;
  const events=(m.detailList||[]).map(e=>({time:e.time?new Date(e.time).toISOString():'',text:heEvent((e.standerdDesc||e.desc||'').trim()),location:''})).filter(e=>e.time&&e.text).sort((a,b)=>a.time.localeCompare(b.time));
