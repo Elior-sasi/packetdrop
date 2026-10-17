@@ -2,7 +2,7 @@
 import type {Parcel} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
 export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck';title:string;body:string;tag:string};
-export type State={parcels:Parcel[];stuck:string[]};
+export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>};
 const DAY=864e5;
 const PICKUP=/לאיסוף|איסוף|pick ?up|collection/i;
 const OUT=/יצאה למסירה|בדרך למסירה|השליח בדרך|out for delivery/i;
@@ -19,8 +19,9 @@ export function withTrack(p:Parcel,t?:TrackInfo):Parcel{
 }
 export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];stuck:string[]}{
  const notes:Note[]=[];const stuck=new Set(before.stuck);
+ const marked=(p:Parcel)=>p.keys.some(k=>before.marks?.[k])||!!before.marks?.[p.id];
  for(const p of after){
-  if(p.cancelled)continue;
+  if(p.cancelled||marked(p))continue;
   const o=find(before.parcels,p);const name=nameOf(p);const recent=now-last(p)<3*DAY;
   if(!o){
    if(!recent)continue;
@@ -34,7 +35,7 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
   else if(p.stage===3&&o.stage===3&&!o.pickup?.code&&p.pickup?.code&&recent)notes.push(pickupOrOut(p,name));
  }
  // A parcel with no news for 10 days gets one heads-up; 30+ days counts as received, so it is left alone.
- for(const p of after){const age=now-last(p);
+ for(const p of after){if(marked(p))continue;const age=now-last(p);
   if(p.stage<3&&!p.cancelled&&age>10*DAY&&age<30*DAY&&!stuck.has(p.id)){stuck.add(p.id);notes.push({id:p.id,kind:'stuck',title:'אין עדכון כבר 10 ימים',body:name10(p),tag:'s:'+p.id});}
   if(p.stage>=3)stuck.delete(p.id);}
  return {notes,stuck:[...stuck].slice(-300)};

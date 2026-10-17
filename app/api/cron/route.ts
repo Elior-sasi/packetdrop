@@ -29,7 +29,7 @@ async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  const list=await gmail('messages?'+new URLSearchParams({maxResults:'100',q:'after:'+since+' '+QUERY,fields:'messages/id'}));
  const seen=new Set(u.seen||[]);const ids=((list.messages||[]) as {id:string}[]).map(m=>m.id).filter(id=>!seen.has(id)).slice(0,60);
  const msgs:Message[]=[];for(let i=0;i<ids.length;i+=10){const got=await Promise.allSettled(ids.slice(i,i+10).map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));for(const g of got)if(g.status==='fulfilled')msgs.push(g.value);}
- const state:State={parcels:u.state?.parcels||[],stuck:u.state?.stuck||[]};
+ const state:State={parcels:u.state?.parcels||[],stuck:u.state?.stuck||[],marks:u.state?.marks||{}};
  let parcels=mergeParcels([...state.parcels,...msgs.map(parseMessage).filter((p):p is Parcel=>!!p)]);
  const numbers=parcels.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,40);
  if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]));}
@@ -40,6 +40,6 @@ async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  for(const n of batch){const alive:Sub[]=[];for(const s of subs){const ok=await send(s,n).catch(()=>true);if(ok)alive.push(s);}subs=alive;sent++;}
  const keep=parcels.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
  const newSeen=[...seen,...msgs.map(m=>m.id)].slice(-1500);
- await sql`update push_users set state=${JSON.stringify({parcels:keep,stuck})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
+ await sql`update push_users set state=${JSON.stringify({parcels:keep,stuck,marks:state.marks})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
  return {sent};
 }

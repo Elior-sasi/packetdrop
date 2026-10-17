@@ -1,6 +1,6 @@
 // Backup file in Google Drive's hidden appDataFolder: only this app can see it, it does not appear in the user's Drive files.
 const NAME='packetdrop-backup.json';
-export type Backup={version:1;updated:string;titles:Record<string,string>;parcels:unknown[];seen?:string[];parser?:number};
+export type Backup={version:1;updated:string;titles:Record<string,string>;parcels:unknown[];seen?:string[];parser?:number;marks?:Record<string,string>;manual?:unknown[]};
 const empty=():Backup=>({version:1,updated:'',titles:{},parcels:[]});
 async function api(token:string,url:string,init:RequestInit={}){const r=await fetch(url,{...init,headers:{Authorization:'Bearer '+token,...(init.headers||{})},cache:'no-store',signal:AbortSignal.timeout(15000)});
  if(r.status===401)throw new Error('RECONNECT');
