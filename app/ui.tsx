@@ -93,7 +93,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const parcels=useMemo(()=>(data?.parcels||[]).map(m=>{const p=withCarrier(m,tracks[m.tracking]);const last=new Date(p.events.at(-1)?.time||0).getTime();
   // Pickup points return parcels after ~2 weeks and shops stop writing once it arrives: after 21 days of silence treat it as received.
   const stale=p.stage<4&&!p.cancelled&&Date.now()-last>(p.stage===3?14:30)*864e5;
-  return {...p,stale,stage:stale?4:p.stage,name:titles[p.id]||displayName(m)};}),[data,titles,tracks]);
+  return {...p,stale,last,stage:stale?4:p.stage,name:titles[p.id]||displayName(m)};})
+  // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
+  .sort((a,b)=>{const urgent=(p:{stage:number;cancelled:boolean})=>p.stage===3&&!p.cancelled?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks]);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4||p.cancelled);
  const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(p=>p.stage===3):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  const pickup=active.filter(p=>p.stage===3).length;const open=parcels.find(p=>p.id===openId)||null;
