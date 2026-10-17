@@ -48,7 +48,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Opening screen: shown on launch, then fades out.
  useEffect(()=>{const a=setTimeout(()=>setSplash('out'),1400),b=setTimeout(()=>setSplash('off'),1800);return()=>{clearTimeout(a);clearTimeout(b);};},[]);
  async function sync(){if(!user||controller.current)return;lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
-  try{const r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});const d=await r.json();if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
+  try{let r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
    const known=new Set([...seen.current,...saved.current.flatMap(p=>p.events.map(e=>e.id))]);
    const todo:string[]=(d.ids as string[]).filter(id=>!known.has(id));const total=todo.length;let done=0,failed=0;

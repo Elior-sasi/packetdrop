@@ -23,6 +23,7 @@ export async function POST(req:NextRequest){
   return Response.json({parcels,read:messages.map(m=>m.id),failed},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return fail(e);}}
 function fail(e:unknown){try{throw e;}catch(e){const code=e instanceof Error?e.message:'';
+  if(!(e instanceof GmailError))console.error('parcels route error',e instanceof Error?e.name+': '+e.message:e);
 
   const messages:Record<string,string>={
    UNAUTHORIZED:'יש להיכנס עם Google',
