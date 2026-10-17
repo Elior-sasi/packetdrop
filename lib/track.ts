@@ -53,15 +53,18 @@ export function fromCainiao(m:CnMod):TrackInfo|null{if(!m.mailNo)return null;
  const stage=cnStage(m.status||'',top.standerdDesc||top.desc||'',top.actionCode||'');const eta=m.globalEtaInfo;
  const status=stage===4?'Delivered':stage===3?(/pick/i.test(top.standerdDesc||top.desc||'')?'AvailableForPickup':'OutForDelivery'):'InTransit';
  return {number:m.mailNo.toUpperCase(),status,stage,carrier:'Cainiao',eta:eta?.deliveryMaxTime?{from:eta.deliveryMinTime?new Date(eta.deliveryMinTime).toISOString():undefined,to:new Date(eta.deliveryMaxTime).toISOString()}:null,events:events.slice(-40)};}
-export async function cainiao(numbers:string[]){const out:Record<string,TrackInfo>={};
+export type CnStatus='ok'|'blocked'|'none';
+export async function cainiao(numbers:string[]):Promise<{tracks:Record<string,TrackInfo>;status:CnStatus}>{const out:Record<string,TrackInfo>={};let status:CnStatus='none';
  const list=[...new Set(numbers.map(n=>n.trim().toUpperCase()).filter(n=>/^[A-Z0-9]{8,40}$/.test(n)))].slice(0,40);
  for(let i=0;i<list.length;i+=10){try{const r=await fetch('https://global.cainiao.com/global/detail.json?'+new URLSearchParams({mailNos:list.slice(i,i+10).join(','),lang:'en-US'}),{headers:{'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',Accept:'application/json',Referer:'https://global.cainiao.com/'},cache:'no-store',signal:AbortSignal.timeout(10000)});
-  if(!r.ok)continue;const d=await r.json().catch(()=>null);for(const m of (d?.module||[]) as CnMod[]){const t=fromCainiao(m);if(t)out[t.number]=t;}}catch{}}
- return out;}
+  if(!r.ok){if(status!=='ok')status='blocked';continue;}const d=await r.json().catch(()=>null);if(!d||!Array.isArray(d.module)){if(status!=='ok')status='blocked';continue;}status='ok';for(const m of (d?.module||[]) as CnMod[]){const t=fromCainiao(m);if(t)out[t.number]=t;}}catch{if(status!=='ok')status='blocked';}}
+ return {tracks:out,status};}
 // Both sources together: the further-along status wins, and the event lists are combined.
 export function combine(a?:TrackInfo,b?:TrackInfo):TrackInfo|undefined{if(!a||a.pending&&!a.events.length)return b||a;if(!b)return a;
  const seen=new Set<string>();const events=[...a.events,...b.events].sort((x,y)=>x.time.localeCompare(y.time)).filter(e=>{const k=e.time.slice(0,16)+e.text;if(seen.has(k))return false;seen.add(k);return true;}).slice(-40);
  const lead=b.stage>a.stage?b:a;return {...lead,carrier:a.carrier||b.carrier,eta:a.eta||b.eta,events,pending:false};}
-export async function trackAll(numbers:string[],key?:string){
- const [t17,cn]=await Promise.all([key?track(numbers,key).catch(()=>({} as Record<string,TrackInfo>)):Promise.resolve({} as Record<string,TrackInfo>),cainiao(numbers)]);
- const out:Record<string,TrackInfo>={};for(const n of new Set([...Object.keys(t17),...Object.keys(cn)])){const c=combine(t17[n],cn[n]);if(c)out[n]=c;}return out;}
+export async function trackSources(numbers:string[],key?:string){let ok17=!!key;
+ const [t17,c]=await Promise.all([key?track(numbers,key).catch(()=>{ok17=false;return {} as Record<string,TrackInfo>;}):Promise.resolve({} as Record<string,TrackInfo>),cainiao(numbers)]);const cn=c.tracks;
+ const out:Record<string,TrackInfo>={};for(const n of new Set([...Object.keys(t17),...Object.keys(cn)])){const x=combine(t17[n],cn[n]);if(x)out[n]=x;}
+ return {tracks:out,sources:{t17:ok17,cainiao:c.status}};}
+export async function trackAll(numbers:string[],key?:string){return (await trackSources(numbers,key)).tracks;}

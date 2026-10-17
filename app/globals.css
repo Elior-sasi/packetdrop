@@ -139,3 +139,8 @@ nav.none:before{opacity:0}
 .ni{position:relative;display:inline-flex}.nb{position:absolute;top:-7px;left:-12px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#2b5f93;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}.nb.warn{background:#1c8f87}
 .ib.on{background:#16314d;color:#fff;border-color:#3b6fa3}
 .primary svg{vertical-align:-3px;margin-left:6px}
+.app{padding-bottom:calc(40px + env(safe-area-inset-bottom))}html{scroll-padding-bottom:40px}
+.tiles{display:flex;gap:8px;margin-top:14px}
+.tile{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;min-height:52px;padding:0 10px;border-radius:16px;background:var(--card);border:1px solid var(--line);color:var(--mut);font-size:calc(15px*var(--fs));font-weight:500;white-space:nowrap}
+.tile b{font-size:calc(22px*var(--fs));font-weight:700;color:var(--ink);line-height:1}.tile.p b{color:#2ed3c6}
+.tile.on{background:#16314d;border-color:#4aa8ff;color:#d6ebff}.tile.on b{color:#fff}.tile.p.on{background:#0f3433;border-color:#2ed3c6;color:#b5fff8}
