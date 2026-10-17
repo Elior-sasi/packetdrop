@@ -18,7 +18,7 @@ const body=z.object({ids:z.array(z.string().regex(/^[a-zA-Z0-9]{6,40}$/)).min(1)
 export async function POST(req:NextRequest){
  if(req.headers.get('origin')!==req.nextUrl.origin)return Response.json({error:'בקשה לא מורשית'},{status:403});
  try{const gmail=await client(req);const {ids}=body.parse(await req.json());const messages:Message[]=[];const failed:string[]=[];
-  for(let i=0;i<ids.length;i+=20){const chunk=ids.slice(i,i+20);const got=await Promise.allSettled(chunk.map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));got.forEach((g,j)=>{if(g.status==='fulfilled')messages.push(g.value);else{if(g.reason instanceof GmailError&&!['GMAIL','RATE'].includes(g.reason.message))throw g.reason;failed.push(chunk[j]);}});}
+  for(let i=0;i<ids.length;i+=6){const chunk=ids.slice(i,i+6);const got=await Promise.allSettled(chunk.map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));got.forEach((g,j)=>{if(g.status==='fulfilled')messages.push(g.value);else{if(g.reason instanceof GmailError&&!['GMAIL','RATE'].includes(g.reason.message))throw g.reason;failed.push(chunk[j]);}});}
   const parcels=mergeParcels(messages.map(parseMessage).filter((p):p is NonNullable<typeof p>=>!!p));
   return Response.json({parcels,read:messages.map(m=>m.id),failed},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return fail(e);}}

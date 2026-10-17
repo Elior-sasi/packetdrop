@@ -69,16 +69,16 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    const todo:string[]=(d.ids as string[]).filter(id=>!known.has(id));const total=todo.length;let done=0,failed=0;
    let acc:Scan={parcels:mergeParcels([...saved.current]),scanned:0,updated:d.updated};setData(old=>old&&!saved.current.length?old:acc);
    const step=()=>setProgress({pct:total?Math.min(90,Math.round(5+85*done/total)):90,label:total?'נקראו '+done+' מתוך '+total+' מיילים חדשים':'אין מיילים חדשים'});step();
-   const chunks:string[][]=[];for(let i=0;i<todo.length;i+=20)chunks.push(todo.slice(i,i+20));const retry:string[]=[];let second=false;let chunkCount=0;
+   const chunks:string[][]=[];for(let i=0;i<todo.length;i+=12)chunks.push(todo.slice(i,i+12));const retry:string[]=[];let second=false;let chunkCount=0;
    const worker=async()=>{for(let ch=chunks.shift();ch&&!c.signal.aborted;ch=chunks.shift()){const r2=await fetch('/api/parcels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ch}),signal:c.signal,cache:'no-store'});const d2=await r2.json().catch(()=>({error:'',code:''}));
      if(!r2.ok){if(['NO_GMAIL','RECONNECT','UNAUTHORIZED','GMAIL_API_DISABLED'].includes(d2.code)){setErrorCode(d2.code);throw Error(d2.error);}if(second)failed+=ch.length;else{retry.push(...ch);}done+=second?0:ch.length;step();continue;}
      for(const id of d2.read as string[])seen.current.add(id);if(second)failed+=(d2.failed as string[]).length;else retry.push(...(d2.failed as string[]));done+=second?0:ch.length;acc={...acc,scanned:acc.scanned+(d2.read as string[]).length,failed,parcels:mergeParcels([...acc.parcels,...d2.parcels])};saved.current=acc.parcels;setData(acc);step();
      // Keep progress, so an interrupted first scan continues where it stopped next time.
      try{localStorage.setItem('pd_cache',JSON.stringify({parser:PARSER,parcels:acc.parcels.slice(0,300),seen:[...seen.current].slice(-4000),updated:acc.updated}));}catch{}
      if(++chunkCount%8===0&&backupOn.current)void saveBackup(acc.parcels);}};
-   await Promise.all([worker(),worker(),worker()]);
+   await Promise.all([worker(),worker()]);
    // Mail Google refused to hand over (usually a short rate limit) gets one slower second try.
-   if(retry.length&&!c.signal.aborted){second=true;await new Promise(res=>setTimeout(res,2000));for(let i=0;i<retry.length;i+=10)chunks.push(retry.slice(i,i+10));await worker();}acc={...acc,updated:new Date().toISOString()};setData(acc);
+   if(retry.length&&!c.signal.aborted){second=true;setProgress({pct:92,label:'משלים '+retry.length+' מיילים שלא נקראו…'});await new Promise(res=>setTimeout(res,1500));for(let i=0;i<retry.length;i+=10)chunks.push(retry.slice(i,i+10));await worker();}acc={...acc,updated:new Date().toISOString()};setData(acc);
    if(!c.signal.aborted){try{localStorage.setItem('pd_fix_shop','1');}catch{}setBusy(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
