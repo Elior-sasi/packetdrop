@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {parseMessage} from '../lib/parcels';
+const msg=(from:string)=>({id:'x1',internalDate:String(Date.parse('2026-10-10')),payload:{mimeType:'text/html',headers:[{name:'Subject',value:'ההזמנה שלך נשלחה'},{name:'From',value:from}],body:{data:Buffer.from('<p>מספר הזמנה 123456 נשלחה. מספר מעקב RR123456789IL</p>').toString('base64url')}}});
+test('platform sender uses display name',()=>{assert.equal(parseMessage(msg('"חנות הפרחים" <orders@konimbo.co.il>') as any)?.shop,'חנות הפרחים');assert.equal(parseMessage(msg('Cool Store <store+123@t.shopifyemail.com>') as any)?.shop,'Cool Store');});
+test('generic display name falls back to domain',()=>{assert.equal(parseMessage(msg('noreply <noreply@myshop.co.il>') as any)?.shop,'myshop.co.il');});

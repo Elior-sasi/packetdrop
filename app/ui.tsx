@@ -62,6 +62,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function sync(){if(!user||controller.current)return;lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   try{let r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch('/api/parcels',{signal:c.signal,cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
+   // One-time repair: parcels whose shop was saved as a web address are read again to pick up the shop's real name.
+   let fixShop=false;try{fixShop=localStorage.getItem('pd_fix_shop')!=='1';}catch{}
+   if(fixShop){const bad=saved.current.filter(p=>/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(p.shop));if(bad.length){const ids=new Set(bad.flatMap(p=>p.events.map(e=>e.id)));saved.current=saved.current.filter(p=>!bad.includes(p));seen.current=new Set([...seen.current].filter(id=>!ids.has(id)));}}
    const known=new Set([...seen.current,...saved.current.flatMap(p=>p.events.map(e=>e.id))]);
    const todo:string[]=(d.ids as string[]).filter(id=>!known.has(id));const total=todo.length;let done=0,failed=0;
    let acc:Scan={parcels:mergeParcels([...saved.current]),scanned:0,updated:d.updated};setData(old=>old&&!saved.current.length?old:acc);
@@ -76,7 +79,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    await Promise.all([worker(),worker(),worker()]);
    // Mail Google refused to hand over (usually a short rate limit) gets one slower second try.
    if(retry.length&&!c.signal.aborted){second=true;await new Promise(res=>setTimeout(res,2000));for(let i=0;i<retry.length;i+=10)chunks.push(retry.slice(i,i+10));await worker();}acc={...acc,updated:new Date().toISOString()};setData(acc);
-   if(!c.signal.aborted){setBusy(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
+   if(!c.signal.aborted){try{localStorage.setItem('pd_fix_shop','1');}catch{}setBusy(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
