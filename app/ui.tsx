@@ -122,7 +122,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   </section>}
  </div>}
 
- {!open&&<nav aria-label="ניווט ראשי" style={{'--tab':view==='account'?2:view==='done'?1:0} as React.CSSProperties}>{([['active','החבילות',Package],['done','נמסרו',CheckCircle2],['account','החשבון',UserRound]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'selected':''} aria-current={view===key?'page':undefined} onClick={()=>go(key)}><Icon size={24}/><span>{label}</span></button>)}</nav>}
+ {!open&&<nav aria-label="ניווט ראשי" style={{'--tab':view==='account'?2:view==='done'?1:0} as React.CSSProperties}>{([['active','החבילות',Package],['done','נמסרו',CheckCircle2],['account','החשבון',UserRound]] as const).map(([key,label,Icon])=><button key={key} className={view===key?'selected':''} aria-current={view===key?'page':undefined} onClick={()=>go(key)}><Icon size={20}/><span>{label}</span></button>)}</nav>}
  <dialog ref={dialog} onCancel={e=>{e.preventDefault();if(!saving)setEdit(null);}} onClose={()=>setEdit(null)}><form onSubmit={e=>{e.preventDefault();void save();}}><h2>שם החבילה</h2><label htmlFor="title" className="sr">שם החבילה</label><input id="title" autoFocus maxLength={180} value={draft} onChange={e=>setDraft(e.target.value)} disabled={saving}/>{editError&&<p className="error" role="alert">{editError}</p>}<div className="dialogActions"><button className="primary" disabled={saving||!draft.trim()}>{saving?'שומר…':'שמירה'}</button><button type="button" className="ghost" disabled={saving} onClick={()=>setEdit(null)}>ביטול</button></div><button type="button" className="textBtn" disabled={saving} onClick={()=>save(true)}>חזרה לשם המקורי</button></form></dialog>
  </main>;
 }
