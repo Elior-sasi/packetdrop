@@ -7,7 +7,9 @@ export async function POST(req:NextRequest){
  if(!dbOn())return Response.json({ok:false,error:'no-db'},{status:503});
  const user=smsUser(req.nextUrl.searchParams.get('t')||'');if(!user)return Response.json({ok:false,error:'bad link'},{status:401});
  let text='';const type=req.headers.get('content-type')||'';
- try{text=type.includes('json')?String((await req.json()).text||''):await req.text();}catch{}
+ try{if(type.includes('json'))text=String((await req.json()).text||'');
+  else if(type.includes('multipart/form-data')||type.includes('x-www-form-urlencoded')){const f=await req.formData();for(const v of f.values()){text=typeof v==='string'?v:await v.text();if(text.trim())break;}}
+  else text=await req.text();}catch{}
  text=text.trim().slice(0,1500);if(text.length<8)return Response.json({ok:false,error:'empty'},{status:400});
  const p=parseSms(text);if(!p)return Response.json({ok:true,parcel:false});
  const {sql,ready}=db();await ready;
