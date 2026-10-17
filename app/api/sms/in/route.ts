@@ -10,7 +10,10 @@ export async function POST(req:NextRequest){
  try{if(type.includes('json'))text=String((await req.json()).text||'');
   else if(type.includes('multipart/form-data')||type.includes('x-www-form-urlencoded')){const f=await req.formData();for(const v of f.values()){text=typeof v==='string'?v:await v.text();if(text.trim())break;}}
   else text=await req.text();}catch{}
- text=text.trim().slice(0,1500);if(text.length<8)return Response.json({ok:false,error:'empty'},{status:400});
+ text=text.trim().slice(0,1500);
+ // Last contact is kept so the app can show whether the Shortcut reached us and with what.
+ {const {sql,ready}=db();await ready;const st=text.length<8?'empty':parseSms(text)?'parcel':'other';await sql`insert into push_meta(k,v) values(${'smsin:'+user+':'+st},now()) on conflict(k) do update set v=now()`;}
+ if(text.length<8)return Response.json({ok:false,error:'empty'},{status:400});
  const p=parseSms(text);if(!p)return Response.json({ok:true,parcel:false});
  const {sql,ready}=db();await ready;
  const recent=await sql`select count(*)::int as n from sms_inbox where user_id=${user} and created_at>now()-interval '1 hour'`;if(recent[0].n>60)return Response.json({ok:false,error:'too many'},{status:429});
