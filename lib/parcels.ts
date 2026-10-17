@@ -133,10 +133,15 @@ export function mergeParcels(rows:Parcel[]){
   const keys=[...new Set(list.flatMap(p=>p.keys?.length?p.keys:[p.id]))].sort((a,b)=>(a.startsWith('order:')?0:1)-(b.startsWith('order:')?0:1)||a.localeCompare(b));
   const events=[...new Map(list.flatMap(p=>p.events).map(e=>[e.id,e])).values()].sort((a,b)=>a.time.localeCompare(b.time));
   const named=sorted.find(p=>p.image)||sorted.find(p=>!/^(?:הזמנה|חבילה|לחבילה|your order|הודעה מ)/i.test(p.name))||latest;
+  // Several orders shipped in one package: name the package after all of them ("שחמט + אזעקה").
+  const generic=(n:string)=>/^(?:הזמנה|חבילה|לחבילה|your order|הודעה מ)/i.test(n);
+  const perOrder=new Map<string,string>();for(const p of sorted)if(p.order&&!generic(p.name)&&!perOrder.has(p.order))perOrder.set(p.order,p.name);
+  const items=[...new Set([...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')))];
+  const title=items.length>1?items.slice(0,2).join(' + ')+(items.length>2?' ועוד '+(items.length-2):''):named.name;
   const stage=Math.max(0,...list.map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
   const cancelled=latest.cancelled||(list.some(p=>p.cancelled)&&stage<1);
-  out.push({...latest,id:keys[0],keys,name:named.name,image:named.image||list.find(p=>p.image)?.image||'',
+  out.push({...latest,id:keys[0],keys,name:title,image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
    url:[...sorted].reverse().find(p=>p.url)?.url||'',stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }
