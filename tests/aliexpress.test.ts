@@ -17,3 +17,12 @@ test('closed order is marked cancelled, not delivered',()=>{const c=parseMessage
 test('review request and delivered package mail both close the order',()=>{const r=parseMessage(mail('r1',TX,"הזמנה מס' 1122877229106914: איך הלך?","<p>תוכלו לכתוב עכשיו ביקורת לגבי הזמנתכם מס' 1122877229106914</p>",'1791286615000'))!;assert.equal(r.stage,4);
  const d=parseMessage(mail('d1',TX,"חבילה מס' RS1339402036Y נמסרה",'<p>החבילה שלכם RS1339402036Y נמסרה בהצלחה</p><a href="https://www.aliexpress.com/x?o_ids=1122877229106914&edm_log_data=package-detail"><table><tr><td>פרטי החבילה</td><td>בקבוק מים טריטן x1</td></tr></table></a>','1790855214000'))!;assert.equal(d.name,'בקבוק מים טריטן');
  const [m]=mergeParcels([r,d]);assert.equal(m.stage,4);});
+import {mergeParcels as mp2} from '../lib/parcels';
+import {test as t2} from 'node:test';import assert2 from 'node:assert/strict';
+t2('orders shipped together from one checkout merge with the package',()=>{
+ const base={name:'',shop:'AliExpress',carrier:'',image:'',url:'',eta:'',cancelled:false,pickup:null,tracking:''};
+ const chessShip={...base,id:'order:1123351833026914',keys:['order:1123351833026914'],order:'1123351833026914',name:'שחמט',stage:1,events:[{id:'a',label:'נשלחה',time:'2026-10-09T00:44:24.000Z'}]};
+ const alarmShip={...base,id:'order:1123351833046914',keys:['order:1123351833046914'],order:'1123351833046914',name:'אזעקה',stage:1,events:[{id:'b',label:'נשלחה',time:'2026-10-09T00:44:24.000Z'}]};
+ const delivered={...base,id:'order:1123351833026914',keys:['order:1123351833026914','tracking:RS1343135466Y'],order:'1123351833026914',tracking:'RS1343135466Y',stage:4,events:[{id:'c',label:'נמסרה',time:'2026-10-15T04:18:28.000Z'}]};
+ const other={...base,id:'order:1122868352196914',keys:['order:1122868352196914'],order:'1122868352196914',stage:1,events:[{id:'d',label:'נשלחה',time:'2026-10-09T00:44:24.000Z'}]};
+ const out=mp2([chessShip,alarmShip,delivered,other]);assert2.equal(out.length,2);assert2.equal(out.find(p=>p.keys.includes('order:1123351833046914'))!.stage,4);});

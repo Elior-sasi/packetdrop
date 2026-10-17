@@ -109,6 +109,10 @@ export function parseMessage(m:Message):Parcel|null{
 export function mergeParcels(rows:Parcel[]){
  const parent=new Map<string,string>();const find=(k:string):string=>{const p=parent.get(k)??k;if(p===k)return k;const r=find(p);parent.set(k,r);return r;};
  for(const p of rows){const keys=p.keys?.length?p.keys:[p.id];for(const k of keys)if(!parent.has(k))parent.set(k,k);for(const k of keys.slice(1))parent.set(find(k),find(keys[0]));}
+ // AliExpress ships several orders from one checkout in a single package, but its package mails name only one of them.
+ // Orders from the same checkout (same id prefix) whose "shipped" mails arrive within 90 seconds are treated as one package.
+ const shipped=rows.filter(p=>p.order&&/aliexpress/i.test(p.shop)).map(p=>({p,t:Date.parse(p.events.find(e=>e.label===stages[1])?.time||'')})).filter(x=>x.t);
+ for(const a of shipped)for(const b of shipped)if(a!==b&&a.p.order.slice(0,10)===b.p.order.slice(0,10)&&a.p.order!==b.p.order&&Math.abs(a.t-b.t)<=90000){const ka=(a.p.keys?.length?a.p.keys:[a.p.id])[0],kb=(b.p.keys?.length?b.p.keys:[b.p.id])[0];parent.set(find(kb),find(ka));}
  const groups=new Map<string,Parcel[]>();for(const p of rows){const root=find((p.keys?.length?p.keys:[p.id])[0]);groups.set(root,[...(groups.get(root)||[]),p]);}
  const out:Parcel[]=[];
  for(const list of groups.values()){

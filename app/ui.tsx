@@ -96,7 +96,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   return {...p,stale,last,stage:stale?4:p.stage,name:titles[p.id]||displayName(m)};})
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:{stage:number;cancelled:boolean})=>p.stage===3&&!p.cancelled?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks]);
- const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4||p.cancelled);
+ const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled);
  const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(p=>p.stage===3):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  const pickup=active.filter(p=>p.stage===3).length;const open=parcels.find(p=>p.id===openId)||null;
  // Phone notifications (Web Push through the service worker).
