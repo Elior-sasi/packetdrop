@@ -1,3 +1,7 @@
 import type {NextConfig} from 'next';
-const config:NextConfig={poweredByHeader:false};
+// One canonical address keeps the Google login cookie and redirect URI on the same host.
+const config:NextConfig={
+  poweredByHeader:false,
+  async redirects(){return [{source:'/:path*',has:[{type:'host',value:'packetdrop-elior-sasi.vercel.app'}],destination:'https://packetdrop.vercel.app/:path*',permanent:false}];}
+};
 export default config;

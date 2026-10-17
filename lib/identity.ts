@@ -1,8 +1,10 @@
 import {getToken} from 'next-auth/jwt';
 import type {NextRequest} from 'next/server';
-export async function identity(req:NextRequest){
+export async function identity(req:NextRequest,needGmail=true){
  const token=await getToken({req,secret:process.env.AUTH_SECRET,secureCookie:req.nextUrl.protocol==='https:'});
  if(!token?.googleId||!token.accessToken)throw new Error('UNAUTHORIZED');
+ if(token.scope!==undefined&&!String(token.scope).includes('gmail.readonly')){if(needGmail)throw new Error('NO_GMAIL');}
+ if(!needGmail)return {id:String(token.googleId),accessToken:''};
  let accessToken=String(token.accessToken);
  if(Number(token.expiresAt||0)*1000<Date.now()+30000){
   if(!token.refreshToken)throw new Error('RECONNECT');
