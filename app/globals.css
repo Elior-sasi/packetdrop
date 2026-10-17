@@ -18,7 +18,13 @@ a{color:#8cc8ff;text-decoration:none}:focus-visible{outline:3px solid #7cc4ff;ou
 
 /* header */
 .top{padding:4px 4px 0}.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.brand{display:flex;align-items:center;gap:8px;font-size:calc(15px*var(--fs));font-weight:600;color:var(--acc)}.brand img{width:28px;height:28px;border-radius:8px}
+.brand{display:flex;align-items:flex-end;gap:1px;font-size:calc(24px*var(--fs));font-weight:700;color:#eaf4ff;line-height:1;letter-spacing:-.2px}.brand svg{height:1.3em;width:auto;margin:0 1px -.04em 0}
+.loader{display:flex;flex-direction:column;align-items:center;gap:18px;padding:56px 0 40px;color:var(--muted,#a9b4c2);font-size:calc(17px*var(--fs))}
+.lmark{width:120px;height:auto;overflow:visible;animation:lbob 1.6s ease-in-out infinite}
+.lmark .lid{transform-box:fill-box;transform-origin:0% 100%;animation:llid 1.6s ease-in-out infinite}
+@keyframes llid{0%,100%{transform:rotate(-4deg) translateY(28px)}50%{transform:rotate(-16deg) translateY(-22px)}}
+@keyframes lbob{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){.lmark,.lmark .lid{animation:none}}
 .actions{display:flex;gap:8px}
 .ib{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#1a1f27;border:1px solid var(--line);color:#d3dbe6;flex-shrink:0}.ib svg{width:21px;height:21px}.ib[aria-pressed=true]{background:#183250;border-color:#2f5d8c;color:#9fd2ff}
 h1{font-size:calc(32px*var(--fs));font-weight:700;letter-spacing:-.4px;margin:14px 0 0;line-height:1.2}

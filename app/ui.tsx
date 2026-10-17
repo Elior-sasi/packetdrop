@@ -33,6 +33,7 @@ const domainOf=(name:string)=>brandDomains[name]||(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/
 // Same white Google sign-in button as TAB: official four-colour G, dark label, white pill.
 function GoogleButton({label,disabled}:{label:string;disabled?:boolean}){return <button className="gbtn" disabled={disabled}><svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg><span>{label}</span></button>;}
 function Favicon({name,size=18}:{name:string;size?:number}){const [failed,setFailed]=useState(false);const d=domainOf(name);if(!d||failed)return null;return <img className="fav" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=64'} alt="" width={size} height={size} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>;}
+function Mark({cls}:{cls?:string}){return <svg className={cls} viewBox="100 76 312 386" aria-hidden="true"><defs><linearGradient id="ug" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug)" strokeWidth="58" strokeLinecap="round"/><rect className="lid" x="112" y="112" width="288" height="48" rx="16" fill="#4aa8ff" transform="rotate(-10 112 160)"/></svg>;}
 function Thumb({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop);
  return <div className={big?'hero':'thumb'}>{p.image&&!failed?<>{big&&<img className="backdrop" src={p.image} alt="" aria-hidden="true" referrerPolicy="no-referrer"/>}<img className="photo" src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
 function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop}/><span dir="auto">{p.shop}</span>{p.carrier&&<><span className="sep">·</span><span dir="auto">{p.carrier}</span></>}</div>;}
@@ -96,7 +97,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  return <main className={large?'app large':'app'}>
  {user&&pull>0&&view!=='account'&&<div className={'ptr'+(pull>=80?' ready':'')} style={{transform:'translate(-50%,'+Math.max(0,pull-46)+'px)',opacity:Math.min(1,pull/80)}} aria-hidden="true"><RefreshCw style={{transform:'rotate('+pull*3+'deg)'}}/></div>}
  <header className="top">
-  <div className="row"><span className="brand" dir="ltr"><img src="/brand.png" alt=""/>Unbox</span>
+  <div className="row"><span className="brand" dir="ltr" aria-label="Unbox"><Mark/><span aria-hidden="true">nbox</span></span>
    <div className="actions"><button className="ib" aria-label="הגדלת טקסט" aria-pressed={large} onClick={()=>setLarge(!large)}><Type/></button></div></div>
   <h1>{view==='account'?'החשבון':view==='done'?'נמסרו':'החבילות שלי'}</h1>
   {user&&view!=='account'&&progress&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
@@ -118,18 +119,20 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  </section>:<>
   {!configured&&<section className="notice"><h2>Unbox מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
+   {busy&&<div className="loader" role="status"><Mark cls="lmark"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p></div>}
    {data&&!busy&&<div className="chips" role="tablist" aria-label="סינון חבילות">
     <button role="tab" aria-selected={view==='active'&&filter==='all'} className={'chip'+(view==='active'&&filter==='all'?' on':'')} onClick={()=>{setFilter('all');go('active');}}>בדרך <b>{active.length}</b></button>
     {pickup>0&&<button role="tab" aria-selected={view==='active'&&filter==='pickup'} className={'chip warn'+(view==='active'&&filter==='pickup'?' on':'')} onClick={()=>{setFilter('pickup');go('active');}}>לאיסוף <b>{pickup}</b></button>}
     <button role="tab" aria-selected={view==='done'} className={'chip'+(view==='done'?' on':'')} onClick={()=>{setFilter('all');go('done');}}>נמסרו <b>{done.length}</b></button></div>}
-   <label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+   {!busy&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
    {error&&<div className="error" role="alert"><span>{error}</span>{['NO_GMAIL','RECONNECT','UNAUTHORIZED'].includes(errorCode)?<form action={login}><button className="primary">חידוש הרשאת Google</button></form>:<button className="ghost" onClick={()=>sync()}>נסה שוב</button>}</div>}
    <div className="list">{shown.map(p=><button key={p.id} className={'card '+(p.stage===3&&!p.cancelled?'focus':'')} onClick={()=>setOpenId(p.id)} aria-label={p.name+', '+statusText(p)}>
     <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{p.name}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span>{p.stage===3&&p.pickup?.place&&!p.cancelled?<span className="eta">איסוף ב<b>{p.pickup.place}</b></span>:p.eta&&!p.cancelled&&<span className="eta">הגעה <b>{p.eta}</b></span>}</div></div></div>
     <Bar p={p}/></button>)}</div>
-   {busy&&!data&&<div className="list">{[0,1,2].map(i=><div key={i} className="card skel"><div className="c"><div className="thumb"/><div className="info"><i/><i/><i/></div></div></div>)}</div>}
+
    {!shown.length&&!busy&&data&&<section className="panel empty"><Package size={40}/><h2>{q?'לא נמצאו חבילות':view==='done'?'עדיין אין חבילות שנמסרו':'אין חבילות בדרך'}</h2><p>{q?'נסה מילה אחרת.':'חבילות חדשות יופיעו כאן אחרי רענון.'}</p></section>}
    {data&&<p className="footnote">נסרקו {data.scanned} הודעות מ־180 הימים האחרונים{busy?', ממשיך לסרוק…':'.'}{data.failed?' '+data.failed+' הודעות לא נקראו, רענון ינסה שוב.':''} {trackState==='on'?'עדכונים מחברות השילוח דרך 17TRACK.':trackState==='error'?'חברות השילוח לא ענו כרגע, מוצג המידע מהמיילים.':'מועד הגעה מוצג רק אם מופיע במייל.'}</p>}
+   </>}
   </>}
  </>}
 
