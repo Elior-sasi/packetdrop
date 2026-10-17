@@ -101,4 +101,6 @@ dialog input{width:100%;min-height:52px;padding:0 14px;border-radius:14px;backgr
 .spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:360px){.app{padding-inline:12px}.thumb{width:68px;height:68px}h1{font-size:calc(28px*var(--fs))}.sp{width:50px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-.src{display:inline-block;font-size:calc(14px*var(--fs));color:var(--mut);margin-top:4px}.trackNote{margin:14px 4px 0;color:var(--mut);font-size:calc(15px*var(--fs));line-height:1.6}
+.src{display:inline-block;font-size:calc(14px*var(--fs));color:var(--mut);margin-top:4px}.trackNote{margin:14px 4px 0;color:var(--mut);font-size:calc(15px*var(--fs));line-height:1.6}.pickup h3{display:flex;align-items:center;gap:6px;color:#ffd98a}.pickup .place{font-size:calc(22px*var(--fs));font-weight:700;margin:4px 0 0}.pickup .addr{color:var(--mut);margin:4px 0 0}
+.code{display:flex;align-items:center;gap:10px;width:100%;margin-top:14px;padding:12px 14px;border-radius:16px;background:#2a2414;border:1px solid #5d4a1c;color:#ffe7b3;min-height:60px}.code span{flex:1;text-align:right;font-weight:500}.code b{font-size:calc(26px*var(--fs));letter-spacing:3px;font-weight:700}
+.pickActions{display:flex;gap:10px;flex-wrap:wrap}.pickActions .ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:1 1 140px;text-decoration:none}
