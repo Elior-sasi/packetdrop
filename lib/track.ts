@@ -40,3 +40,28 @@ export async function track(numbers:string[],key:string){
  const out:Record<string,TrackInfo>={};for(const a of (d?.data?.accepted||[]) as Raw[])out[a.number]=toInfo(a);
  for(const n of list)if(!out[n])out[n]={number:n,status:'NotFound',stage:-1,carrier:'',eta:null,events:[],pending:true};
  return out;}
+// Cainiao (AliExpress logistics) public tracking page data. Unofficial and best-effort: any failure just returns nothing.
+type CnEvent={time?:number;timeStr?:string;desc?:string;standerdDesc?:string;actionCode?:string;group?:{nodeDesc?:string}};
+type CnMod={mailNo?:string;status?:string;statusDesc?:string;detailList?:CnEvent[];globalEtaInfo?:{deliveryMinTime?:number;deliveryMaxTime?:number}};
+export function cnStage(status:string,latest:string,action:string){const s=(status+' '+action).toUpperCase();
+ if(/SIGN(?!.*FAIL)|DELIVERED/.test(s)||/\bdelivered\b|signed/i.test(latest))return 4;
+ if(/PICKUP|STA_|WAIT4|DELIVERING|OUT_FOR/.test(s)||/out for delivery|ready for (?:pick ?up|collection)|available for pick/i.test(latest))return 3;
+ if(/NOT_?FOUND|^\s*$/.test(s))return -1;return 2;}
+export function fromCainiao(m:CnMod):TrackInfo|null{if(!m.mailNo)return null;
+ const events=(m.detailList||[]).map(e=>({time:e.time?new Date(e.time).toISOString():'',text:heEvent((e.standerdDesc||e.desc||'').trim()),location:''})).filter(e=>e.time&&e.text).sort((a,b)=>a.time.localeCompare(b.time));
+ if(!events.length)return null;const top=(m.detailList||[]).slice().sort((a,b)=>(b.time||0)-(a.time||0))[0]||{};
+ const stage=cnStage(m.status||'',top.standerdDesc||top.desc||'',top.actionCode||'');const eta=m.globalEtaInfo;
+ const status=stage===4?'Delivered':stage===3?(/pick/i.test(top.standerdDesc||top.desc||'')?'AvailableForPickup':'OutForDelivery'):'InTransit';
+ return {number:m.mailNo.toUpperCase(),status,stage,carrier:'Cainiao',eta:eta?.deliveryMaxTime?{from:eta.deliveryMinTime?new Date(eta.deliveryMinTime).toISOString():undefined,to:new Date(eta.deliveryMaxTime).toISOString()}:null,events:events.slice(-40)};}
+export async function cainiao(numbers:string[]){const out:Record<string,TrackInfo>={};
+ const list=[...new Set(numbers.map(n=>n.trim().toUpperCase()).filter(n=>/^[A-Z0-9]{8,40}$/.test(n)))].slice(0,40);
+ for(let i=0;i<list.length;i+=10){try{const r=await fetch('https://global.cainiao.com/global/detail.json?'+new URLSearchParams({mailNos:list.slice(i,i+10).join(','),lang:'en-US'}),{headers:{'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',Accept:'application/json',Referer:'https://global.cainiao.com/'},cache:'no-store',signal:AbortSignal.timeout(10000)});
+  if(!r.ok)continue;const d=await r.json().catch(()=>null);for(const m of (d?.module||[]) as CnMod[]){const t=fromCainiao(m);if(t)out[t.number]=t;}}catch{}}
+ return out;}
+// Both sources together: the further-along status wins, and the event lists are combined.
+export function combine(a?:TrackInfo,b?:TrackInfo):TrackInfo|undefined{if(!a||a.pending&&!a.events.length)return b||a;if(!b)return a;
+ const seen=new Set<string>();const events=[...a.events,...b.events].sort((x,y)=>x.time.localeCompare(y.time)).filter(e=>{const k=e.time.slice(0,16)+e.text;if(seen.has(k))return false;seen.add(k);return true;}).slice(-40);
+ const lead=b.stage>a.stage?b:a;return {...lead,carrier:a.carrier||b.carrier,eta:a.eta||b.eta,events,pending:false};}
+export async function trackAll(numbers:string[],key?:string){
+ const [t17,cn]=await Promise.all([key?track(numbers,key).catch(()=>({} as Record<string,TrackInfo>)):Promise.resolve({} as Record<string,TrackInfo>),cainiao(numbers)]);
+ const out:Record<string,TrackInfo>={};for(const n of new Set([...Object.keys(t17),...Object.keys(cn)])){const c=combine(t17[n],cn[n]);if(c)out[n]=c;}return out;}

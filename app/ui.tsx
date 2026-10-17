@@ -165,7 +165,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
     <Bar p={p}/></button>)}</div>
 
    {!shown.length&&!busy&&data&&<section className="panel empty"><Package size={40}/><h2>{q?'לא נמצאו חבילות':view==='done'?'עדיין אין חבילות שנמסרו':'אין חבילות בדרך'}</h2><p>{q?'נסה מילה אחרת.':'חבילות חדשות יופיעו כאן אחרי רענון.'}</p></section>}
-   {data&&<p className="footnote">נסרקו {data.scanned} הודעות מ־180 הימים האחרונים{busy?', ממשיך לסרוק…':'.'}{data.failed?' '+data.failed+' הודעות לא נקראו, רענון ינסה שוב.':''} {trackState==='on'?'עדכונים מחברות השילוח דרך 17TRACK.':trackState==='error'?'חברות השילוח לא ענו כרגע, מוצג המידע מהמיילים.':'מועד הגעה מוצג רק אם מופיע במייל.'}</p>}
+   {data&&<p className="footnote">נסרקו {data.scanned} הודעות מ־180 הימים האחרונים{busy?', ממשיך לסרוק…':'.'}{data.failed?' '+data.failed+' הודעות לא נקראו, רענון ינסה שוב.':''} {trackState==='on'?'עדכונים מחברות השילוח דרך 17TRACK ו־Cainiao.':trackState==='error'?'חברות השילוח לא ענו כרגע, מוצג המידע מהמיילים.':'מועד הגעה מוצג רק אם מופיע במייל.'}</p>}
    </>}
   </>}
  </>}
