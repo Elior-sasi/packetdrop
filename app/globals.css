@@ -101,3 +101,4 @@ dialog input{width:100%;min-height:52px;padding:0 14px;border-radius:14px;backgr
 .spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:360px){.app{padding-inline:12px}.thumb{width:68px;height:68px}h1{font-size:calc(28px*var(--fs))}.sp{width:50px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.src{display:inline-block;font-size:calc(14px*var(--fs));color:var(--mut);margin-top:4px}.trackNote{margin:14px 4px 0;color:var(--mut);font-size:calc(15px*var(--fs));line-height:1.6}
