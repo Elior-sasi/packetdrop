@@ -4,7 +4,7 @@ import {parseMessage,mergeParcels,type Message} from '@/lib/parcels';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
 // Subjects plus common shop/carrier senders and body phrases, so orders whose subject lacks a keyword are not missed.
-const QUERY='newer_than:180d -in:spam -in:trash {'+[
+const QUERY='newer_than:180d -in:spam -in:trash -category:promotions -subject:פרסומת {'+[
  'subject:order','subject:shipped','subject:shipment','subject:delivery','subject:delivered','subject:tracking','subject:package','subject:parcel','subject:dispatched',
  'subject:הזמנה','subject:הזמנתך','subject:משלוח','subject:חבילה','subject:איסוף','subject:נשלח','subject:נמסר',
  'from:aliexpress.com','from:amazon.com','from:temu.com','from:shein.com','from:ebay.com','from:iherb.com','from:israelpost.co.il','from:ups.com','from:dhl.com','from:fedex.com','from:cainiao.com','from:hfd.co.il',
