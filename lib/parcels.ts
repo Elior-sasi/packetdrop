@@ -30,6 +30,20 @@ const STAGE_RULES:[number,RegExp][]=[
 const CANCEL=/is closed|בוטלה|ביטול ההזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי/i;
 function stageOf(s:string){for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
 
+export function tidyName(raw:string){let n=raw.replace(/\s+x\d+$/i,'').trim();
+ if(/(\.\.\.|…)\s*$/.test(n)){n=n.replace(/(\.\.\.|…)\s*$/,'').trim();n=n.replace(/[\s,،\-–(]+\S{0,3}$/,'').replace(/[\s,،\-–(]+$/,'').trim();}
+ // Store titles are keyword lists; keep the part before the second comma so the card reads like a name.
+ if(n.length>42){const parts=n.split(/\s*[,،|]\s*/);let out=parts[0];for(const p of parts.slice(1)){if((out+', '+p).length>42)break;out+=', '+p;}n=out.length>=12?out:n.slice(0,42).replace(/\s+\S*$/,'');}
+ return n;}
+const MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+// Keep only the date part of "arriving September 6 Elior - ..." and write it the Israeli way (6.9).
+export function etaOf(raw:string){const t=raw.trim();
+ const en=t.match(/^(?:[a-z]+day,?\s*)?([a-z]{3})[a-z]*\.?\s+(\d{1,2})(?:\s*[-–]\s*(?:([a-z]{3})[a-z]*\.?\s+)?(\d{1,2}))?/i);
+ if(en&&MONTHS.includes(en[1].toLowerCase())){const m=MONTHS.indexOf(en[1].toLowerCase())+1;const m2=en[3]&&MONTHS.includes(en[3].toLowerCase())?MONTHS.indexOf(en[3].toLowerCase())+1:m;return en[4]?en[2]+'.'+m+'-'+en[4]+'.'+m2:en[2]+'.'+m;}
+ const de=t.match(/^(\d{1,2})\s+([a-z]{3})[a-z]*/i);if(de&&MONTHS.includes(de[2].toLowerCase()))return de[1]+'.'+(MONTHS.indexOf(de[2].toLowerCase())+1);
+ const d=t.match(/^(\d{1,2})[./](\d{1,2})(?:[./]\d{2,4})?(?:\s*[-–]\s*(\d{1,2})[./](\d{1,2}))?/);if(d)return (+d[1])+'.'+(+d[2])+(d[3]?'-'+(+d[3])+'.'+(+d[4]):'');
+ const h=t.match(/^(\d{1,2})\s+(?:ב)?(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)/);if(h)return h[1]+' ב'+h[2];
+ return '';}
 export function parseMessage(m:Message):Parcel|null{
  const h=m.payload?.headers||[];const header=(key:string)=>h.find(x=>x.name.toLowerCase()===key)?.value||'';
  const subject=header('subject'),from=header('from');
@@ -69,18 +83,18 @@ export function parseMessage(m:Message):Parcel|null{
  // Product block: the link to the order/package details, not the "you may also like" grid.
  $('a').each((_,el)=>{if(name)return;const a=$(el),href=a.attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;
   const bits=a.find('*').addBack().contents().toArray().filter(n=>n.type==='text').map(n=>$(n).text().replace(/\s+/g,' ').trim()).filter(t=>t.length>6&&!/^[₪$€]|\d+[.,]\d{2}\s*$|^x\d+$|משלוח אל|סך הכל|לפרטי|פרטי ה(?:חבילה|הזמנה|משלוח)|order details|package details/i.test(t));
-  if(bits[0]){name=bits[0].replace(/\s+x\d+$/i,'').trim();}});
+  if(bits[0]){name=tidyName(bits[0]);}});
  // The photo often sits in its own anchor next to the title anchor; take the first real product photo from those links (skip tiny badge icons).
  const productImg=(el:any)=>{const src=$(el).attr('src')||$(el).attr('data-src')||'';const u=secureUrl(src.startsWith('//')?'https:'+src:src.replace(/^http:\/\/(?=[^/]*(?:alicdn|aliexpress-media|media-amazon|ssl-images-amazon|temu|shein|ebayimg))/i,'https://'));const w=Number($(el).attr('width')||0);
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
  if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;$(el).find('img').each((_,im)=>{if(!image)image=productImg(im);});});
- if(!name)$('img').each((_,el)=>{if(image)return;const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein)$/i.test(alt)){name=alt;image=src;}});
+ if(!name)$('img').each((_,el)=>{if(image)return;const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein|completed|delivered|shipped|ordered|success|check ?mark|in transit)$/i.test(alt)){name=alt;image=src;}});
  if(!name)name=/^הודעה (?:מ|ב)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
  const cancelled=CANCEL.test(subject);
  let stage=stageOf(subject);if(stage<0)stage=stageOf(lead);
  const range=text.match(/בין התאריכים\s*(\d{1,2})[./-](\d{1,2})(?:[./-]\d{2,4})?\s*(?:ו?עד|-)\s*(\d{1,2})[./-](\d{1,2})/);
- const eta=range?(+range[1]+'.'+(+range[2])+'-'+(+range[3])+'.'+(+range[4])):text.match(/(?:estimated delivery|expected delivery|arriving|delivery date|הגעה משוערת|מועד הגעה|צפויה להגיע)\s*[:\-]?\s*([^.!?|]{4,65})/i)?.[1]?.trim()||'';
+ const eta=range?(+range[1]+'.'+(+range[2])+'-'+(+range[3])+'.'+(+range[4])):etaOf(text.match(/(?:estimated delivery|expected delivery|arriving|delivery date|הגעה משוערת|מועד הגעה|צפויה להגיע)\s*[:\-]?\s*([^.!?|]{4,65})/i)?.[1]||'');
  const url=$('a').toArray().map(a=>({text:$(a).text(),url:secureUrl($(a).attr('href')||'')})).find(l=>l.url&&/track|מעקב|לעקוב/i.test(l.text))?.url||'';
  const time=new Date(Number(m.internalDate)||Date.now()).toISOString();
  const keys=[...new Set([...[...orders].map(o=>'order:'+o),...(tracking?['tracking:'+tracking]:[]),...[...extra].map(x=>'tracking:'+x)])];

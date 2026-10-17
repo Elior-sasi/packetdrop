@@ -4,18 +4,20 @@ import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,UserRound,RefreshCw,Type,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload} from 'lucide-react';
 import {mergeParcels,brandDomains,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
-type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean};
+type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean};
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
 const STATUS=['ההזמנה התקבלה','נשלחה','בדרך ליעד','מוכנה לאיסוף / במסירה','נמסרה'];
 const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
 const tone=(p:Parcel)=>p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3?'warn':'';
-const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&p.carrierStatus==='OutForDelivery'?'יצאה למסירה':p.stage===3?(p.events.some(e=>/איסוף|pickup|collection/i.test(e.label))?'מוכנה לאיסוף':'במסירה'):STATUS[p.stage];
+const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.stale?'כנראה התקבלה':p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&p.carrierStatus==='OutForDelivery'?'יצאה למסירה':p.stage===3?(p.events.some(e=>/איסוף|pickup|collection/i.test(e.label))?'מוכנה לאיסוף':'במסירה'):STATUS[p.stage];
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
-const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^\S*\d{8,}/.test(name);
-const displayName=(p:Parcel)=>isGeneric(p.name)?(p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):p.name;
+const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|הזמנתך|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^(?:תודה|אישור (?:ה)?הזמנה|order confirm|thank you for your order|thanks for your order)/i.test(name)||/^\S*\d{8,}/.test(name);
+const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):p.name;
+const NOISE=/איך הלך|בהמתנה לאישור|ביקורת|review|rate your|תסומן בקרוב|how was/i;
+const timeline=(evs:Event[])=>{const out:Event[]=[];for(const e of evs){if(NOISE.test(e.label))continue;const l=cleanLabel(e.label);if(out.length&&cleanLabel(out[out.length-1].label)===l)continue;out.push(e);}return out.length?out:evs.slice(-1);};
 const when=(iso:string)=>{const d=new Date(iso);return d.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})+' · '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
-const ago=(iso:string)=>{const m=Math.round((Date.now()-new Date(iso).getTime())/60000);return m<1?'עודכן עכשיו':m<60?'עודכן לפני '+m+' דק׳':'עודכן ב־'+new Date(iso).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
+const ago=(iso:string)=>{const m=Math.floor((Date.now()-new Date(iso).getTime())/60000);return m<1?'עודכן עכשיו':m<60?'עודכן לפני '+m+' דק׳':'עודכן ב־'+new Date(iso).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
 
 const day=(d?:string)=>{if(!d)return '';const x=new Date(d);return isNaN(+x)?'':x.getDate()+'.'+(x.getMonth()+1);};
 const etaText=(e:TrackInfo['eta'])=>{if(!e)return '';const a=day(e.from),b=day(e.to);return a&&b&&a!==b?a+'-'+b:a||b;};
@@ -48,8 +50,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    const chunks:string[][]=[];for(let i=0;i<todo.length;i+=20)chunks.push(todo.slice(i,i+20));
    const worker=async()=>{for(let ch=chunks.shift();ch&&!c.signal.aborted;ch=chunks.shift()){const r2=await fetch('/api/parcels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ch}),signal:c.signal,cache:'no-store'});const d2=await r2.json();
      if(!r2.ok){if(['NO_GMAIL','RECONNECT','UNAUTHORIZED','GMAIL_API_DISABLED'].includes(d2.code)){setErrorCode(d2.code);throw Error(d2.error);}failed+=ch.length;done+=ch.length;step();continue;}
-     for(const id of d2.read as string[])seen.current.add(id);failed+=(d2.failed as string[]).length;done+=ch.length;acc={...acc,scanned:acc.scanned+(d2.read as string[]).length,failed,parcels:mergeParcels([...acc.parcels,...d2.parcels])};setData(acc);step();}};
-   await Promise.all([worker(),worker(),worker(),worker()]);
+     for(const id of d2.read as string[])seen.current.add(id);failed+=(d2.failed as string[]).length;done+=ch.length;acc={...acc,scanned:acc.scanned+(d2.read as string[]).length,failed,parcels:mergeParcels([...acc.parcels,...d2.parcels])};saved.current=acc.parcels;setData(acc);step();}};
+   await Promise.all([worker(),worker(),worker(),worker()]);acc={...acc,updated:new Date().toISOString()};setData(acc);
    if(!c.signal.aborted){setProgress({pct:92,label:'בודק מול חברות השילוח…'});await loadTracks(acc.parcels);setProgress({pct:96,label:'שומר גיבוי בענן…'});await saveBackup(acc.parcels);setProgress({pct:100,label:'הסתיים'});}
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
@@ -79,7 +81,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function loadTracks(list:MailParcel[]){const numbers=list.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,40);if(!numbers.length)return;
   try{const r=await fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({numbers}),cache:'no-store'});const d=await r.json();if(!d.enabled){setTrackState('off');return;}if(!r.ok)throw Error();setTracks(old=>({...old,...d.tracks}));setTrackState('on');}catch{setTrackState('error');}}
  async function copy(v:string){try{await navigator.clipboard.writeText(v);setCopied(v);setTimeout(()=>setCopied(''),1500);}catch{}}
- const parcels=useMemo(()=>(data?.parcels||[]).map(m=>{const p=withCarrier(m,tracks[m.tracking]);return {...p,name:titles[p.id]||displayName(m)};}),[data,titles,tracks]);
+ const parcels=useMemo(()=>(data?.parcels||[]).map(m=>{const p=withCarrier(m,tracks[m.tracking]);const last=new Date(p.events.at(-1)?.time||0).getTime();
+  // Pickup points return parcels after ~2 weeks and shops stop writing once it arrives: after 21 days of silence treat it as received.
+  const stale=p.stage<4&&!p.cancelled&&Date.now()-last>(p.stage===3?14:30)*864e5;
+  return {...p,stale,stage:stale?4:p.stage,name:titles[p.id]||displayName(m)};}),[data,titles,tracks]);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4||p.cancelled);
  const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(p=>p.stage===3):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  const pickup=active.filter(p=>p.stage===3).length;const open=parcels.find(p=>p.id===openId)||null;
@@ -110,7 +115,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  </section>:<>
   {!configured&&<section className="notice"><h2>PacketDrop מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
-   {data&&<div className="chips" role="tablist" aria-label="סינון חבילות">
+   {data&&!busy&&<div className="chips" role="tablist" aria-label="סינון חבילות">
     <button role="tab" aria-selected={view==='active'&&filter==='all'} className={'chip'+(view==='active'&&filter==='all'?' on':'')} onClick={()=>{setFilter('all');go('active');}}>בדרך <b>{active.length}</b></button>
     {pickup>0&&<button role="tab" aria-selected={view==='active'&&filter==='pickup'} className={'chip warn'+(view==='active'&&filter==='pickup'?' on':'')} onClick={()=>{setFilter('pickup');go('active');}}>לאיסוף <b>{pickup}</b></button>}
     <button role="tab" aria-selected={view==='done'} className={'chip'+(view==='done'?' on':'')} onClick={()=>{setFilter('all');go('done');}}>נמסרו <b>{done.length}</b></button></div>}
@@ -137,7 +142,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <div className="pickActions">{open.pickup.address&&<a className="ghost" href={'https://waze.com/ul?navigate=yes&q='+encodeURIComponent(open.pickup.place+' '+open.pickup.address)} target="_blank" rel="noopener noreferrer"><Navigation size={18}/> ניווט</a>}
     {open.pickup.url&&<a className="ghost" href={open.pickup.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/> שעות פתיחה</a>}</div></section>}
   {open.tracking&&trackState==='on'&&open.trackPending&&open.stage<4&&<p className="trackNote">מספר המעקב נרשם אצל חברת השילוח. העדכונים שלה יופיעו כאן בדקות הקרובות.</p>}
-  <section className="box"><h3>היסטוריה</h3>{[...open.events].reverse().map((e,i)=><div key={e.id} className={'ev '+(!i?'l':'')}><span className="dot"/><div><strong dir="auto">{cleanLabel(e.label)}</strong>{e.src?<span className="src">מ־{e.src}</span>:<a href={'https://mail.google.com/mail/u/?authuser='+encodeURIComponent(user?.email||'')+'#all/'+encodeURIComponent(e.id)} target="_blank" rel="noopener noreferrer">המייל המקורי <ExternalLink size={13}/></a>}</div><time dateTime={e.time}>{when(e.time)}</time></div>)}</section>
+  <section className="box"><h3>היסטוריה</h3>{[...timeline(open.events)].reverse().map((e,i)=><div key={e.id} className={'ev '+(!i?'l':'')}><span className="dot"/><div><strong dir="auto">{cleanLabel(e.label)}</strong>{e.src?<span className="src">מ־{e.src}</span>:<a href={'https://mail.google.com/mail/u/?authuser='+encodeURIComponent(user?.email||'')+'#all/'+encodeURIComponent(e.id)} target="_blank" rel="noopener noreferrer">המייל המקורי <ExternalLink size={13}/></a>}</div><time dateTime={e.time}>{when(e.time)}</time></div>)}</section>
   {(open.tracking||open.order||open.url)&&<section className="box">
    {open.tracking&&<div className="kv"><span>מספר מעקב</span><button className="copy" onClick={()=>copy(open.tracking)}><b dir="ltr">{open.tracking}</b>{copied===open.tracking?' ✓':<Copy size={15}/>}</button></div>}
    {open.order&&<div className="kv"><span>מספר הזמנה</span><button className="copy" onClick={()=>copy(open.order)}><b dir="ltr">{open.order}</b>{copied===open.order?' ✓':<Copy size={15}/>}</button></div>}
