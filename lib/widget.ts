@@ -21,7 +21,7 @@ export function lines(all:Parcel[],names:Record<string,string>,when:Record<strin
 // Runs inside Scriptable (fetched by the small script on the phone). `r` is this route's JSON.
 // The logo stays where it always was (top left on the phone); texts follow the natural (right) side.
 export const RENDER=`
-const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');w.url='https://packetdrop.vercel.app';w.setPadding(14,14,12,14)
+const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');w.url='https://packetdrop.vercel.app';w.setPadding(6,14,12,14)
 const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadImage().catch(()=>null)
 if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*24/img.size.height,24);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
 w.addSpacer(8)
