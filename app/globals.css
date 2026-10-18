@@ -240,3 +240,5 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .app.nonav{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
 .ahead{border-top:1px dashed var(--line);margin-top:4px}.ahead .ev{border-top:0;padding:8px 0}.ev.f strong{color:#7f8b9a;font-weight:500}.ev.f .dot{background:transparent;border:2px solid #3a4656}.ev.f.n strong{color:var(--mut)}
 nav{touch-action:none}nav.dragging:before{transition:none}
+.menu{position:relative}.grab{width:40px;height:5px;border-radius:3px;background:#4a5b70;margin:-6px auto 4px}
+.menu .sheetX{position:absolute;top:12px;left:14px;width:36px;height:36px;min-height:0;min-width:0;box-sizing:border-box;border-radius:50%;display:grid;place-items:center;background:#ffffff14;border:0;color:#c8d6e6;padding:0}

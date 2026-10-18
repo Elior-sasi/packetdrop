@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {heName} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
-import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2} from 'lucide-react';
+import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean};
@@ -188,6 +188,12 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
    <text x="348" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">{abroad(p)?'חו"ל':'החנות'}</text><text x="12" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">אתה</text></svg></button>;}
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
 
+// Bottom sheet chrome: a grab bar you can pull down to close, and a close button.
+function swipeClose(close:()=>void){let y0=0,dy=0;return {
+ onTouchStart:(e:React.TouchEvent<HTMLElement>)=>{const el=e.currentTarget;y0=el.scrollTop>0?-1:e.touches[0].clientY;dy=0;},
+ onTouchMove:(e:React.TouchEvent<HTMLElement>)=>{if(y0<0)return;dy=Math.max(0,e.touches[0].clientY-y0);e.currentTarget.style.transform=dy?'translateY('+dy+'px)':'';},
+ onTouchEnd:(e:React.TouchEvent<HTMLElement>)=>{const el=e.currentTarget;if(dy>90){close();}else{el.style.transition='transform .2s';el.style.transform='';setTimeout(()=>{el.style.transition='';},220);}y0=0;dy=0;}};}
+function SheetTop({close}:{close:()=>void}){return <><div className="grab" aria-hidden="true"/><button type="button" className="sheetX" aria-label="סגירה" onClick={close}><X size={20}/></button></>;}
 export default function Dashboard({user,gmail,drive,configured,login}:{user:User|null;gmail:boolean;drive?:boolean;configured:boolean;login:()=>Promise<void>}){
  const [view,setView]=useState<'active'|'done'|'account'>('active'),[size,setSize]=useState(0),[auto,setAuto]=useState(true),[splash,setSplash]=useState<'on'|'out'|'off'>('on'),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[filter,setFilter]=useState<'all'|'pickup'>('all'),[backup,setBackup]=useState<{state:'off'|'on'|'error'|'saving';updated?:string;msg?:string}>({state:drive?'on':'off'}),saved=useRef<MailParcel[]>([]),backupOn=useRef(!!drive),seen=useRef<Set<string>>(new Set()),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off'),[sources,setSources]=useState<{t17:boolean;cainiao:string}|null>(null),[section,setSection]=useState<'list'|'today'|'stats'>('list'),[marks,setMarks]=useState<Record<string,'got'|'hide'>>({}),[manual,setManual]=useState<MailParcel[]>([]),[adding,setAdding]=useState(false),[addNum,setAddNum]=useState(''),[addName,setAddName]=useState(''),[addErr,setAddErr]=useState(''),[menu,setMenu]=useState<Parcel|null>(null),[geo,setGeo]=useState<Geo>({}),[month,setMonth]=useState(0),[reading,setReading]=useState(false),[addSms,setAddSms]=useState(''),[smsLink,setSmsLink]=useState(''),[toast,setToast]=useState(''),[smsLast,setSmsLast]=useState<{at:string;kind:string}|null>(null),[widgetUrl,setWidgetUrl]=useState(''),[showEst,setShowEst]=useState(true),[showMap,setShowMap]=useState(true),[foldCourier,setFoldCourier]=useState(true),[showNext,setShowNext]=useState(true);
  const marksRef=useRef(marks);marksRef.current=marks;const manualRef=useRef(manual);manualRef.current=manual;
@@ -493,23 +499,22 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
 
  <dialog ref={dialog} onCancel={e=>{e.preventDefault();if(!saving)setEdit(null);}} onClose={()=>setEdit(null)}><form onSubmit={e=>{e.preventDefault();void save();}}><h2>שם החבילה</h2><label htmlFor="title" className="sr">שם החבילה</label><input id="title" autoFocus maxLength={180} value={draft} onChange={e=>setDraft(e.target.value)} disabled={saving}/>{editError&&<p className="error" role="alert">{editError}</p>}<div className="dialogActions"><button className="primary" disabled={saving||!draft.trim()}>{saving?'שומר…':'שמירה'}</button><button type="button" className="ghost" disabled={saving} onClick={()=>setEdit(null)}>ביטול</button></div><button type="button" className="textBtn" disabled={saving} onClick={()=>save(true)}>חזרה לשם המקורי</button></form></dialog>
  {toast&&<div className="toast" role="status">{toast}</div>}
- {menu&&<div className="menuWrap" onClick={()=>setMenu(null)}><div className="menu" role="dialog" aria-modal="true" aria-label={'פעולות: '+menu.name} onClick={e=>e.stopPropagation()}>
+ {menu&&<div className="menuWrap" onClick={()=>setMenu(null)}><div className="menu" role="dialog" aria-modal="true" aria-label={'פעולות: '+menu.name} onClick={e=>e.stopPropagation()} {...swipeClose(()=>setMenu(null))}><SheetTop close={()=>setMenu(null)}/>
   <p className="menuTitle">{bidi(menu.name)}</p>
   {menu.pickup?.code&&<button onClick={()=>{void copy(menu.pickup!.code);setMenu(null);}}><KeyRound size={20}/> העתק קוד איסוף <b dir="ltr">{menu.pickup.code}</b></button>}
   {menu.pickup&&(menu.pickup.address||menu.pickup.place)&&<div className="menuNav"><NavLinks pk={menu.pickup} geo={geo[placeQuery(menu.pickup)]}/></div>}
   {menu.tracking&&<button onClick={()=>{void copy(menu.tracking);setMenu(null);}}><Copy size={20}/> העתק מספר מעקב</button>}
   {menu.got?<button onClick={()=>mark(menu,null)}><Undo2 size={20}/> בטל "קיבלתי"</button>:menu.stage<4&&<button onClick={()=>mark(menu,'got')}><PackageCheck size={20}/> קיבלתי</button>}
-  <button onClick={()=>mark(menu,'hide')}><EyeOff size={20}/> הסתר, זו לא חבילה</button>
-  <button className="menuCancel" onClick={()=>setMenu(null)}>ביטול</button></div></div>}
- {adding&&<div className="menuWrap" onClick={()=>setAdding(false)}><form className="menu addForm" onClick={e=>e.stopPropagation()} onSubmit={e=>{e.preventDefault();addManual();}}>
-  <p className="menuTitle">הוספת חבילה</p>
+  <button onClick={()=>mark(menu,'hide')}><EyeOff size={20}/> הסתר, זו לא חבילה</button></div></div>}
+ {adding&&<div className="menuWrap" onClick={()=>setAdding(false)}><form className="menu addForm" role="dialog" aria-modal="true" aria-label="הוספת חבילה" onClick={e=>e.stopPropagation()} {...swipeClose(()=>setAdding(false))} onSubmit={e=>{e.preventDefault();addManual();}}>
+  <SheetTop close={()=>setAdding(false)}/><p className="menuTitle">הוספת חבילה</p>
   <label htmlFor="addSms">הדבקת SMS מהדואר או מהשליח</label><textarea id="addSms" rows={3} value={addSms} onChange={e=>setAddSms(e.target.value)}/>
   {addSms.trim()?<><button type="button" className="primary" onClick={()=>{if(applySms([addSms])){setAddSms('');setAdding(false);setAddErr('');}else setAddErr('לא נמצא מספר מעקב בהודעה');}}>הוספה מה־SMS</button>{addErr&&<p className="error" role="alert">{addErr}</p>}</>:<>
   <p className="orLine">או לפי מספר מעקב</p>
   <label htmlFor="addNum">מספר מעקב</label><input id="addNum" dir="ltr" autoFocus autoCapitalize="characters" autoComplete="off" value={addNum} onChange={e=>setAddNum(e.target.value)}/>
   <label htmlFor="addName">שם (לא חובה)</label><input id="addName" value={addName} onChange={e=>setAddName(e.target.value)}/>
   {addErr&&<p className="error" role="alert">{addErr}</p>}
-  <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button></>}<button type="button" className="menuCancel" onClick={()=>setAdding(false)}>ביטול</button></form></div>}
+  <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button></>}</form></div>}
  {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" className={navDrag!==null?'dragging':''} style={{'--tab':navDrag??['list','today','stats'].indexOf(section)} as React.CSSProperties}
   onTouchStart={e=>navSlide(e,false)} onTouchMove={e=>navSlide(e,true)} onTouchEnd={()=>setNavDrag(null)} onTouchCancel={()=>setNavDrag(null)}>{([['list','חבילות',Package,0],['today','איסוף',MapPin,today.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
  </main>;
