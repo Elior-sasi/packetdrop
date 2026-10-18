@@ -8,3 +8,8 @@ test('Shopify order: item title, quantity, refund closes it',()=>{
  assert.ok(a.name.startsWith('כסא ארגונומי'),a.name);assert.ok(a.image.includes('chair'));
  const b=parseMessage(msg('s2','store+80190144817@t.shopifyemail.com','הודעה על זיכוי','<span class="order-number__text">הזמנה #500078564</span><h2>הזמנתך זוכתה</h2><p>סך הכל זיכוי: 798.00 ₪</p><span class="order-list__item-title">כסא ארגונומי פרמיום עם גב רשת דגם CH05-8 × 1</span>','2026-10-04T11:44:12Z'))!;
  assert.ok(b.cancelled);const m=mergeParcels([a,b]);assert.equal(m.length,1);assert.ok(m[0].cancelled);});
+test('shop of a package stays the store when Israel Post writes later',()=>{
+ const base={name:'תחפושת',carrier:'',image:'',url:'',eta:'',cancelled:false,pickup:null};
+ const a={...base,id:'order:1',keys:['order:1','tracking:RS1'],shop:'AliExpress',tracking:'RS1',order:'1',stage:1,events:[{id:'a',label:'נשלחה',time:'2026-10-10T00:00:00Z'}]};
+ const b={...base,id:'tracking:RS1',keys:['tracking:RS1'],name:'חבילה',shop:'דואר ישראל',carrier:'דואר ישראל',tracking:'RS1',order:'',stage:2,events:[{id:'b',label:'בדרך',time:'2026-10-16T00:00:00Z'}]};
+ const m=mergeParcels([a,b] as never);assert.equal(m.length,1);assert.equal(m[0].shop,'AliExpress');assert.equal(m[0].carrier,'דואר ישראל');});
