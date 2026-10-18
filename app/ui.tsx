@@ -74,7 +74,11 @@ function Mark({cls,anim}:{cls?:string;anim?:'bob'|'open'}){return <svg className
 function Thumb({p,big}:{p:Parcel;big?:boolean}){if(p.images&&p.images.length>1){
  // Card: the first item fills the square, the second sits as a small inset so neither is cut in half.
  if(!big)return <div className="thumb multi n2">{p.images.slice(0,2).map(src=><img key={src} src={src} alt="" loading="lazy" referrerPolicy="no-referrer"/>)}</div>;
- return <div className={'hero multi n'+Math.min(p.images.length,4)}>{p.images.slice(0,4).map(src=><img key={src} src={src} alt="" loading="lazy" referrerPolicy="no-referrer"/>)}</div>;}
+ return <Gallery imgs={p.images.slice(0,12)}/>;}
+// Several photos: one at a time, swiped sideways, with dots that show where you are.
+function Gallery({imgs}:{imgs:string[]}){const [at,setAt]=useState(0);
+ return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={src} alt={'תמונה '+(i+1)+' מתוך '+imgs.length} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer"/>)}</div>
+  <div className="dots" aria-hidden="true">{imgs.map((_,i)=><i key={i} className={i===at?'on':''}/>)}</div></div>;}
  return <ThumbOne p={p} big={big}/>;}
 function ThumbOne({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop)||domainOf(p.carrier);
  return <div className={big?'hero':'thumb'}>{p.image&&!failed?<>{big&&<img className="backdrop" src={p.image} alt="" aria-hidden="true" referrerPolicy="no-referrer"/>}<img className="photo" src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
@@ -217,7 +221,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Opening screen: shown on launch, then fades out.
  useEffect(()=>{const a=setTimeout(()=>setSplash('out'),1400),b=setTimeout(()=>setSplash('off'),1800);return()=>{clearTimeout(a);clearTimeout(b);};},[]);
  async function sync(){if(!user||controller.current)return;void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
-  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v15')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
+  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v16')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
   try{let r=await fetch(listUrl,{signal:c.signal,cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch(listUrl,{signal:c.signal,cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
    // One-time repair: parcels whose shop was saved as a web address are read again to pick up the shop's real name.
@@ -258,7 +262,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    if(retry.length&&!c.signal.aborted){second=true;setProgress({pct:92,label:'משלים '+retry.length+' מיילים שלא נקראו…'});await new Promise(res=>setTimeout(res,1500));for(let i=0;i<retry.length;i+=10)chunks.push(retry.slice(i,i+10));await worker();}
    // Anything that could not be read again keeps its old copy.
    if(held.length){acc={...acc,parcels:shown(acc.parcels)};saved.current=acc.parcels;}acc={...acc,updated:new Date().toISOString()};setData(acc);
-   if(!c.signal.aborted){try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v15','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
+   if(!c.signal.aborted){try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v16','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setReading(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);

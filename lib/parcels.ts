@@ -115,6 +115,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  // The photo often sits in its own anchor next to the title anchor; take the first real product photo from those links (skip tiny badge icons).
  const productImg=(el:any)=>{const src=$(el).attr('src')||$(el).attr('data-src')||'';const u=secureUrl(src.startsWith('//')?'https:'+src:src.replace(/^http:\/\/(?=[^/]*(?:alicdn|aliexpress-media|media-amazon|ssl-images-amazon|temu|shein|ebayimg))/i,'https://'));const w=Number($(el).attr('width')||0);
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
+ // A photo for each product in a package notice, so the detail page can show them all.
+ const listedImgs=[...new Set($('.EDM-SYSTEM-TEXT-productName').toArray().map(el=>{let box=$(el);for(let k=0;k<6&&!box.find('img').length;k++)box=box.parent();return box.find('img').toArray().map(productImg).find(Boolean)||'';}).filter(Boolean))].slice(0,12);
  if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;$(el).find('img').each((_,im)=>{if(!image)image=productImg(im);});});
  // Shopify stores: the item title cell ("כסא ארגונומי … × 1").
  if(!name){const t=$('.order-list__item-title').first().text().replace(/\s+/g,' ').trim();if(t.length>3)name=tidyName(t.replace(/\s*[x×]\s*\d{1,3}\s*$/,''));const img=$('.order-list__product-image').first().attr('src');if(name&&img&&!image)image=secureUrl(img);}
@@ -148,7 +150,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
  const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qh=[...text.matchAll(/כמות:\s*(\d{1,2})(?!\d)/g)].map(x=>+x[1]);const qa=qm.length?qm:qh;const qty=qa.length===1&&qa[0]>1?qa[0]:undefined;
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
