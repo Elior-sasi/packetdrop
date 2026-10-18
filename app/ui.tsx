@@ -72,10 +72,13 @@ const ROUTE:[string,RegExp][]=[
  ['אצל חברת המסירה',/חברת המסירה|חברת המשלוחים המקומית|המקומית/i],
  ['במסירה / לאיסוף',/יצאה למסירה|לאיסוף|מוכנה למסירה/i],
  ['נמסרה',/נמסרה|נמסר|delivered/i]];
-function Route({p}:{p:Parcel}){if(p.cancelled)return null;const evs=[...p.events].sort((a,b)=>a.time.localeCompare(b.time));
+// Orders from abroad get the full route; Israeli shops skip the warehouse-abroad, customs and flight steps.
+const abroad=(p:Parcel)=>/AliExpress|Temu|SHEIN|Amazon|eBay|iHerb|ASOS|Banggood|Wish|Zara/i.test(p.shop)||/Cainiao|YunExpress|4PX/i.test(p.carrier)||p.events.some(e=>/מכס|customs|ארץ המוצא|מדינת המוצא|טיסה|flight/i.test(e.label));
+const LOCAL=[0,2,7,8,9];
+function Route({p}:{p:Parcel}){if(p.cancelled)return null;const evs=[...p.events].sort((a,b)=>a.time.localeCompare(b.time));const steps=abroad(p)?ROUTE.map((_,i)=>i):LOCAL;
  const hit=ROUTE.map(([,r],i)=>i===0?evs[0]:i===9&&p.stage>=4?(evs.find(e=>r.test(e.label))||evs.at(-1)):i===8&&p.stage>=3?(evs.find(e=>r.test(e.label))||null):evs.find(e=>r.test(e.label))||null);
  let last=-1;hit.forEach((h,i)=>{if(h)last=i;});if(p.stage>=4)last=9;
- return <section className="box"><h3>מסלול</h3><ol className="route">{ROUTE.map(([label],i)=>{const done=i<=last;const h=hit[i];return <li key={label} className={(done?'d ':'')+(i===last?'c':'')}><span className="rdot"/><b>{label}</b>{done&&h&&<time>{new Date(h.time).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})}</time>}</li>;})}</ol></section>;}
+ return <section className="box"><h3>מסלול</h3><ol className="route">{steps.map(i=>{const label=i===2&&!abroad(p)?'נשלחה':ROUTE[i][0];const done=i<=last;const h=hit[i];return <li key={label} className={(done?'d ':'')+(i===last?'c':'')}><span className="rdot"/><b>{label}</b>{done&&h&&<time>{new Date(h.time).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})}</time>}</li>;})}</ol></section>;}
 // Courier mails (HFD, Cheetah...) often lack the product: pair each with a different AliExpress order that was on its way just before
 // (closest first, one order per courier parcel) and show the two as one parcel.
 function pairCouriers<T extends Parcel&{stale?:boolean}>(P:T[],titles:Record<string,string>):T[]{
@@ -158,7 +161,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   // Pickup points return parcels after ~2 weeks and shops stop writing once it arrives: after 21 days of silence treat it as received.
   // Step 4 (pickup / delivery) only when an update actually says so; otherwise it is still on its way.
   if(p.stage===3&&!p.carrierStatus?.match(/OutForDelivery|AvailableForPickup/)&&!p.pickup&&!p.events.some(e=>OUT_RE.test(e.label)||PICK_RE.test(e.label)))p.stage=2;
-  const stale=p.stage<4&&!p.cancelled&&Date.now()-last>(p.stage===3?14:30)*864e5;
+  const stale=p.stage<4&&!p.cancelled&&Date.now()-last>(p.stage===3?14:abroad(p)?30:p.stage>=1?10:21)*864e5;
   return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual]);
