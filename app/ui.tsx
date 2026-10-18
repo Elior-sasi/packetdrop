@@ -3,7 +3,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {heName} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X} from 'lucide-react';
-import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
+import {mergeParcels,brandDomains,polishName,parseSms,photoKey,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,tidyPlace,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean;real?:number;returned?:boolean};
 type Geo=Record<string,{lat:number;lon:number}|null>;
@@ -243,7 +243,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function sync(){if(!user||controller.current)return;setSlow(false);void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   // No single request may hang the whole check: each one gets its own time limit.
   const lim=(ms:number)=>typeof AbortSignal!=='undefined'&&'any' in AbortSignal&&'timeout' in AbortSignal?(AbortSignal as unknown as {any:(a:AbortSignal[])=>AbortSignal}).any([c.signal,AbortSignal.timeout(ms)]):c.signal;
-  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v18')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
+  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v19')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
   try{let r=await fetch(listUrl,{signal:lim(25000),cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch(listUrl,{signal:lim(25000),cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
    // One-time repair: parcels whose shop was saved as a web address are read again to pick up the shop's real name.
@@ -285,7 +285,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    if(retry.length&&!c.signal.aborted){second=true;setProgress({pct:92,label:'משלים '+retry.length+' מיילים שלא נקראו…'});await new Promise(res=>setTimeout(res,1500));for(let i=0;i<retry.length;i+=10)chunks.push(retry.slice(i,i+10));await worker();}
    // Anything that could not be read again keeps its old copy.
    if(held.length){acc={...acc,parcels:shown(acc.parcels)};saved.current=acc.parcels;}acc={...acc,updated:new Date().toISOString()};setData(acc);
-   if(!c.signal.aborted){retried.current=false;try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v18','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
+   if(!c.signal.aborted){retried.current=false;try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v19','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
   }catch(e){
    // A dropped connection ("Load failed" on iPhone) or a slow reply is not an error to show: try once more quietly, then say it in plain Hebrew.
    const net=e instanceof TypeError||(e instanceof Error&&/load failed|failed to fetch|network|timeout/i.test(e.name+' '+e.message));
@@ -336,6 +336,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Deliveries couriers have for the user's phone (only when the user saved it in settings).
  async function loadByPhone(){const ph=phoneRef.current;if(!ph)return;try{const r=await fetch('/api/couriers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ph}),cache:'no-store'});const d=await r.json();if(Array.isArray(d.parcels)){setPhoneParcels(d.parcels);try{localStorage.setItem('pd_phone_parcels',JSON.stringify(d.parcels));}catch{}}}catch{}}
  async function copy(v:string){try{await navigator.clipboard.writeText(v);setCopied(v);setTimeout(()=>setCopied(''),1500);}catch{}}
+ // Photos named in one mail (a package notice) name the same photo in another mail that came without a title.
+ const photoNames=useMemo(()=>{const m:Record<string,string>={};for(const p of data?.parcels||[])Object.assign(m,p.named||{});return m;},[data]);
+ const byPhoto=(m:MailParcel)=>{if(!isGeneric(m.name))return '';const imgs=[m.image,...(m.images||[])].filter(Boolean).map(photoKey);const all=imgs.map(k=>photoNames[k]).filter(Boolean);const names=[...new Set(all)];if(!names.length)return '';const n=names.length===1&&all.length>1?' ×'+all.length:'';return heName(names.slice(0,4).join(' + '))+n;};
  const parcels=useMemo(()=>pairCouriers((manual.length||phoneParcels.length?mergeParcels([...(data?.parcels||[]),...manual,...phoneParcels]):(data?.parcels||[])).filter(m=>!/eventbuzz|smarticket|tickchak/i.test(m.shop)&&!/^\s*(?:re|fwd?)\s*:|^ביטול ה?הזמנה/i.test(m.name)&&!/בוטל|ביטול ה?הזמנה|cancel/i.test(m.events.at(-1)?.label||'')).filter(m=>!(marks[m.id]==='hide'||m.keys.some(k=>marks[k]==='hide'))).map(m=>{const got=marks[m.id]==='got'||m.keys.some(k=>marks[k]==='got');const p={...withCarrier(m,tracks[m.tracking]||(m.tracking?tracks['KX:'+m.tracking]:undefined)||(m.order&&!m.tracking?(m.via||[]).map(h=>tracks['TZ:'+h+':'+m.order]).find(Boolean):undefined))};const last=new Date(p.events.at(-1)?.time||0).getTime();
   // Pickup points return parcels after ~2 weeks and shops stop writing once it arrives: after 21 days of silence treat it as received.
   // Step 4 (pickup / delivery) only when an update actually says so; otherwise it is still on its way.
@@ -347,7 +350,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const stale=p.stage<4&&!p.cancelled&&age>(p.stage===3?14:abroad(p)?30:local?30:p.stage>=1?10:21)*864e5;
   // A parcel nobody collected goes back to the sender: that is the end of it, not "on the way".
   const returned=!got&&RETURNED.test(p.events.at(-1)?.label||'');
-  return {...p,got,returned,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got&&!returned,ask:ask&&!returned,last,stage:stale||got||returned?4:p.stage,real:p.stage,name:titles[p.id]||displayName(m)};}),titles)
+  return {...p,got,returned,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got&&!returned,ask:ask&&!returned,last,stage:stale||got||returned?4:p.stage,real:p.stage,name:titles[p.id]||byPhoto(m)||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual,snooze,phoneParcels]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);

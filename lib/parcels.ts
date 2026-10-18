@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import {heName} from '@/lib/hename';
 export type Event={id:string;label:string;time:string};
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
-export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];customs?:{amount:string;url:string;at:string}};
+export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string}};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
@@ -47,6 +47,8 @@ export function polishName(n:string){let t=n.trim();
   const m=t.match(/^(.{8,}?)[,،]\s*([^,،\s]+)$/);if(m&&m[2].length<=10)t=m[1].trim();
   t=t.replace(/[\s,،\-–(]+$/,'');if(t===before)break;}
  return t.length>=4?t:n.trim();}
+// The same photo is served from different sizes/hosts; the file id is what identifies it.
+export const photoKey=(u:string)=>(u.match(/\/kf\/([A-Za-z0-9]+)/)?.[1]||u.replace(/[?#].*$/,'').replace(/_\d+x\d+.*$/,'')).toLowerCase();
 export function tidyName(raw:string){let n=raw.replace(/\s+x\d+$/i,'').trim();
  // AliExpress machine-translation fixes, on the full title before it is shortened.
  n=n.replace(/(\S) '(\S)/g,"$1'$2").replace(/וואן\s*1?\s*פיס/g,'One\u2060Piece').replace(/^\d{5,}\s+/,'').replace(/^פרוק(?=\s)/,'פאה').replace(/\s+(?:מותאם|מותאמת|בהתאמה)\s+אישית/g,'');
@@ -130,8 +132,11 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
  // A photo for each product in a package notice, so the detail page can show them all.
  const listedImgs=[...new Set($('.EDM-SYSTEM-TEXT-productName').toArray().map(el=>{let box=$(el);for(let k=0;k<6&&!box.find('img').length;k++)box=box.parent();return box.find('img').toArray().map(productImg).find(Boolean)||'';}).filter(Boolean))].slice(0,12);
+ // Each product photo with its own name, so a later mail that has only the photo (no title) can be named from it.
+ const named:Record<string,string>={};$('.EDM-SYSTEM-TEXT-productName').each((_,el)=>{let box=$(el);for(let k=0;k<6&&!box.find('img').length;k++)box=box.parent();const u=box.find('img').toArray().map(productImg).find(Boolean);const t=$(el).text().replace(/\s+/g,' ').trim().replace(/\s*[x×]\s*\d{1,3}$/,'');if(u&&t.length>3)named[photoKey(u)]=tidyName(/(\.\.\.|…)$/.test(t)||t.length<28?t:t+'...');});
+ const cellImgs:string[]=[];
  // Some AliExpress order mails put the product photos on table cells (a background attribute), not in <img>.
- if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|orderdetail/i.test(href))return;$(el).find('[background]').each((_,e)=>{const u=secureUrl($(e).attr('background')||'');if(!image&&/alicdn|aliexpress-media/.test(u)&&!/\/\d{1,2}x\d{1,2}\./.test(u))image=u;});});
+ if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|orderdetail/i.test(href))return;$(el).find('[background]').each((_,e)=>{const u=secureUrl($(e).attr('background')||'');if(/alicdn|aliexpress-media/.test(u)&&!/\/\d{1,2}x\d{1,2}\./.test(u)){if(!image)image=u;if(!cellImgs.includes(u))cellImgs.push(u);}});});
  if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;$(el).find('img').each((_,im)=>{if(!image)image=productImg(im);});});
  // Shopify stores: the item title cell ("כסא ארגונומי … × 1").
  if(!name){const t=$('.order-list__item-title').first().text().replace(/\s+/g,' ').trim();if(t.length>3)name=tidyName(t.replace(/\s*[x×]\s*\d{1,3}\s*$/,''));const img=$('.order-list__product-image').first().attr('src');if(name&&img&&!image)image=secureUrl(img);}
@@ -170,7 +175,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
  const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qh=[...text.matchAll(/כמות:\s*(\d{1,2})(?!\d)/g)].map(x=>+x[1]);const qa=qm.length?qm:qh;const qty=qa.length===1&&qa[0]>1?qa[0]:undefined;
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:cellImgs.length>1?{images:cellImgs}:{}),...(Object.keys(named).length?{named}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
@@ -208,7 +213,8 @@ export function mergeParcels(rows:Parcel[]){
   // The shop comes from the order mails, not from a carrier's notice (Israel Post writes as itself).
   const isCarrier=(n:string)=>!n||n==='הזמנה מהדוא״ל'||carriers.some(([,c])=>c===n);
   const shop=sorted.find(p=>p.order&&!isCarrier(p.shop))?.shop||sorted.find(p=>!isCarrier(p.shop))?.shop||latest.shop;
-  out.push({...latest,shop,id:keys[0],keys,name:title,...(contents.length>1?{items:contents}:{}),image:named.image||list.find(p=>p.image)?.image||'',
+  const namedAll=Object.assign({},...list.map(p=>p.named||{}));
+  out.push({...latest,shop,id:keys[0],keys,name:title,...(Object.keys(namedAll).length?{named:namedAll}:{}),...(contents.length>1?{items:contents}:{}),image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
    url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }
