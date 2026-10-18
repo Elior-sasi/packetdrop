@@ -31,8 +31,8 @@ async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  const msgs:Message[]=[];for(let i=0;i<ids.length;i+=10){const got=await Promise.allSettled(ids.slice(i,i+10).map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));for(const g of got)if(g.status==='fulfilled')msgs.push(g.value);}
  const state:State={parcels:u.state?.parcels||[],stuck:u.state?.stuck||[],marks:u.state?.marks||{},reminded:u.state?.reminded||{},weekly:u.state?.weekly||''};
  let parcels=mergeParcels([...state.parcels,...msgs.map(parseMessage).filter((p):p is Parcel=>!!p)]);
- const numbers=parcels.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,40);
- if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]));}
+ const numbers=[...parcels.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,36),...parcels.filter(p=>!p.tracking&&p.order&&p.stage<4&&!p.cancelled&&!/aliexpress|temu|shein|amazon|ebay|iherb/i.test(p.shop)&&Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<45*864e5).map(p=>'TZ:'+p.order).slice(0,4)];
+ if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]||(!p.tracking&&p.order?t['TZ:'+p.order]:undefined)));}
  // With no baseline yet, the first check only records the current state.
  const {notes,stuck}=state.parcels.length?diff(state,parcels):{notes:[],stuck:state.stuck};
  const rem=reminders({...state,parcels});const wk=weekly({...state,parcels});const allNotes=[...notes,...rem.notes,...(wk.note?[wk.note]:[])];

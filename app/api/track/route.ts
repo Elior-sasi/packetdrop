@@ -1,6 +1,6 @@
 import {NextRequest} from 'next/server';import {z} from 'zod';import {identity} from '@/lib/identity';import {trackSources} from '@/lib/track';
 export const dynamic='force-dynamic';export const maxDuration=30;
-const schema=z.object({numbers:z.array(z.string().max(40)).max(40)});
+const schema=z.object({numbers:z.array(z.string().max(40)).max(44)});
 export async function POST(req:NextRequest){
  if(req.headers.get('origin')!==req.nextUrl.origin)return Response.json({error:'בקשה לא מורשית'},{status:403});
  const key=process.env.TRACK17_KEY;

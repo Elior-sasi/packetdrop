@@ -1,7 +1,11 @@
 import * as cheerio from 'cheerio';
 export const dynamic='force-dynamic';
 // Temporary: shows how the Tapuz (Baldar) status page is built, so automatic tracking can be wired to it. No user data involved.
-export async function GET(){
+import {NextRequest} from 'next/server';
+import {tapuz} from '@/lib/tapuz';
+export async function GET(req:NextRequest){
+ const n=req.nextUrl.searchParams.get('n');
+ if(n&&/^\d{5,12}$/.test(n)){try{const r=await fetch('https://crm.tapuzdelivery.co.il/Baldar/DeliveryStatus.aspx/GetStatus',{method:'POST',headers:{'Content-Type':'application/json; charset=utf-8','User-Agent':'Mozilla/5.0','Referer':'https://crm.tapuzdelivery.co.il/Baldar/deliverystatus.aspx'},body:JSON.stringify({deliveryNumber:n,customerCode:-1}),signal:AbortSignal.timeout(12000)});const raw=(await r.text()).slice(0,3000);return Response.json({status:r.status,raw,parsed:await tapuz(n)},{headers:{'Cache-Control':'no-store'}});}catch(e){return Response.json({error:String(e)});}}
  const url='https://crm.tapuzdelivery.co.il/Baldar/deliverystatus.aspx';
  try{const r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'},signal:AbortSignal.timeout(15000)});const html=await r.text();const $=cheerio.load(html);
   const forms=$('form').toArray().map(f=>({action:$(f).attr('action'),method:$(f).attr('method'),id:$(f).attr('id')}));
