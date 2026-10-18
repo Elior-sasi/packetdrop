@@ -5,14 +5,14 @@ import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,tidyPlace,type TrackInfo} from '@/lib/track';
-type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean;real?:number};
+type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean;real?:number;returned?:boolean};
 type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
 const STATUS=['ההזמנה התקבלה','נשלחה','בדרך','מוכנה לאיסוף / במסירה','נמסרה'];
 const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
 // A parcel that went quiet is not delivered; its steps stay where the last real update left them.
-const step=(p:Parcel)=>p.stale?(p.real??p.stage):p.stage;
-const tone=(p:Parcel)=>p.stale?'unk':p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3&&(isPickup(p)||outToday(p))?'warn':'';
+const step=(p:Parcel)=>p.stale||p.returned?(p.real??p.stage):p.stage;
+const tone=(p:Parcel)=>p.stale?'unk':p.cancelled||p.returned||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3&&(isPickup(p)||outToday(p))?'warn':'';
 // Waiting at a pickup point (as opposed to a courier bringing it to the door).
 // Search by meaning, not only by spelling: stores name the same thing differently ("חולצה" / "בגדי אנימה" / "T-shirt").
 const SYN:string[][]=[['חולצ','shirt','טישרט','טי-שירט','טי שירט','בגדי'],['מכנס','pants','trousers','קארגו','ג\'ינס','jeans','shorts'],['אוזני','airpods','earbuds','headphone','earphone','buds'],['שעון','watch'],['נעל','shoe','sneaker','סניקרס','סנדל'],['תיק','bag','backpack','ארנק','wallet'],['כבל','cable','usb'],['מטען','charger'],['כיסוי','case','cover','מגן'],['שקע','plug','socket','מתאם','adapter'],['טלפון','phone','iphone','סמארטפון'],['מקלדת','keyboard'],['עכבר','mouse'],['שלט','remote','controller','בקר','gamepad'],['מנורה','lamp','light','תאורה']];
@@ -34,7 +34,8 @@ const OUT_RE=/יצאה למסירה|יצא למסירה|בדרך למסירה|ה
 const PICK_RE=/לאיסוף|איסוף|pick ?up|collection/i;
 // "Out for delivery today" needs an actual out-for-delivery update dated today, not just any update today.
 const outToday=(p:Parcel)=>p.stage===3&&!p.cancelled&&!isPickup(p)&&p.events.some(e=>OUT_RE.test(e.label)&&new Date(e.time).toDateString()===new Date().toDateString());
-const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.got?'התקבלה':p.stale?'בלי עדכון מ־'+day(p.events.at(-1)?.time):p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
+const RETURNED=/יוחזר לשולח|הוחזר(?:ה)? לשולח|הוחזר(?:ה)? לשולח|return(?:ed)? to (?:the )?sender|לא נדרש בידי הנמען/i;
+const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.returned?'הוחזרה לשולח':p.got?'התקבלה':p.stale?'בלי עדכון מ־'+day(p.events.at(-1)?.time):p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 // Mail subjects are long ("הזמנתך 21327277 בחנות X - המוצר נשלח"); the history shows just what happened.
 const SHORT:[RegExp,string][]=[[/בוטל|cancel/i,'ההזמנה בוטלה'],[/נמסר|delivered/i,'נמסרה'],[/לאיסוף|ready for pick ?up/i,'מוכנה לאיסוף'],[/יצא[הו]? למסירה|בדרך למסירה|out for delivery/i,'יצאה למסירה'],
@@ -132,7 +133,7 @@ type Est={from:number;to:number;n:number;avg:number;late:boolean;scope:'route'|'
 const MILES:[string,RegExp][]=[['מהמשלוח',SHIP_RE],['מיציאה מארץ המוצא',/יצאה מארץ המוצא|יצאה בטיסה|נמסרה לחברת ההובלה|יצאה מאזור המוצא|בתעבורה/i],['מההגעה לישראל',/הגיעה לארץ|נחתה|הגיעה לחברת ההובלה|במדינה|באזור שלכם|הגיע לארץ/i],['מהשחרור ממכס',/שוחררה מהמכס/i],['מחברת המסירה',/חברת המסירה|חברת המשלוחים המקומית|המקומית/i]];
 const mileAt=(p:Parcel,k:number)=>{if(k===0)return shippedAt(p);const e=p.events.find(e=>MILES[k][1].test(e.label));return e?new Date(e.time).getTime():0;};
 function learn(all:Parcel[]){const days:Record<string,number[]>={};
- for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got)continue;const end=new Date(p.events.at(-1)!.time).getTime();
+ for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got||(p as {returned?:boolean}).returned)continue;const end=new Date(p.events.at(-1)!.time).getTime();
   MILES.forEach((_,k)=>{const t=mileAt(p,k);if(!t)return;const d=(end-t)/864e5;if(!(d>0.1&&d<90))return;for(const key of [routeKey(p),p.shop+'|*'])(days[key+'#'+k]??=[]).push(d);});}
  return days;}
 const pct=(a:number[],q:number)=>{const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1))))];};
@@ -247,7 +248,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    else if(pushOn.current&&!fix7){try{setProgress({pct:4,label:'מביא עדכונים מהשרת…'});const s=await fetch('/api/state',{signal:c.signal,cache:'no-store'}).then(r=>r.json());
     if(s.ok&&Array.isArray(s.parcels)){const have=new Set(saved.current.flatMap(p=>p.events.map(e=>e.id)));const add=(s.parcels as MailParcel[]).filter(p=>Array.isArray(p.events)&&Array.isArray(p.keys)).map(p=>({...p,events:p.events.filter(e=>!e.id.startsWith('t:'))})).filter(p=>p.events.length&&p.events.some(e=>!have.has(e.id)));
      if(add.length){saved.current=mergeParcels([...saved.current,...add]);setData(old=>old?{...old,parcels:mergeParcels([...old.parcels,...add])}:{parcels:saved.current,scanned:0,updated:s.checkedAt||new Date().toISOString()});}
-     for(const id of (s.seen||[]) as string[])seen.current.add(id);}}catch{}}
+     // Mail being repaired stays unread here, even if the background check already read it with the older rules.
+     const again=new Set(reread);for(const id of (s.seen||[]) as string[])if(!again.has(id))seen.current.add(id);}}catch{}}
    const known=new Set([...seen.current,...saved.current.flatMap(p=>p.events.map(e=>e.id))]);
    const todo:string[]=[...new Set([...(d.ids as string[]),...(fix7&&Array.isArray(d.recheck)?d.recheck as string[]:[]),...reread])].filter(id=>!known.has(id));const total=todo.length;setReading(total>0);let done=0,failed=0;
    let acc:Scan={parcels:mergeParcels([...saved.current]),scanned:0,updated:d.updated};setData(old=>old&&!saved.current.length&&!held.length?old:{...acc,parcels:shown(acc.parcels)});
@@ -313,7 +315,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const em=[...p.eta.matchAll(/(\d{1,2})\.(\d{1,2})/g)].at(-1);let due=last+9*864e5;if(em){const y=new Date(last).getFullYear();let t=new Date(y,+em[2]-1,+em[1]).getTime();if(t<last-60*864e5)t=new Date(y+1,+em[2]-1,+em[1]).getTime();due=t+864e5;}
   const ask=local&&!got&&!p.cancelled&&Date.now()>due&&age<30*864e5&&!((snooze[p.id]||0)>Date.now());
   const stale=p.stage<4&&!p.cancelled&&age>(p.stage===3?14:abroad(p)?30:local?30:p.stage>=1?10:21)*864e5;
-  return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,ask,last,stage:stale||got?4:p.stage,real:p.stage,name:titles[p.id]||displayName(m)};}),titles)
+  // A parcel nobody collected goes back to the sender: that is the end of it, not "on the way".
+  const returned=!got&&RETURNED.test(p.events.at(-1)?.label||'');
+  return {...p,got,returned,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got&&!returned,ask:ask&&!returned,last,stage:stale||got||returned?4:p.stage,real:p.stage,name:titles[p.id]||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual,snooze,phoneParcels]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
@@ -399,7 +403,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const inMonth=(t:string)=>{const x=new Date(t);return x>=ref&&x<end;};const first=(p:Parcel)=>p.events[0]?.time||'';
   const all=parcels.filter(p=>!p.cancelled);const ordered=all.filter(p=>inMonth(first(p)));const delivered=all.filter(p=>p.stage===4&&!p.stale&&inMonth(p.events.at(-1)?.time||''));
   const shops=Object.entries(ordered.reduce((m,p)=>{const k=p.shop||'אחר';m[k]=(m[k]||0)+1;return m;},{} as Record<string,number>)).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const durs=all.filter(p=>p.stage===4&&!p.stale&&!p.got&&p.events.length>1).map(p=>(new Date(p.events.at(-1)!.time).getTime()-new Date(first(p)).getTime())/864e5).filter(x=>x>0.5&&x<120);
+  const durs=all.filter(p=>p.stage===4&&!p.stale&&!p.got&&!p.returned&&p.events.length>1).map(p=>(new Date(p.events.at(-1)!.time).getTime()-new Date(first(p)).getTime())/864e5).filter(x=>x>0.5&&x<120);
   const avg=durs.length?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):0;
   return {label:ref.toLocaleDateString('he-IL',{month:'long',year:'numeric'}),ordered:ordered.length,delivered:delivered.length,shops,avg,fast:durs.length?Math.round(Math.min(...durs)):0,slow:durs.length?Math.round(Math.max(...durs)):0,n:durs.length};},[parcels,month]);
 // The animation replaces the list on first load and while new mail is read; a quick check on return keeps the list.
