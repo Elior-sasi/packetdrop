@@ -421,8 +421,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
   {user&&<section className="set"><h3>מעקב אצל חברות השליחויות</h3>
    {phone&&!phoneEdit?<><div className="setRow"><span>טלפון <b dir="ltr">{phone.replace(/^(\d{3})(\d{3})(\d+)$/,'$1-$2$3')}</b></span><button className="linkBtn" onClick={()=>{setPhoneDraft(phone);setPhoneEdit(true);}}>עריכה</button></div>
-    <p className="setNote">השרת בודק משלוחים לפי המספר אצל תפוז, פשוט, פוקוס, חפוז ו־K Express.</p></>
-   :<><p className="setNote">עם מספר הטלפון שלך, השרת בודק בעצמו משלוחים אצל תפוז, פשוט, פוקוס, חפוז ו־K Express, גם כשלא הגיע עליהם מייל. המספר נשלח רק לחברות האלה.</p>
+    <p className="setNote">השרת בודק לפי המספר משלוחים אצל חברות משלוחים בארץ.</p></>
+   :<><p className="setNote">עם מספר הטלפון שלך, השרת בודק בעצמו משלוחים אצל חברות משלוחים בארץ, גם כשלא הגיע עליהם מייל. המספר נשלח רק אליהן.</p>
    <label className="setRow" htmlFor="phoneIn"><span>מספר טלפון</span></label>
    <input id="phoneIn" className="phoneIn" type="tel" inputMode="tel" dir="ltr" autoComplete="tel" value={phoneDraft} onChange={e=>setPhoneDraft(e.target.value)}/>
    <button className="ghost" onClick={()=>{const v=phoneDraft.replace(/\D/g,'');if(v&&!/^0\d{8,9}$/.test(v)){setToast('מספר לא תקין');return;}setPhoneEdit(false);if(v===phone)return;setPhone(v);phoneRef.current=v;setPref('pd_phone',v);if(!v){setPhoneParcels([]);setPref('pd_phone_parcels','[]');}if(pushOn.current)void pushPost({phone:v}).catch(()=>{});if(v)void loadByPhone();setToast(v?'נשמר ✓':'המספר הוסר');}}>{phone&&!phoneDraft.trim()?'הסרת המספר':'שמירה'}</button></>}</section>}
