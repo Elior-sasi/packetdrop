@@ -1,0 +1,10 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {speak,spokenDate,spokenName} from '../lib/speak';
+const now=new Date('2026-10-18T09:00:00Z').getTime();const iso=(h:number)=>new Date(now-h*3600e3).toISOString();
+const P=(o:object)=>({id:'a',keys:['a'],name:'x',shop:'',carrier:'',image:'',url:'',tracking:'',order:'',eta:'',stage:2,cancelled:false,pickup:null,events:[{id:'e',label:'נשלחה',time:iso(30)}],...o}) as never;
+test('dates',()=>{assert.equal(spokenDate('25.10'),'25 באוקטובר');assert.equal(spokenDate('25.10-29.10'),'בין 25 ל־29 באוקטובר');assert.equal(spokenDate('30.10-2.11'),'בין 30 באוקטובר ל־2 בנובמבר');assert.equal(spokenDate(''),'');});
+test('names',()=>{assert.equal(spokenName(P({name:'Smart watch for men waterproof sport digital'})),'Smart watch for men waterproof');assert.equal(spokenName(P({name:'הזמנה 123',shop:'KSP'})),'הזמנה מ־KSP');assert.equal(spokenName(P({id:'z',keys:['k']}),{k:'שעון'}),'שעון');});
+test('empty',()=>assert.equal(speak([],{now}),'אין חבילות בדרך כרגע.'));
+test('full',()=>{const s=speak([P({id:'1',keys:['1'],name:'אוזניות',stage:3,pickup:{place:'סופר יודה',code:'4821'},events:[{id:'p',label:'ממתינה לאיסוף',time:iso(5)}]}),P({id:'2',keys:['2'],name:'שקע',stage:3,events:[{id:'o',label:'יצאה למסירה',time:iso(1)}]}),P({id:'3',keys:['3'],name:'שעון',eta:'25.10'}),P({id:'4',keys:['4'],name:'ישן',events:[{id:'x',label:'נשלחה',time:iso(24*40)}]}),P({id:'5',keys:['5'],name:'בוטל',cancelled:true})],{now,checkedAt:iso(0.5)});
+ assert.equal(s,'חבילה אחת מחכה לך לאיסוף. אוזניות, בסופר יודה, קוד 4 8 2 1. היום מגיעה: שקע. ועוד חבילה אחת בדרך. הקרובה: שעון, צפויה ב־25 באוקטובר.');});
+test('many and stale',()=>{const s=speak([P({id:'1',keys:['1']}),P({id:'2',keys:['2']}),P({id:'3',keys:['3'],stage:1})],{now,checkedAt:iso(5),marks:{'3':'got'}});assert.equal(s,'2 חבילות בדרך. המידע עודכן לפני 5 שעות.');});

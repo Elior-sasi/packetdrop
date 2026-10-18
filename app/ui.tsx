@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {signOut} from 'next-auth/react';
-import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane} from 'lucide-react';
+import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean};
@@ -276,6 +276,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   try{const reg=await navigator.serviceWorker.register('/sw.js');const s=await fetch('/api/push',{cache:'no-store'}).then(r=>r.json()).catch(()=>({enabled:false}));pushKey.current=s.publicKey||'';
    if(!s.enabled){setPush('nodb');return;}if(Notification.permission==='denied'){setPush('denied');return;}
    const sub=await reg.pushManager.getSubscription();setPush(sub&&Notification.permission==='granted'?'on':'off');}catch{setPush('unsupported');}})();},[user?.id]);
+ // Widget and Siri use the app's own idea of what is on the way (see lib/live.ts).
+ const viewSent=useRef('');
+ useEffect(()=>{if(push!=='on'||busy||!data)return;const v=JSON.stringify(active.map(p=>({keys:p.keys.slice(0,30),name:p.name.slice(0,200)})));if(v===viewSent.current)return;
+  const id=setTimeout(()=>{void pushPost({view:{at:new Date().toISOString(),active:JSON.parse(v)}}).then(()=>{viewSent.current=v;}).catch(()=>{});},1500);return ()=>clearTimeout(id);},[push,busy,data,active]);
  async function pushPost(b:object){const r=await fetch('/api/push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'הפעולה נכשלה');return d;}
  async function enablePush(){setPushMsg('');const perm=await Notification.requestPermission();if(perm!=='granted'){setPush(perm==='denied'?'denied':'off');return;}setPush('busy');
   try{const reg=await navigator.serviceWorker.ready;const key=Uint8Array.from(atob(pushKey.current.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
@@ -382,6 +386,12 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <p className="setNote">{push==='on'?'עובד דרך אפליקציית Scriptable, ומתעדכן עם ההתראות.':'עובד דרך Scriptable ומתעדכן מהשרת של ההתראות, אז צריך שההתראות יהיו פעילות.'}</p>
    <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox</b>.</li><li>במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← גודל קטן או בינוני. בהגדרות הווידג'ט בחר את הסקריפט <b>Unbox</b>.</li></ol>
    <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
+  {user&&widgetUrl&&<section className="set"><h3><Mic size={20}/> לשאול את Siri</h3>
+   <p className="setNote">אומרים "היי Siri, איפה החבילות שלי" ושומעים מה מחכה לאיסוף ועם איזה קוד, מה מגיע היום ומה בדרך. {push==='on'?'':'צריך שההתראות יהיו פעילות.'}</p>
+   <ol className="steps2"><li>העתק את הקישור האישי.</li><li>באפליקציית קיצורים: <b>+</b> ← הוסף פעולה <b>קבל תוכן של URL</b> והדבק את הקישור.</li><li>הוסף פעולה <b>דבר טקסט</b>.</li><li>שמור את הקיצור בשם <b>איפה החבילות שלי</b>.</li></ol>
+   <button className="ghost" onClick={()=>copy(widgetUrl.replace('/api/widget','/api/speak'))}><Copy size={18}/> {copied===widgetUrl.replace('/api/widget','/api/speak')?'הקישור הועתק ✓':'העתקת הקישור האישי'}</button>
+   <button className="ghost" onClick={async()=>{try{const t=await (await fetch(widgetUrl.replace('/api/widget','/api/speak'),{cache:'no-store'})).text();const u=new SpeechSynthesisUtterance(t);u.lang='he-IL';speechSynthesis.cancel();speechSynthesis.speak(u);setToast(t);}catch{setToast('לא הצלחתי להשמיע כרגע');}}}><Volume2 size={18}/> השמע עכשיו</button>
+   <p className="setNote">הקישור אישי. אל תשתף אותו.</p></section>}
   {user&&hiddenCount>0&&<section className="set"><h3>חבילות מוסתרות</h3><p className="setNote">הסתרת {hiddenCount} פריטים שזוהו בטעות כחבילות.</p><button className="ghost" onClick={()=>{const next=Object.fromEntries(Object.entries(marks).filter(([,v])=>v!=='hide')) as Record<string,'got'|'hide'>;setMarks(next);persist(next,manual);}}><Undo2 size={18}/> החזר את כולם</button></section>}
   <section className="set"><h3>חשבון</h3>
    {user?<><div className="setRow"><span>{user.name||'Google'}</span></div><p className="setNote mono" dir="ltr">{user.email}</p>
