@@ -35,7 +35,7 @@ const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.got?'התק
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 // Mail subjects are long ("הזמנתך 21327277 בחנות X - המוצר נשלח"); the history shows just what happened.
 const SHORT:[RegExp,string][]=[[/בוטל|cancel/i,'ההזמנה בוטלה'],[/נמסר|delivered/i,'נמסרה'],[/לאיסוף|ready for pick ?up/i,'מוכנה לאיסוף'],[/יצא[הו]? למסירה|בדרך למסירה|out for delivery/i,'יצאה למסירה'],
- [/במכס|customs/i,'במכס'],[/במדינה|באזור שלכם|הגיע[הו]? לארץ|arrived in/i,'הגיעה לארץ'],[/יצאה מאזור המוצא|בתעבורה|in transit/i,'בדרך לארץ'],[/עם חברת המשלוחים המקומית|local delivery/i,'נאספה בארץ, בדרך למרכז המסירה'],
+ [/במכס|customs/i,'במכס'],[/במדינה|באזור שלכם|הגיע[הו]? לארץ|arrived in/i,'הגיעה לארץ'],[/יצאה מאזור המוצא|בתעבורה|in transit/i,'בדרך לארץ'],[/עם חברת המשלוחים המקומית|local delivery/i,'בדרך למרכז המסירה'],
  [/נשלח|shipped|dispatched/i,'נשלחה'],[/נאספ|נארז|packed/i,'נארזה ויצאה'],[/אושר|מאושרת|התקבל|confirmed|received/i,'ההזמנה התקבלה']];
 const shortLabel=(s:string)=>{if(s.length<=22&&!/\d{5,}/.test(s))return s;for(const [r,t] of SHORT)if(r.test(s))return t;return s;};
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
