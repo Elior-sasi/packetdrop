@@ -8,4 +8,4 @@ test('K Express SMS: shipment + store order, stages, returns skipped',()=>{
  assert.equal(a.tracking,'7482743');assert.equal(a.order,'302828582');assert.equal(a.shop,'Urbanica');assert.equal(a.carrier,'K Express');assert.equal(a.stage,2);
  assert.equal(parseSms('משלוח מספר 7482743 מחברת URBANICA בדרכו לכתובת רחמילביץ משה 134 ירושלים.השליח יצור קשר במהלך היום. בברכה, K.EXPRESS')!.stage,3);
  assert.equal(parseSms('משלוח 7482743 מ- URBANICA נמסרה ל אליאור , בהצלחה , בברכה, K.EXPRESS')!.stage,4);
- assert.equal(parseSms("שלום, נתבקשנו לאסוף ממך משלוח מס' 7554453 מאורבניקה. בבקשה לארוז"),null);});
+ {const r=parseSms("שלום, נתבקשנו לאסוף ממך משלוח מס' 7554453 מאורבניקה. בבקשה לארוז")!;assert.ok(r.ret);assert.equal(r.name,'החזרה ל־Urbanica');assert.deepEqual(r.keys,['return:7554453']);assert.equal(r.tracking,'');}});

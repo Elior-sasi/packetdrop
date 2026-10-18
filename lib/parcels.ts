@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import {heName} from '@/lib/hename';
 export type Event={id:string;label:string;time:string};
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
-export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string}};
+export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
@@ -25,7 +25,9 @@ export function secureUrl(value:string){try{const u=new URL(value);return u.prot
 function body(p?:Part):string{if(!p)return '';const here=p.body?.data?Buffer.from(p.body.data,'base64url').toString('utf8'):'';return [here,...(p.parts||[]).map(body)].join('\n');}
 
 // Marketing mail: Israeli law requires the "פרסומת" prefix; promo senders and Gmail's Promotions tab are the other tells.
-export function isAd(subject:string,from:string,labels:string[]=[]){return /(?:^|[\s(|])פרסומת(?:[\s)|]|$)/.test(subject)||/^\s*(?:advertisement|ad\s*[:|])/i.test(subject)||/promotion@|promo@|marketing@|newsletter|ae-brief|deals@/i.test(from)||labels.includes('CATEGORY_PROMOTIONS');}
+// A refund notice is never an ad, even from a promotions address.
+export const REFUND=/ההחזר הכספי (?:אושר|בוצע|על ביטול)|זיכוי נשלח לאמצעי התשלום|refund has been issued|refunded bonus|fast refund bonus|הונפק החזר כספי|הזמנתך זוכתה|הודעה על זיכוי/i;
+export function isAd(subject:string,from:string,labels:string[]=[]){if(REFUND.test(subject)&&/aliexpress|temu|shein|amazon|shopify/i.test(from))return false;return /(?:^|[\s(|])פרסומת(?:[\s)|]|$)/.test(subject)||/^\s*(?:advertisement|ad\s*[:|])/i.test(subject)||/promotion@|promo@|marketing@|newsletter|ae-brief|deals@/i.test(from)||labels.includes('CATEGORY_PROMOTIONS');}
 
 const NOT_PARCEL=/eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesplanet|רב[- ]?חן|lev\.co\.il|eventim|leaan|לאן כרטיסים|tixwise|kartisim|כרטיס(?:ים)? (?:לסרט|להופעה|להצגה|לאירוע)|הקרנה|אולם \d|מושב|wolt\.com|10bis|tenbis|cibus|uber|gett|yango ?ride|booking\.com|airbnb|elal|אל על|טיסה|flight|מלון|hotel|netflix|spotify|disney|youtube premium|google play|app store|חשבון חודשי|תשלום חשבון/i;
 // Physical shipping words; unknown senders must mention one of these to count as a parcel.
@@ -81,7 +83,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  // Replies and forwards are the user's own correspondence, not shipping updates.
  if(!knownSender&&/^\s*(?:re|fw|fwd|השב|הועבר)\s*:/i.test(subject))return null;
  // A refund/cancellation of an order is kept (it closes that order) even without shipping words.
- const closing=/הזמנתך זוכתה|הודעה על זיכוי|order (?:has been )?(?:cancel+ed|refunded)|ההזמנה בוטלה/i.test(subject+' '+text.slice(0,400));
+ const closing=/הזמנתך זוכתה|הודעה על זיכוי|order (?:has been )?(?:cancel+ed|refunded)|ההזמנה בוטלה/i.test(subject+' '+text.slice(0,400))||REFUND.test(subject);
  if(NOT_PARCEL.test(from+' '+subject)||(!knownSender&&!closing&&(NOT_PARCEL.test(text.slice(0,1500))||!SHIPPING.test(text))))return null;
  const hrefs=$('a').toArray().map(a=>$(a).attr('href')||'');
  // Israeli stores link to their courier's Baldar status page; remember which, so the order can be looked up there.
@@ -92,7 +94,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  if(orderText)orders.add(orderText.replace(/-/g,''));
  // Israeli stores often write just "#302834565" or "המספר שלה: #…".
  if(!orders.size&&knownSender){const h=text.match(/(?:המספר שלה|מספר(?:\s+ה)?הזמנה)\s*:?\s*#?\s*(\d{6,12})/)?.[1]||text.match(/#\s?(\d{6,12})\b/)?.[1];if(h)orders.add(h);}
- for(const href of hrefs){const a=href.match(/[?&]orderId=(\d{8,})/i)?.[1];if(a)orders.add(a);const b=href.match(/[?&]o_ids=([\d,]+)/i)?.[1];if(b)b.split(',').filter(x=>x.length>=8).forEach(x=>orders.add(x));}
+ for(const href of hrefs){const a=href.match(/[?&](?:orderId|tradeOrderId)=(\d{8,})/i)?.[1];if(a)orders.add(a);const b=href.match(/[?&]o_ids=([\d,]+)/i)?.[1];if(b)b.split(',').filter(x=>x.length>=8).forEach(x=>orders.add(x));}
  // Summary mails about several packages at once would glue unrelated parcels together.
  if(orders.size>1&&/\d+\s*(?:ה?חבילות|packages|parcels)/i.test(subject))return null;
  const tracking=((subject+' '+text).match(/(?:tracking(?:\s+(?:number|no\.?|id|code))?|מספר\s*(?:ה?מעקב|ה?משלוח)|קוד\s*מעקב)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{7,34})/i)?.[1]
@@ -175,7 +177,10 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
  const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qh=[...text.matchAll(/כמות:\s*(\d{1,2})(?!\d)/g)].map(x=>+x[1]);const qa=qm.length?qm:qh;const qty=qa.length===1&&qa[0]>1?qa[0]:undefined;
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:cellImgs.length>1?{images:cellImgs}:{}),...(Object.keys(named).length?{named}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
+ // Money back: the amount and when, attached to the order (also store credit, "bonus").
+ const refund=REFUND.test(subject)||REFUND.test(lead)?(()=>{const mm=text.slice(0,3000).match(/(?:₪|ILS)\s?(\d[\d,]*(?:\.\d{1,2})?)|(\d[\d,]*(?:\.\d{1,2})?)\s?(?:₪|ILS|ש"ח)/);const amount=mm?'₪'+(mm[1]||mm[2]).replace(/,/g,''):'';return {amount,at:time,...(/bonus|בונוס/i.test(subject)?{bonus:true}:{})};})():undefined;
+ const refundLabel=refund?(refund.bonus?'הוחזר כבונוס באתר'+(refund.amount?' '+refund.amount:''):refund.amount?'הוחזרו '+refund.amount:'בוצע החזר כספי'):'';
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:cellImgs.length>1?{images:cellImgs}:{}),...(Object.keys(named).length?{named}:{}),customs,...(refund?{refund}:{}),events:[{id:m.id,label:refundLabel||label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
@@ -216,15 +221,17 @@ export function mergeParcels(rows:Parcel[]){
   const namedAll=Object.assign({},...list.map(p=>p.named||{}));
   out.push({...latest,shop,id:keys[0],keys,name:title,...(Object.keys(namedAll).length?{named:namedAll}:{}),...(contents.length>1?{items:contents}:{}),image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
-   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
+   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,refund:[...sorted].reverse().find(p=>p.refund)?.refund,ret:list.some(p=>p.ret)||undefined,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }
  return out.sort((a,b)=>b.events.at(-1)!.time.localeCompare(a.events.at(-1)!.time));
 }
 // An SMS from the post office or a courier (pasted, or sent by an iPhone Shortcut) turned into a parcel update.
 export function parseSms(raw:string,now=new Date()):Parcel|null{
  const text=raw.replace(/\s+/g,' ').trim().slice(0,1200);if(text.length<8)return null;
- // A courier asking to collect a return from the user is not an incoming parcel.
- if(/לאסוף ממך|איסוף החזרה|איסוף ה?משלוח ה?חוזר/.test(text))return null;
+ // A courier coming to collect a return from the user: kept as an outgoing parcel (marked `ret`), never joined to the order.
+ if(/לאסוף ממך|איסוף החזרה|איסוף ה?משלוח ה?חוזר/.test(text)){const no=text.match(/(?:משלוח|מס['׳]?|מספר)\s*(?:מס['׳]?|מספר)?\s*:?\s*#?\s*([A-Z0-9]{5,20})\b/i)?.[1]||'';const shop=shops.find(([r])=>r.test(text))?.[1]||'';
+  if(!no)return null;const id='return:'+no.toUpperCase();
+  return {id,keys:[id],name:'החזרה'+(shop?' ל־'+shop:''),shop,carrier:carrierFrom(text,''),image:'',url:'',tracking:'',order:'',eta:'',stage:1,cancelled:false,pickup:null,ret:true,events:[{id:'sms:'+id+':'+now.toISOString().slice(0,10),label:'השליח יאסוף ממך את ההחזרה',time:now.toISOString()}]};}
  const tracking=(text.match(/(?:מספר\s*(?:ה?מעקב|ה?משלוח|ה?חבילה|פריט)|מס['׳]?\s*(?:מעקב|משלוח|חבילה)|tracking(?:\s*(?:number|no\.?))?|פריט)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{5,34})/i)?.[1]
   ||text.match(/\b([A-Z]{2}\d{9}[A-Z]{2}|1Z[0-9A-Z]{16}|RS\d{9,}Y?|LP\d{10,}|AP\d{8,}|AE\d{8,})\b/i)?.[1]||text.match(/משלוח\s*(?:מספר|מס['׳]?)?\s*:?\s*#?\s*(\d{6,14})\b/)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
  if(!tracking)return null;

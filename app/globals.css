@@ -187,6 +187,7 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .route li:not(:last-child)::after{content:'';position:absolute;inset-inline-start:10px;top:27px;height:calc(100% - 14px);width:2px;background:#2a3442}
 .route li.d{color:var(--ink)}.route li.d .rdot{background:#4aa8ff;border-color:#4aa8ff}.route li.d:not(:last-child)::after{background:#4aa8ff}
 .route li.c b{font-weight:700}.route li.c .rdot{box-shadow:0 0 0 5px #4aa8ff33}
+.refundTag.guardTag{background:#10332c;border-color:#2ed3c6;color:#b5fff8}
 .guardTag{display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 10px;border-radius:12px;background:#3a2a10;border:1px solid #c98a2c;color:#ffd79a;font-size:calc(14px*var(--fs));font-weight:500}
 .guardBox{border-color:#c98a2c}.guardBox h3{display:flex;align-items:center;gap:6px;color:#ffd79a}.guardBox .primary,.guardBox .ghost{margin-top:10px}
 .msg{direction:ltr;text-align:left;background:#0d141b;border:1px solid #2a3644;border-radius:14px;padding:12px;font-size:calc(14px*var(--fs));line-height:1.55;color:#d6e2f0;margin-top:8px}
