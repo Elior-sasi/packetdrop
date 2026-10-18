@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import {heName} from '@/lib/hename';
 export type Event={id:string;label:string;time:string};
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
-export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean};
+export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[]};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
@@ -180,7 +180,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  // Money back: the amount and when, attached to the order (also store credit, "bonus").
  const refund=REFUND.test(subject)||REFUND.test(lead)?(()=>{const mm=text.slice(0,3000).match(/(?:₪|ILS)\s?(\d[\d,]*(?:\.\d{1,2})?)|(\d[\d,]*(?:\.\d{1,2})?)\s?(?:₪|ILS|ש"ח)/);const amount=mm?'₪'+(mm[1]||mm[2]).replace(/,/g,''):'';return {amount,at:time,...(/bonus|בונוס/i.test(subject)?{bonus:true}:{})};})():undefined;
  const refundLabel=refund?(refund.bonus?'הוחזר כבונוס באתר'+(refund.amount?' '+refund.amount:''):refund.amount?'הוחזרו '+refund.amount:'בוצע החזר כספי'):'';
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:cellImgs.length>1?{images:cellImgs}:{}),...(Object.keys(named).length?{named}:{}),customs,...(refund?{refund}:{}),events:[{id:m.id,label:refundLabel||label||(stage>=0?stages[stage]:'עדכון'),time}]};
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:cellImgs.length>1?{images:cellImgs}:{}),...(Object.keys(named).length?{named}:{}),customs,...(refund?{refund}:{}),...(/aliexpress/i.test(shop)&&shownTracking&&!refund?(()=>{const got=listed.length?listed:/^(?:הזמנה|חבילה|לחבילה|your order|הודעה)/i.test(name)?[]:[name];return got.length?{pkgItems:got.slice(0,20)}:{};})():{}),events:[{id:m.id,label:refundLabel||label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
@@ -219,9 +219,17 @@ export function mergeParcels(rows:Parcel[]){
   const isCarrier=(n:string)=>!n||n==='הזמנה מהדוא״ל'||carriers.some(([,c])=>c===n);
   const shop=sorted.find(p=>p.order&&!isCarrier(p.shop))?.shop||sorted.find(p=>!isCarrier(p.shop))?.shop||latest.shop;
   const namedAll=Object.assign({},...list.map(p=>p.named||{}));
+  // Per order: products its order mail listed but that no package notice of that order named, i.e. probably not in the package.
+  // Only judged for orders that have shipped with a notice that lists its contents; earlier findings carry over (merges repeat).
+  const pkgItems=[...new Set(list.flatMap(p=>p.pkgItems||[]))];const norm=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();const head=(t:string)=>norm(t).split(' ').slice(0,3).join(' ');
+  const sameItem=(a:string,b:string)=>{const na=norm(a),nb=norm(b);return !!na&&!!nb&&(na===nb||na.startsWith(nb)||nb.startsWith(na)||head(a)===head(b));};
+  const found:string[]=[];if(/aliexpress/i.test(list.find(p=>p.order)?.shop||latest.shop))for(const k of keys.filter(k=>k.startsWith('order:'))){const rs=list.filter(p=>(p.keys||[]).includes(k));
+   const ordered=[...new Set(rs.filter(r=>!r.tracking).flatMap(r=>r.items?.length?r.items:generic(r.name)?[]:r.name.replace(/\s+ועוד \d+$/,'').split(' + ')))];
+   const inPkg=rs.filter(r=>r.tracking).flatMap(r=>r.pkgItems||[]);if(!ordered.length||!inPkg.length)continue;for(const it of ordered)if(!inPkg.some(x=>sameItem(it,x)))found.push(it);}
+  const missing=[...new Set([...list.flatMap(p=>p.missing||[]),...found])].filter(it=>!pkgItems.some(x=>sameItem(it,x))).slice(0,5);
   out.push({...latest,shop,id:keys[0],keys,name:title,...(Object.keys(namedAll).length?{named:namedAll}:{}),...(contents.length>1?{items:contents}:{}),image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
-   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,refund:[...sorted].reverse().find(p=>p.refund)?.refund,ret:list.some(p=>p.ret)||undefined,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
+   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,refund:[...sorted].reverse().find(p=>p.refund)?.refund,ret:list.some(p=>p.ret)||undefined,...(pkgItems.length?{pkgItems:pkgItems.slice(0,30)}:{}),...(missing.length?{missing}:{}),price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }
  return out.sort((a,b)=>b.events.at(-1)!.time.localeCompare(a.events.at(-1)!.time));
 }
