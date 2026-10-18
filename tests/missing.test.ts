@@ -20,3 +20,6 @@ test('a single-product order is never flagged, even when the two mails name it d
  const k={...base,id:'tracking:RS1',keys:['tracking:RS1','order:2'],name:'מקלט אלחוטי USB',pkgItems:['מקלט אלחוטי USB'],pkgByOrder:{'2':['מקלט אלחוטי USB']},tracking:'RS1',order:'2',stage:2,events:[{id:'k2',label:'נשלחה',time:'2026-10-05T00:00:00Z'}]};
  assert.equal(mergeParcels([o,k] as never)[0].missing,undefined);});
 test('an old wrong flag is dropped on the next merge',()=>{const stale={...pkgA,missing:['משהו']} as never;assert.equal(mergeParcels([stale])[0].missing,undefined);});
+test('order-number placeholders never become product names in the title',()=>{
+ const merged={...pkgA,id:'order:9',keys:['order:9','order:8','order:7','tracking:AP9'],name:'שקע + הזמנה …000008',items:['שקע','הזמנה …000008','הזמנה …000007'],pkgByOrder:undefined,pkgItems:undefined} as never;
+ const m=mergeParcels([merged]);assert.ok(!/הזמנה …/.test(m[0].name),m[0].name);});
