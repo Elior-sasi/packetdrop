@@ -1,7 +1,7 @@
 // 17TRACK carrier tracking (server side only; the key never reaches the browser).
 export type TrackEvent={time:string;text:string;location:string};
 export type TrackInfo={number:string;status:string;stage:number;carrier:string;eta:{from?:string;to?:string}|null;events:TrackEvent[];pending?:boolean};
-import {tapuz} from '@/lib/tapuz';
+import {tapuz,kexpress} from '@/lib/tapuz';
 const BASE='https://api.17track.net/track/v2.4';
 // 17TRACK main statuses mapped onto the app's five steps (-1 = no step information).
 export const STATUS_STAGE:Record<string,number>={InfoReceived:1,InTransit:2,AvailableForPickup:3,OutForDelivery:3,Delivered:4,DeliveryFailure:-1,Exception:-1,Expired:-1,NotFound:-1};
@@ -89,12 +89,12 @@ export async function cainiao(numbers:string[]):Promise<{tracks:Record<string,Tr
 export function combine(a?:TrackInfo,b?:TrackInfo):TrackInfo|undefined{if(!a||a.pending&&!a.events.length)return b||a;if(!b)return a;
  const seen=new Set<string>();const events=[...a.events,...b.events].sort((x,y)=>x.time.localeCompare(y.time)).filter(e=>{const k=e.time.slice(0,16)+e.text;if(seen.has(k))return false;seen.add(k);return true;}).slice(-40);
  const lead=b.stage>a.stage?b:a;return {...lead,carrier:a.carrier||b.carrier,eta:a.eta||b.eta,events,pending:false};}
-export async function trackSources(all:string[],key?:string){let ok17=!!key;
+export async function trackSources(all:string[],key?:string,phone=''){let ok17=!!key;
  // "TZ:<order>" = an Israeli store order looked up at Tapuz; everything else goes to 17TRACK / Cainiao.
- const tz=all.filter(n=>n.startsWith('TZ:')).slice(0,8);const numbers=all.filter(n=>!n.startsWith('TZ:'));
- const tzRes=await Promise.all(tz.map(n=>tapuz(n.slice(3)).catch(()=>null)));
+ const tz=all.filter(n=>n.startsWith('TZ:')).slice(0,8);const kx=phone?all.filter(n=>n.startsWith('KX:')).slice(0,4):[];const numbers=all.filter(n=>!/^(?:TZ|KX):/.test(n));
+ const [tzRes,kxRes]=await Promise.all([Promise.all(tz.map(n=>tapuz(n.slice(3)).catch(()=>null))),Promise.all(kx.map(n=>kexpress(n.slice(3),phone).catch(()=>null)))]);
  const [t17,c]=await Promise.all([key&&numbers.length?track(numbers,key).catch(()=>{ok17=false;return {} as Record<string,TrackInfo>;}):Promise.resolve({} as Record<string,TrackInfo>),numbers.length?cainiao(numbers):Promise.resolve({tracks:{} as Record<string,TrackInfo>,status:'idle'})]);const cn=c.tracks;
  const out:Record<string,TrackInfo>={};for(const n of new Set([...Object.keys(t17),...Object.keys(cn)])){const x=combine(t17[n],cn[n]);if(x)out[n]=x;}
- tz.forEach((n,i)=>{const t=tzRes[i];if(t)out[n]=t;});
+ tz.forEach((n,i)=>{const t=tzRes[i];if(t)out[n]=t;});kx.forEach((n,i)=>{const t=kxRes[i];if(t)out[n]=t;});
  return {tracks:out,sources:{t17:ok17,cainiao:c.status}};}
-export async function trackAll(numbers:string[],key?:string){return (await trackSources(numbers,key)).tracks;}
+export async function trackAll(numbers:string[],key?:string,phone=''){return (await trackSources(numbers,key,phone)).tracks;}

@@ -2,6 +2,7 @@ import {GOOGLE_CLIENT_ID} from '@/lib/google';
 import {QUERY,gmailClient} from '@/lib/gmail';
 import {parseMessage,mergeParcels,type Parcel,type Message} from '@/lib/parcels';
 import {trackAll} from '@/lib/track';
+import {baldarByPhone} from '@/lib/tapuz';
 import {diff,withTrack,reminders,weekly,type State} from '@/lib/notify';
 import {open,send,db,dbOn,type Sub} from '@/lib/push';
 export const dynamic='force-dynamic';
@@ -30,9 +31,10 @@ async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  const seen=new Set(u.seen||[]);const ids=((list.messages||[]) as {id:string}[]).map(m=>m.id).filter(id=>!seen.has(id)).slice(0,60);
  const msgs:Message[]=[];for(let i=0;i<ids.length;i+=10){const got=await Promise.allSettled(ids.slice(i,i+10).map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));for(const g of got)if(g.status==='fulfilled')msgs.push(g.value);}
  const state:State={parcels:u.state?.parcels||[],stuck:u.state?.stuck||[],marks:u.state?.marks||{},reminded:u.state?.reminded||{},weekly:u.state?.weekly||''};
- let parcels=mergeParcels([...state.parcels,...msgs.map(parseMessage).filter((p):p is Parcel=>!!p)]);
- const numbers=[...parcels.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,36),...parcels.filter(p=>!p.tracking&&p.order&&p.via?.length&&p.stage<4&&!p.cancelled&&Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<45*864e5).flatMap(p=>p.via!.map(h=>'TZ:'+h+':'+p.order)).slice(0,6)];
- if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]||(!p.tracking&&p.order?(p.via||[]).map(h=>t['TZ:'+h+':'+p.order]).find(Boolean):undefined)));}
+ const phone=String((u.state as {phone?:string})?.phone||'');
+ let parcels=mergeParcels([...state.parcels,...msgs.map(parseMessage).filter((p):p is Parcel=>!!p),...(phone?await baldarByPhone(phone).catch(()=>[]):[])]);
+ const numbers=[...parcels.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,36),...(phone?parcels.filter(p=>p.tracking&&p.carrier==='K Express'&&p.stage<4&&!p.cancelled).map(p=>'KX:'+p.tracking).slice(0,4):[]),...parcels.filter(p=>!p.tracking&&p.order&&p.via?.length&&p.stage<4&&!p.cancelled&&Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<45*864e5).flatMap(p=>p.via!.map(h=>'TZ:'+h+':'+p.order)).slice(0,6)];
+ if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY,phone).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]||(p.tracking?t['KX:'+p.tracking]:undefined)||(!p.tracking&&p.order?(p.via||[]).map(h=>t['TZ:'+h+':'+p.order]).find(Boolean):undefined)));}
  // With no baseline yet, the first check only records the current state.
  const {notes,stuck}=state.parcels.length?diff(state,parcels):{notes:[],stuck:state.stuck};
  const rem=reminders({...state,parcels});const wk=weekly({...state,parcels});const allNotes=[...notes,...rem.notes,...(wk.note?[wk.note]:[])];
@@ -41,6 +43,6 @@ async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  for(const n of batch){const alive:Sub[]=[];for(const s of subs){const ok=await send(s,n).catch(()=>true);if(ok)alive.push(s);}subs=alive;sent++;}
  const keep=parcels.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
  const newSeen=[...seen,...msgs.map(m=>m.id)].slice(-1500);
- await sql`update push_users set state=${JSON.stringify({parcels:keep,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,view:(u.state as {view?:unknown})?.view})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
+ await sql`update push_users set state=${JSON.stringify({parcels:keep,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,view:(u.state as {view?:unknown})?.view,phone})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
  return {sent};
 }

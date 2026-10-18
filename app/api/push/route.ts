@@ -6,7 +6,7 @@ import {mergeParcels,type Parcel} from '@/lib/parcels';
 export const dynamic='force-dynamic';
 const H={'Cache-Control':'private, no-store'};
 const sub=z.object({endpoint:z.string().url().max(1000),keys:z.object({p256dh:z.string().max(200),auth:z.string().max(100)})});
-const body=z.object({subscription:sub.optional(),parcels:z.array(z.any()).max(400).optional(),test:z.boolean().optional(),remove:z.string().max(1000).optional(),marks:z.record(z.string().max(250),z.enum(['got','hide'])).optional(),view:z.object({at:z.string().max(40),active:z.array(z.object({keys:z.array(z.string().max(250)).max(30),name:z.string().max(200)})).max(200)}).optional()});
+const body=z.object({subscription:sub.optional(),parcels:z.array(z.any()).max(400).optional(),test:z.boolean().optional(),remove:z.string().max(1000).optional(),marks:z.record(z.string().max(250),z.enum(['got','hide'])).optional(),phone:z.string().max(20).optional(),view:z.object({at:z.string().max(40),active:z.array(z.object({keys:z.array(z.string().max(250)).max(30),name:z.string().max(200)})).max(200)}).optional()});
 const keep=(list:Parcel[])=>list.filter(p=>p&&Array.isArray(p.keys)&&Array.isArray(p.events)&&Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
 export async function GET(){return Response.json({enabled:dbOn(),publicKey:dbOn()?vapid().publicKey:''},{headers:H});}
 export async function POST(req:NextRequest){
@@ -20,7 +20,7 @@ export async function POST(req:NextRequest){
   // The phone's current list becomes the baseline, so things already seen in the app are not announced again.
   const parcels=b.parcels?keep(mergeParcels([...(state.parcels||[]),...keep(b.parcels as Parcel[])])):state.parcels||[];
   if(!row&&!b.subscription)return Response.json({ok:false},{headers:H});
-  await sql`insert into push_users(user_id,email,refresh,subs,state,checked_at) values(${u.id},${u.email},${seal(u.refreshToken)},${JSON.stringify(subs)},${JSON.stringify({...state,parcels,marks:b.marks??state.marks??{},view:b.view??state.view})},now())
+  await sql`insert into push_users(user_id,email,refresh,subs,state,checked_at) values(${u.id},${u.email},${seal(u.refreshToken)},${JSON.stringify(subs)},${JSON.stringify({...state,parcels,marks:b.marks??state.marks??{},view:b.view??state.view,phone:b.phone!==undefined?b.phone.replace(/\D/g,''):state.phone})},now())
    on conflict(user_id) do update set email=excluded.email,refresh=excluded.refresh,subs=excluded.subs,state=excluded.state,updated_at=now()`;
   if(b.test||b.subscription){const target=b.subscription?[b.subscription]:subs;let ok=0;for(const s of target)if(await send(s,{title:'Unbox',body:b.subscription?'ההתראות פעילות ✓':'התראת בדיקה ✓',tag:'test',url:'/'}).catch(()=>false))ok++;
    if(!ok)return Response.json({error:'ההתראה לא נשלחה. נסה לכבות ולהפעיל שוב.'},{status:502,headers:H});}

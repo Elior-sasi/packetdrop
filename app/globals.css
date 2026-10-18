@@ -244,3 +244,4 @@ nav{touch-action:none}nav.dragging:before{transition:none}
 .menu .sheetX{position:absolute;top:12px;left:14px;width:36px;height:36px;min-height:0;min-width:0;box-sizing:border-box;border-radius:50%;display:grid;place-items:center;background:#ffffff14;border:0;color:#c8d6e6;padding:0}
 .askRow{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;font-weight:600}.askRow>span:first-child{color:var(--ink)}
 .askRow [role=button]{padding:7px 14px;border-radius:999px;font-size:calc(15px*var(--fs));cursor:pointer}.askYes{background:#0f2e24;color:#8cf0c6;border:1px solid #1f5a46}.askNo{background:#ffffff10;color:#cfe4f7;border:1px solid #ffffff1a}
+.phoneIn{width:100%;height:50px;border-radius:14px;background:var(--card);border:1px solid var(--line);color:var(--ink);font-size:calc(18px*var(--fs));padding:0 14px;margin:6px 0 10px;text-align:left}
