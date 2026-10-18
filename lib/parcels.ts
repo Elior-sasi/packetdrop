@@ -1,5 +1,6 @@
 import {baldarHost} from '@/lib/tapuz';
 import * as cheerio from 'cheerio';
+import {heName} from '@/lib/hename';
 export type Event={id:string;label:string;time:string};
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
 export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];customs?:{amount:string;url:string;at:string}};
@@ -187,7 +188,7 @@ export function mergeParcels(rows:Parcel[]){
   // Several orders shipped in one package: name the package after all of them ("שחמט + אזעקה").
   const generic=(n:string)=>/^(?:הזמנה|חבילה|לחבילה|your order|הודעה מ)/i.test(n);
   const perOrder=new Map<string,string>();for(const p of sorted)if(p.order&&!generic(p.name)&&!perOrder.has(p.order))perOrder.set(p.order,p.name);
-  const items=[...new Set([...[...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')),...list.flatMap(p=>p.items||[])])].filter((a,_,all)=>{const n=(t:string)=>t.replace(/[.…\s]+$/,'').trim();return !all.some(b=>b!==a&&n(b).length>n(a).length&&n(b).startsWith(n(a)));});
+  const items=[...new Set([...[...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')),...list.flatMap(p=>p.items||[])])].filter((a,i,all)=>{const n=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();const na=n(a);return !all.some((b,j)=>{const nb=n(b);return b!==a&&(nb===na?j<i:nb.length>na.length&&(nb.startsWith(na)||nb.startsWith(na.split(' ').slice(0,3).join(' '))&&na.split(' ').length>=3&&nb.split(' ').slice(0,3).join(' ')===na.split(' ').slice(0,3).join(' ')));});});
   // The same product named by two mails, one cut shorter ("מכנסי קארגו לגברים" / "… כותנה"), is listed once.
   // One picture per order in the package.
   const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set([...list.flatMap(p=>p.images||[]),...perImg.values()])];
