@@ -9,6 +9,12 @@ type Raw={number:string;track_info?:{latest_status?:{status?:string};time_metric
 async function call(path:string,body:unknown,key:string){const r=await fetch(BASE+path,{method:'POST',headers:{'17token':key,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('TRACK_HTTP_'+r.status);return r.json();}
 // Carrier events usually arrive in English; common phrasings are translated here (no translation quota, no outside service).
 const HE:[RegExp,string][]=[
+ [/export (?:customs )?(?:clearance )?(?:complete|completed|success)|export clearance success/i,'עברה מכס יצוא'],
+ [/export (?:customs )?(?:clearance )?(?:started|start|in progress)/i,'בבדיקת מכס יצוא'],
+ [/processing at (?:the )?sorting (?:center|centre)/i,'בטיפול במרכז מיון'],
+ [/last-?mile delivery forecast|delivery forecast/i,'נקבע מועד מסירה משוער'],
+ [/^carrier update$/i,'עדכון מחברת השילוח'],
+ [/shipment information received by (?:the )?warehouse|order received successfully/i,'המחסן קיבל את פרטי ההזמנה'],
  [/ready for shipping|packed (?:at|in) (?:the )?warehouse|warehouse (?:processing|packed)|outbound (?:from |in )?(?:the )?warehouse.*ready/i,'נארזה במחסן ומוכנה למשלוח'],
  [/shipped out from (?:the )?warehouse|left (?:the )?warehouse|departed (?:from )?(?:the )?warehouse|outbound from (?:the )?warehouse/i,'יצאה מהמחסן'],
  [/arrived at (?:the )?warehouse|received (?:at|by) (?:the )?warehouse|inbound (?:at|in) (?:the )?warehouse/i,'הגיעה למחסן'],
@@ -42,7 +48,7 @@ const HE:[RegExp,string][]=[
  [/shipping (?:information|info) received|electronic (?:information|notification)|order information received|label (?:created|printed)|shipment information|pre-?advice/i,'פרטי המשלוח נקלטו אצל חברת השילוח'],
  [/in transit|on the way|in progress/i,'בדרך'],
 ];
-export function heEvent(text:string){if(!text||/[֐-׿]/.test(text))return text;for(const [r,he] of HE)if(r.test(text))return he;return text;}
+export function heEvent(text:string):string{const m=text?.match(/^\s*\[([^\]]{1,40})\]\s*(.+)$/);if(m){const t=heEvent(m[2]);return t===m[2]?text:t+' · '+m[1];}if(!text||/[֐-׿]/.test(text))return text;for(const [r,he] of HE)if(r.test(text))return he;return text;}
 export function toInfo(a:Raw):TrackInfo{const t=a.track_info||{};const status=t.latest_status?.status||'NotFound';const providers=t.tracking?.providers||[];
  const events=providers.flatMap(p=>(p.events||[]).map(e=>({time:e.time_utc||e.time_iso||'',text:heEvent((e.description_translation?.description||e.description||'').trim()),location:(e.location||'').trim()}))).filter(e=>e.time&&e.text);
  const seen=new Set<string>();const uniq=events.filter(e=>{const k=e.time+e.text;if(seen.has(k))return false;seen.add(k);return true;}).sort((x,y)=>x.time.localeCompare(y.time));

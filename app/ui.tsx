@@ -60,6 +60,22 @@ function Mark({cls,anim}:{cls?:string;anim?:'bob'|'open'}){return <svg className
 function Thumb({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop);
  return <div className={big?'hero':'thumb'}>{p.image&&!failed?<>{big&&<img className="backdrop" src={p.image} alt="" aria-hidden="true" referrerPolicy="no-referrer"/>}<img className="photo" src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
 function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop}/><span dir="auto">{p.shop}</span>{p.carrier&&<><span className="sep">·</span><span dir="auto">{p.carrier}</span></>}</div>;}
+// Detailed route, like the carrier sites: each milestone is lit by a real event (or by a later one), with its date.
+const ROUTE:[string,RegExp][]=[
+ ['ההזמנה התקבלה',/./],
+ ['נארזה במחסן',/נארז|מוכנה למשלוח|המחסן קיבל|נקלטו|ready for shipping|packed/i],
+ ['יצאה מהמחסן',/יצאה מהמחסן|נאספה|נשלח|מרכז מיון|מרכז המיון|shipped|dispatched/i],
+ ['מכס יצוא',/מכס יצוא|הגיעה למרכז השילוח בארץ המוצא/i],
+ ['טסה לישראל',/יצאה מארץ המוצא|יצאה בטיסה|בדרך לארץ|נמסרה לחברת ההובלה|בתעבורה|יצאה מאזור המוצא/i],
+ ['הגיעה לישראל',/הגיעה לארץ|נחתה|הגיעה לחברת ההובלה|במדינה|באזור שלכם/i],
+ ['שחרור ממכס',/שוחררה מהמכס|במכס|שחרור מהמכס/i],
+ ['אצל חברת המסירה',/חברת המסירה|חברת המשלוחים המקומית|המקומית/i],
+ ['במסירה / לאיסוף',/יצאה למסירה|לאיסוף|מוכנה למסירה/i],
+ ['נמסרה',/נמסרה|נמסר|delivered/i]];
+function Route({p}:{p:Parcel}){if(p.cancelled)return null;const evs=[...p.events].sort((a,b)=>a.time.localeCompare(b.time));
+ const hit=ROUTE.map(([,r],i)=>i===0?evs[0]:i===9&&p.stage>=4?(evs.find(e=>r.test(e.label))||evs.at(-1)):i===8&&p.stage>=3?(evs.find(e=>r.test(e.label))||null):evs.find(e=>r.test(e.label))||null);
+ let last=-1;hit.forEach((h,i)=>{if(h)last=i;});if(p.stage>=4)last=9;
+ return <section className="box"><h3>מסלול</h3><ol className="route">{ROUTE.map(([label],i)=>{const done=i<=last;const h=hit[i];return <li key={label} className={(done?'d ':'')+(i===last?'c':'')}><span className="rdot"/><b>{label}</b>{done&&h&&<time>{new Date(h.time).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})}</time>}</li>;})}</ol></section>;}
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
 
 export default function Dashboard({user,gmail,drive,configured,login}:{user:User|null;gmail:boolean;drive?:boolean;configured:boolean;login:()=>Promise<void>}){
@@ -293,6 +309,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <div className="dt"><h2>{bidi(open.name)}</h2><Meta p={open}/></div>
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled&&<span className="eta">הגעה <b>{open.eta}</b></span>}</div>
    {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':open.stage/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<open.stage?'d':i===open.stage?'c':'')}><span/>{i===3&&open.stage>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
+  <Route p={open}/>
   {open.pickup&&open.stage<4&&!open.cancelled&&<section className="box pickup"><h3><MapPin size={18}/> נקודת איסוף</h3>
    {open.pickup.place&&<p className="place">{open.pickup.place}</p>}{open.pickup.address&&<p className="addr">{open.pickup.address}</p>}{open.pickup.hours&&<p className="addr">שעות: {open.pickup.hours}</p>}
    {open.pickup.code&&<button className="code" onClick={()=>copy(open.pickup!.code)} aria-label={'קוד איסוף '+open.pickup.code.split('').join(' ')+', העתקה'}><KeyRound size={20}/><span>קוד איסוף</span><b dir="ltr">{open.pickup.code}</b>{copied===open.pickup.code?' ✓':<Copy size={17}/>}</button>}
