@@ -281,3 +281,6 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .stat b small{font-size:.42em;font-weight:600;margin-inline-start:2px}
 .stat span{white-space:nowrap}
 .tiles,.seg{touch-action:pan-y}
+/* Long numbers stay on one line: the label keeps its width, the number shrinks a little if it must. */
+.kv>span{white-space:nowrap;flex:0 0 auto}
+.kv .copy{min-width:0}.kv .copy b{overflow-wrap:normal;white-space:nowrap;font-size:clamp(13px,4.2vw,calc(16px*var(--fs)))}
