@@ -223,7 +223,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const autoRef=useRef(true);autoRef.current=auto;
  // Opening screen: shown on launch, then fades out.
  useEffect(()=>{const a=setTimeout(()=>setSplash('out'),1400),b=setTimeout(()=>setSplash('off'),1800);return()=>{clearTimeout(a);clearTimeout(b);};},[]);
- async function sync(){if(!user||controller.current)return;void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
+ async function sync(){if(!user||controller.current)return;setSlow(false);void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   let fix7=false;try{fix7=localStorage.getItem('pd_fix_v17')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
   try{let r=await fetch(listUrl,{signal:c.signal,cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch(listUrl,{signal:c.signal,cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
@@ -268,6 +268,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    if(held.length){acc={...acc,parcels:shown(acc.parcels)};saved.current=acc.parcels;}acc={...acc,updated:new Date().toISOString()};setData(acc);
    if(!c.signal.aborted){try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v17','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setReading(false);setTimeout(()=>setProgress(null),700);}}
+ // Safety net: if nothing has started 6 seconds after opening (a stuck request), start reading anyway; after 15 seconds offer a retry.
+ const [slow,setSlow]=useState(false);
+ useEffect(()=>{if(!user)return;const a=setTimeout(()=>{if(!controller.current&&!lastSync.current)void syncRef.current();},6000),b=setTimeout(()=>setSlow(true),15000);return()=>{clearTimeout(a);clearTimeout(b);};},[user?.id]);
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
  // While a sheet or menu is open the page behind it must not scroll (iOS needs the body pinned in place).
@@ -488,7 +491,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  </div>:<>
   {!configured&&<section className="notice"><h2>Unbox מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
-   {(waiting)&&<div className="loader" role="status"><Mark cls="lmark" anim="bob"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p></div>}
+   {(waiting)&&<div className="loader" role="status"><Mark cls="lmark" anim="bob"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p>{slow&&!progress&&<button className="ghost" onClick={()=>location.reload()}>לוקח יותר מדי זמן? נסה שוב</button>}</div>}
    {!(waiting)&&section==='today'&&<div className="list">{today.length?<>{pickPoints.map(p=>{const pk=p.pickup!;const q=placeQuery(pk);return <section key={p.id} className="box mapCard">
      <iframe title={'מפה: '+pk.place} src={'https://maps.google.com/maps?q='+encodeURIComponent(q)+'&hl=iw&z=16&output=embed'} loading="lazy" referrerPolicy="no-referrer-when-downgrade"/>
      <p className="place">{pk.place||pk.address}</p>{pk.place&&pk.address&&<p className="addr">{pk.address}</p>}{pk.hours&&<p className="addr">שעות: {pk.hours}</p>}
