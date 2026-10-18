@@ -291,3 +291,4 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .otherTag{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 10px;border-radius:12px;background:#1c2433;border:1px solid #3d4a63;color:#c9d4e5;font-size:calc(13px*var(--fs))}
 .micBtn{margin-inline-start:auto;background:none;border:0;color:#9fb0c0;padding:6px;border-radius:50%;display:flex}.micBtn.on{color:#0a0f14;background:#2ed3c6}
 .voiceAnswer{margin:10px 4px 0;padding:10px 14px;border-radius:14px;background:#10332c;border:1px solid #2ed3c6;color:#e8fffc;font-size:calc(15px*var(--fs));line-height:1.5}
+.money .shopRow{grid-template-columns:minmax(80px,auto) 1fr 64px}.money .shopRow b{white-space:nowrap}
