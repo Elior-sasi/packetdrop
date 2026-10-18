@@ -1,0 +1,10 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {parseMessage,mergeParcels} from '../lib/parcels';
+const msg=(id:string,from:string,subject:string,html:string,t:string)=>({id,internalDate:String(Date.parse(t)),payload:{mimeType:'text/html',headers:[{name:'Subject',value:subject},{name:'From',value:from}],body:{data:Buffer.from(html).toString('base64url')}}}) as never;
+test('Israel Post notice: accessibility icon is not the product',()=>{
+ const p=parseMessage(msg('p1','noReply@postil.co.il','הודעה על משלוח שמספרו RS1344385286Y','<a href="https://uclicks.inforu.net/?page=webview" data-linkid="accessibility"><img title="תפריט נגישות" alt="תפריט נגישות" src="https://ufront2.inforu.net//files/Z9A32S/0fu3wp5tn7.png"/></a><img src="https://uclicks.inforu.net/?page=view" alt="תמונה" height="1" width="1"/><div>שלום Elior Sasi,<br/> משלוח RS1344385286Y מחו"ל בדרכו לארץ. לאחר שחרורו ממכס, הוא ישלח לנקודת האיסוף</div><div>בברכה, דואר ישראל</div>','2026-10-16T01:09:37Z'))!;
+ assert.ok(p);assert.notEqual(p.name,'תפריט נגישות');assert.equal(p.image,'');});
+test('Shopify order: item title, quantity, refund closes it',()=>{
+ const a=parseMessage(msg('s1','store+80190144817@t.shopifyemail.com','Order #500078564 confirmed','<img src="https://cdn.shopify.com/logo.png" alt="misradia" width="150"/><span class="order-number__text">Order #500078564</span><h2>תודה על רכישתך!</h2><p>אנחנו מכינים את ההזמנה שלך למשלוח.</p><img src="https://cdn.shopify.com/chair.gif" class="order-list__product-image"/><span class="order-list__item-title">כסא ארגונומי פרמיום עם גב רשת דגם CH05-8 × 1</span><p>798.00 ₪</p>','2026-09-28T10:44:39Z'))!;
+ assert.ok(a.name.startsWith('כסא ארגונומי'),a.name);assert.ok(a.image.includes('chair'));
+ const b=parseMessage(msg('s2','store+80190144817@t.shopifyemail.com','הודעה על זיכוי','<span class="order-number__text">הזמנה #500078564</span><h2>הזמנתך זוכתה</h2><p>סך הכל זיכוי: 798.00 ₪</p><span class="order-list__item-title">כסא ארגונומי פרמיום עם גב רשת דגם CH05-8 × 1</span>','2026-10-04T11:44:12Z'))!;
+ assert.ok(b.cancelled);const m=mergeParcels([a,b]);assert.equal(m.length,1);assert.ok(m[0].cancelled);});

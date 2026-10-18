@@ -33,7 +33,7 @@ const STAGE_RULES:[number,RegExp][]=[
  [2,/במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
  [1,/נשלחה|נשלח|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
  [0,/אושרה|מאושרת|התקבלה|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
-const CANCEL=/is closed|בוטלה|בוטל|ביטול ה?הזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי/i;
+const CANCEL=/is closed|בוטלה|בוטל|ביטול ה?הזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי|הודעה על זיכוי|הזמנתך זוכתה|has been refunded/i;
 function stageOf(s:string){for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
 
 // Final touch on any title: no dangling connector word, no lone fragment after the last comma.
@@ -67,7 +67,9 @@ export function parseMessage(m:Message):Parcel|null{
  const knownSender=shops.some(([r])=>r.test(from))||carriers.some(([r])=>r.test(from));
  // Replies and forwards are the user's own correspondence, not shipping updates.
  if(!knownSender&&/^\s*(?:re|fw|fwd|השב|הועבר)\s*:/i.test(subject))return null;
- if(NOT_PARCEL.test(from+' '+subject)||(!knownSender&&(NOT_PARCEL.test(text.slice(0,1500))||!SHIPPING.test(text))))return null;
+ // A refund/cancellation of an order is kept (it closes that order) even without shipping words.
+ const closing=/הזמנתך זוכתה|הודעה על זיכוי|order (?:has been )?(?:cancel+ed|refunded)|ההזמנה בוטלה/i.test(subject+' '+text.slice(0,400));
+ if(NOT_PARCEL.test(from+' '+subject)||(!knownSender&&!closing&&(NOT_PARCEL.test(text.slice(0,1500))||!SHIPPING.test(text))))return null;
  const hrefs=$('a').toArray().map(a=>$(a).attr('href')||'');
  // Order IDs from text and from order links (AliExpress package mails only carry them as o_ids=...).
  const orders=new Set<string>();
@@ -103,10 +105,12 @@ export function parseMessage(m:Message):Parcel|null{
  const productImg=(el:any)=>{const src=$(el).attr('src')||$(el).attr('data-src')||'';const u=secureUrl(src.startsWith('//')?'https:'+src:src.replace(/^http:\/\/(?=[^/]*(?:alicdn|aliexpress-media|media-amazon|ssl-images-amazon|temu|shein|ebayimg))/i,'https://'));const w=Number($(el).attr('width')||0);
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
  if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;$(el).find('img').each((_,im)=>{if(!image)image=productImg(im);});});
- if(!name)$('img').each((_,el)=>{if(image)return;const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein|completed|delivered|shipped|ordered|success|check ?mark|in transit)$/i.test(alt)){name=alt;image=src;}});
+ // Shopify stores: the item title cell ("כסא ארגונומי … × 1").
+ if(!name){const t=$('.order-list__item-title').first().text().replace(/\s+/g,' ').trim();if(t.length>3)name=tidyName(t.replace(/\s*[x×]\s*\d{1,3}\s*$/,''));const img=$('.order-list__product-image').first().attr('src');if(name&&img&&!image)image=secureUrl(img);}
+ if(!name)$('img').each((_,el)=>{if(image)return;const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking|נגישות|accessib|webview|inforu|^תמונה$/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein|completed|delivered|shipped|ordered|success|check ?mark|in transit)$/i.test(alt)){name=alt;image=src;}});
  if(!name)name=/^הודעה (?:מ|ב)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
- const cancelled=CANCEL.test(subject);
+ const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
  let stage=stageOf(subject);if(stage<0)stage=stageOf(lead);
  const range=text.match(/בין התאריכים\s*(\d{1,2})[./-](\d{1,2})(?:[./-]\d{2,4})?\s*(?:ו?עד|-)\s*(\d{1,2})[./-](\d{1,2})/);
  const eta=range?(+range[1]+'.'+(+range[2])+'-'+(+range[3])+'.'+(+range[4])):etaOf(text.match(/(?:estimated delivery|expected delivery|arriving|delivery date|הגעה משוערת|מועד הגעה|צפויה להגיע)\s*[:\-]?\s*([^.!?|]{4,65})/i)?.[1]||'');
@@ -123,7 +127,7 @@ export function parseMessage(m:Message):Parcel|null{
  const customs=due?{amount:(text.match(/(?:סך|סה"?כ|סכום|בסך|לתשלום|amount|total)[^₪$\d]{0,25}(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?(?:₪|ש"ח|שקלים))/i)?.[1]||'').replace(/\s+/g,'').replace(/ש"ח|שקלים/,'₪'),url:$('a').toArray().map(a=>secureUrl($(a).attr('href')||'')).find(u=>OFFICIAL.test(u))||'',at:time}:undefined;
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
- const qm=[...text.matchAll(/\s[x×](\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qty=qm.length===1&&qm[0]>1?qm[0]:undefined;
+ const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qty=qm.length===1&&qm[0]>1?qm[0]:undefined;
  return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
