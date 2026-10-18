@@ -9,6 +9,12 @@ export async function GET(req:NextRequest){
  if(u.protocol!=='https:'||!HOSTS.test(u.hostname))return new Response('host',{status:403});
  try{const r=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0'},signal:AbortSignal.timeout(8000)});if(!r.ok)return Response.redirect(u.toString(),302);
   const buf=Buffer.from(await r.arrayBuffer());if(buf.length>8_000_000)return Response.redirect(u.toString(),302);
-  const out=await sharp(buf).rotate().trim({background:'#ffffff',threshold:18}).resize({width:1000,height:1000,fit:'inside',withoutEnlargement:true}).jpeg({quality:84,mozjpeg:true}).toBuffer();
+  // The product is cut out of its white padding, then set in the middle of a frame of the shape it is shown in
+  // ("w": the detail photo, 5:4; "sq": the card thumbnail), with the same small white margin on every side.
+  const [W,H]=req.nextUrl.searchParams.get('f')==='sq'?[600,600]:[1000,800];const m=0.06;
+  let img=sharp(buf).rotate();try{img=sharp(await img.trim({background:'#ffffff',threshold:18}).toBuffer());}catch{}
+  const inner=await img.resize({width:Math.round(W*(1-2*m)),height:Math.round(H*(1-2*m)),fit:'inside'}).toBuffer();const meta=await sharp(inner).metadata();
+  const left=Math.round((W-(meta.width||0))/2),top=Math.round((H-(meta.height||0))/2);
+  const out=await sharp(inner).extend({left,right:W-(meta.width||0)-left,top,bottom:H-(meta.height||0)-top,background:'#ffffff'}).flatten({background:'#ffffff'}).jpeg({quality:84,mozjpeg:true}).toBuffer();
   return new Response(new Uint8Array(out),{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=2592000, s-maxage=2592000, immutable'}});
  }catch{return Response.redirect(u.toString(),302);}}

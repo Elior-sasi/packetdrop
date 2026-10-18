@@ -260,3 +260,7 @@ nav{touch-action:none}nav.dragging:before{transition:none}
 /* One photo fills the frame edge to edge, like the gallery (the white padding is trimmed on the server). */
 .hero>img.photo.fill{object-fit:cover;background:#fff}
 .hero,.galTrack{height:min(80vw,380px)}
+/* Photos arrive already framed (product centred, even white margin), so they are shown whole, never cropped. */
+.hero,.galTrack{height:auto;aspect-ratio:5/4;max-height:420px}
+.hero>img.photo.fill,.galTrack img{object-fit:contain;background:#fff}
+.hero:has(>img.photo.fill){background:#fff}

@@ -9,7 +9,7 @@ type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events
 type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
 // Product photos go through our server, which cuts off the white bars stores pad them with.
-function trimmed(src:string){return /^https:\/\/[^/]*(?:aliexpress-media\.com|alicdn\.com|media-amazon\.com|ssl-images-amazon\.com|cdn\.shopify\.com)\//i.test(src)?'/api/img?u='+encodeURIComponent(src):src;}
+function trimmed(src:string,f='w'){return /^https:\/\/[^/]*(?:aliexpress-media\.com|alicdn\.com|media-amazon\.com|ssl-images-amazon\.com|cdn\.shopify\.com)\//i.test(src)?'/api/img?f='+f+'&u='+encodeURIComponent(src):src;}
 const STATUS=['ההזמנה התקבלה','נשלחה','בדרך','מוכנה לאיסוף / במסירה','נמסרה'];
 const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
 // A parcel that went quiet is not delivered; its steps stay where the last real update left them.
@@ -76,7 +76,7 @@ function Favicon({name,size=18}:{name:string;size?:number}){const [failed,setFai
 function Mark({cls,anim}:{cls?:string;anim?:'bob'|'open'}){return <svg className={cls} viewBox="100 76 312 386" aria-hidden="true"><defs><linearGradient id="ug" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug)" strokeWidth="58" strokeLinecap="round"/><g className="lid">{anim==="bob"&&<animateTransform attributeName="transform" type="translate" values="0 40;0 -26;0 40" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>}{anim==="open"&&<animateTransform attributeName="transform" type="translate" values="0 56;0 0" dur=".9s" begin=".2s" fill="freeze" calcMode="spline" keySplines=".2 .9 .3 1"/>}<rect x="112" y="112" width="288" height="48" rx="16" fill="#4aa8ff" transform="rotate(-10 112 160)"/></g></svg>;}
 function Thumb({p,big}:{p:Parcel;big?:boolean}){if(p.images&&p.images.length>1){
  // Card: the first item fills the square, the second sits as a small inset so neither is cut in half.
- if(!big)return <div className="thumb multi n2">{p.images.slice(0,2).map(src=><img key={src} src={trimmed(src)} alt="" loading="lazy" referrerPolicy="no-referrer"/>)}</div>;
+ if(!big)return <div className="thumb multi n2">{p.images.slice(0,2).map(src=><img key={src} src={trimmed(src,'sq')} alt="" loading="lazy" referrerPolicy="no-referrer"/>)}</div>;
  return <Gallery imgs={p.images.slice(0,12)}/>;}
 // Several photos: one at a time, swiped sideways, with dots that show where you are.
 function Gallery({imgs}:{imgs:string[]}){const [at,setAt]=useState(0);
@@ -84,7 +84,7 @@ function Gallery({imgs}:{imgs:string[]}){const [at,setAt]=useState(0);
   <div className="dots" aria-hidden="true">{imgs.map((_,i)=><i key={i} className={i===at?'on':''}/>)}</div></div>;}
  return <ThumbOne p={p} big={big}/>;}
 function ThumbOne({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop)||domainOf(p.carrier);
- return <div className={big?'hero':'thumb'}>{p.image&&!failed?<img className={'photo'+(big?' fill':'')} src={trimmed(p.image)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
+ return <div className={big?'hero':'thumb'}>{p.image&&!failed?<img className={'photo'+(big?' fill':'')} src={trimmed(p.image,big?'w':'sq')} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
 function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop}/><span dir="auto">{p.shop}</span>{p.carrier&&<><span className="sep">·</span><span dir="auto">{p.carrier}</span></>}</div>;}
 // Detailed route, like the carrier sites: each milestone is lit by a real event (or by a later one), with its date.
 const ROUTE:[string,RegExp][]=[
