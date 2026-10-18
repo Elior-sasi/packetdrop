@@ -173,7 +173,8 @@ const ISRAEL_MILES=new Set(['מההגעה לישראל','מהשחרור ממכס
 function freshEta(p:Parcel,all:Parcel[]):Parcel{if(!p.eta||p.stage>=3||p.cancelled)return p;const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(!m)return p;
  if(learnCache?.all!==all)learnCache={all,days:learn(all)};const e=estimate({...p,eta:''},learnCache.days);if(!e||e.late||!ISRAEL_MILES.has(e.stage))return p;
  const y=new Date().getFullYear();let start=new Date(y,+m[2]-1,+m[1]).getTime();if(start<Date.now()-60*864e5)start=new Date(y+1,+m[2]-1,+m[1]).getTime();
- return e.to<start-864e5?{...p,eta:''}:p;}
+ const em=p.eta.match(/-(\d{1,2})\.(\d{1,2})/);let end=em?new Date(y,+em[2]-1,+em[1]).getTime():start;if(end<start)end=new Date(y+1,+em![2]-1,+em![1]).getTime();
+ return e.to<end?{...p,eta:''}:p;}
 const dd=(t:number)=>{const d=new Date(t);return d.getDate()+'.'+(d.getMonth()+1);};
 const estText=(e:Est)=>e.late?'מתעכבת מהרגיל':dd(e.from)===dd(e.to)?dd(e.from):dd(e.from)+'-'+dd(e.to);
 // ---- AliExpress buyer protection: the order is about to be closed but the parcel has not arrived ----
@@ -214,7 +215,7 @@ const AF=Object.getPrototypeOf(async function(){}).constructor
 if(code&&code.includes('ListWidget')){await new AF('r',code)(r)}else{const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');const t=w.addText(r&&r.lines?r.lines.map(x=>x.t).join('\\n'):'אין נתונים כרגע');t.textColor=Color.white();t.font=Font.boldSystemFont(15);if(config.runsInWidget)Script.setWidget(w);else await w.presentSmall();Script.complete()}`;
 // Hero card: the next parcel to reach you, with a countdown and its place on the way.
 function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
- const pick=isPickup(p),today=outToday(p);const days=Math.max(0,Math.round((when-Date.now())/864e5));
+ const pick=isPickup(p),today=outToday(p);const sod=(t:number)=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime();};const days=Math.max(0,Math.round((sod(when)-sod(Date.now()))/864e5));
  const has=(r:RegExp)=>p.events.some(e=>r.test(e.label));
  const T=pick||today||p.stage>=3?1:has(ROUTE[7][1])?.85:has(ROUTE[6][1])?.75:has(ROUTE[5][1])?.65:has(ROUTE[4][1])?.42:p.stage>=1?.15:.05;
  const k=pick?'מחכה לך לאיסוף':today?'מגיעה היום':'החבילה הבאה שמגיעה';
@@ -228,7 +229,7 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
    <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?20:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
    <div className="nc-info"/><Thumb p={p}/></div>
   <div className="nc-nm nc-full">{bidi(p.name)}</div>
-  <div className="nc-chips" aria-hidden="true"><span>{statusText(p)}</span>{!today&&<span>{'צפי '+dd(when)}</span>}</div></button>;}
+  <div className="nc-chips" aria-hidden="true"><span>{statusText(p)}</span>{!today&&<span>{'צפי '+(p.eta&&/-/.test(p.eta)?p.eta:dd(when))}</span>}</div></button>;}
  const x=348-T*338;
  return <button className="nextCard nc-ring" onClick={onOpen} aria-label={label}>
   <div className="nc-row"><Thumb p={p}/><div className="nc-info"><div className="nc-k">{k}</div><div className="nc-nm">{bidi(p.name)}</div>
@@ -382,8 +383,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled||p.cancelled&&!!p.refund);
  // On the way: what is due first comes first (carrier date, else your own estimate); pickups and today's deliveries stay on top.
  const etaAt=(p:Parcel)=>{const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(m){const y=new Date().getFullYear();let t=new Date(y,+m[2]-1,+m[1]).getTime();if(t<Date.now()-60*864e5)t=new Date(y+1,+m[2]-1,+m[1]).getTime();return t;}const e=est(p);return e&&!e.late?e.from:e?.late?Date.now():Infinity;};
+ // A delivery window that has already started ("19.10-26.10" on the 19th): count to its end, not "today".
+ const etaWhen=(p:Parcel)=>{const t=etaAt(p);const m=p.eta.match(/-(\d{1,2})\.(\d{1,2})/);if(!m||t>Date.now())return t;const y=new Date().getFullYear();let e=new Date(y,+m[2]-1,+m[1],12).getTime();if(e<t)e=new Date(y+1,+m[2]-1,+m[1],12).getTime();return e;};
  const byEta=(list:Parcel[])=>[...list].sort((a,b)=>{const u=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return u(a)-u(b)||etaAt(a)-etaAt(b)||(b as {last?:number}).last!-(a as {last?:number}).last!;});
- const nextP=(()=>{const l=byEta(active).filter(p=>isPickup(p)||outToday(p)||!!p.eta||(est(p)&&!est(p)!.late));const p=l[0];if(!p)return null;const t=isPickup(p)||outToday(p)?Date.now():etaAt(p);return Number.isFinite(t)?{p,t}:null;})();
+ const nextP=(()=>{const l=byEta(active).filter(p=>isPickup(p)||outToday(p)||!!p.eta||(est(p)&&!est(p)!.late));const p=l[0];if(!p)return null;const t=isPickup(p)||outToday(p)?Date.now():etaWhen(p);return Number.isFinite(t)?{p,t}:null;})();
  const q=search.trim().toLowerCase();const qs=searchTerms(q);// A search looks through everything, delivered parcels included.
  const shownAll=(q?[...byEta(active),...done]:view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>{if(!q)return true;const hay=[p.name,p.shop,p.carrier,p.tracking,p.order,...(p.items||[]),...p.keys].join(' ').toLowerCase();return qs.some(t=>hay.includes(t));});
  // Delivered courier notices with no product (HFD etc.) fold into one row at the bottom of "נמסרו".
@@ -400,7 +403,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    const sub=await reg.pushManager.getSubscription();setPush(sub&&Notification.permission==='granted'?'on':'off');}catch{setPush('unsupported');}})();},[user?.id]);
  // Widget and Siri use the app's own idea of what is on the way (see lib/live.ts).
  const viewSent=useRef('');
- useEffect(()=>{if(push!=='on'||busy||!data)return;const v=JSON.stringify(active.map(p=>{const e=p.eta?null:est(p);const t=isPickup(p)||outToday(p)?Date.now():p.eta?etaAt(p):e&&!e.late?e.from:NaN;return {keys:p.keys.slice(0,30),name:p.name.slice(0,200),...(Number.isFinite(t)?{when:Math.round(t)}:{})};}));if(v===viewSent.current)return;
+ useEffect(()=>{if(push!=='on'||busy||!data)return;const v=JSON.stringify(active.map(p=>{const e=p.eta?null:est(p);const t=isPickup(p)||outToday(p)?Date.now():p.eta?etaWhen(p):e&&!e.late?e.from:NaN;return {keys:p.keys.slice(0,30),name:p.name.slice(0,200),...(Number.isFinite(t)?{when:Math.round(t)}:{})};}));if(v===viewSent.current)return;
   const id=setTimeout(()=>{void pushPost({view:{at:new Date().toISOString(),active:JSON.parse(v)}}).then(()=>{viewSent.current=v;}).catch(()=>{});},1500);return ()=>clearTimeout(id);},[push,busy,data,active]);
  // Slide a finger along the tab bar to move between tabs, like the iOS tab bars.
  const [navDrag,setNavDrag]=useState<number|null>(null);
