@@ -1,7 +1,7 @@
 import {NextRequest} from 'next/server';
 import {z} from 'zod';
 import {identity} from '@/lib/identity';
-import {QUERY,GmailError,gmailClient} from '@/lib/gmail';
+import {QUERY,GmailError,gmailClient,pdfInfo} from '@/lib/gmail';
 import {parseMessage,mergeParcels,type Message} from '@/lib/parcels';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -21,7 +21,8 @@ export async function POST(req:NextRequest){
  if(req.headers.get('origin')!==req.nextUrl.origin)return Response.json({error:'בקשה לא מורשית'},{status:403});
  try{const gmail=await client(req);const {ids}=body.parse(await req.json());const messages:Message[]=[];const failed:string[]=[];
   for(let i=0;i<ids.length;i+=6){const chunk=ids.slice(i,i+6);const got=await Promise.allSettled(chunk.map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));got.forEach((g,j)=>{if(g.status==='fulfilled')messages.push(g.value);else{if(g.reason instanceof GmailError&&!['GMAIL','RATE'].includes(g.reason.message))throw g.reason;failed.push(chunk[j]);}});}
-  const parcels=mergeParcels(messages.map(parseMessage).filter((p):p is NonNullable<typeof p>=>!!p));
+  const pdfs=await Promise.all(messages.map(m=>pdfInfo(gmail,m as never).catch(()=>undefined)));
+  const parcels=mergeParcels(messages.map((m,i)=>parseMessage(m,pdfs[i])).filter((p):p is NonNullable<typeof p>=>!!p));
   return Response.json({parcels,read:messages.map(m=>m.id),failed},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return fail(e);}}
 function fail(e:unknown){try{throw e;}catch(e){const code=e instanceof Error?e.message:'';

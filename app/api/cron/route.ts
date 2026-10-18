@@ -1,5 +1,5 @@
 import {GOOGLE_CLIENT_ID} from '@/lib/google';
-import {QUERY,gmailClient} from '@/lib/gmail';
+import {QUERY,gmailClient,pdfInfo} from '@/lib/gmail';
 import {parseMessage,mergeParcels,type Parcel,type Message} from '@/lib/parcels';
 import {trackAll} from '@/lib/track';
 import {baldarByPhone} from '@/lib/tapuz';
@@ -32,7 +32,8 @@ async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  const msgs:Message[]=[];for(let i=0;i<ids.length;i+=10){const got=await Promise.allSettled(ids.slice(i,i+10).map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));for(const g of got)if(g.status==='fulfilled')msgs.push(g.value);}
  const state:State={parcels:u.state?.parcels||[],stuck:u.state?.stuck||[],marks:u.state?.marks||{},reminded:u.state?.reminded||{},weekly:u.state?.weekly||''};
  const phone=String((u.state as {phone?:string})?.phone||'');
- let parcels=mergeParcels([...state.parcels,...msgs.map(parseMessage).filter((p):p is Parcel=>!!p),...(phone?await baldarByPhone(phone).catch(()=>[]):[])]);
+ const pdfs=await Promise.all(msgs.map(m=>pdfInfo(gmail,m as never).catch(()=>undefined)));
+ let parcels=mergeParcels([...state.parcels,...msgs.map((m,i)=>parseMessage(m,pdfs[i])).filter((p):p is Parcel=>!!p),...(phone?await baldarByPhone(phone).catch(()=>[]):[])]);
  const numbers=[...parcels.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,36),...(phone?parcels.filter(p=>p.tracking&&p.carrier==='K Express'&&p.stage<4&&!p.cancelled).map(p=>'KX:'+p.tracking).slice(0,4):[]),...parcels.filter(p=>!p.tracking&&p.order&&p.via?.length&&p.stage<4&&!p.cancelled&&Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<45*864e5).flatMap(p=>p.via!.map(h=>'TZ:'+h+':'+p.order)).slice(0,6)];
  if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY,phone).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]||(p.tracking?t['KX:'+p.tracking]:undefined)||(!p.tracking&&p.order?(p.via||[]).map(h=>t['TZ:'+h+':'+p.order]).find(Boolean):undefined)));}
  // With no baseline yet, the first check only records the current state.

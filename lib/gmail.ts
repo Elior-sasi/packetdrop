@@ -17,3 +17,11 @@ export function gmailClient(accessToken:string){
   if((r.status===429||(r.status===403&&/rateLimitExceeded|userRateLimitExceeded/i.test(detail)))&&attempt<4){await new Promise(res=>setTimeout(res,500*2**attempt+Math.random()*300));return gmail(path,attempt+1);}
   if(r.status===429)throw new GmailError('RATE');
   throw new GmailError('GMAIL');};}
+// Invoices / order copies attached as PDF (מחסני חשמל and other Israeli stores): read the order number and products.
+type Part={filename?:string;mimeType?:string;body?:{attachmentId?:string;size?:number};parts?:Part[];headers?:{name:string;value:string}[]};
+export async function pdfInfo(gmail:(p:string)=>Promise<any>,m:{id:string;payload?:Part}){
+ const subject=m.payload?.headers?.find(h=>/^subject$/i.test(h.name))?.value||'';if(!/חשבונית|הזמנ|invoice|order|קבלה/i.test(subject))return undefined;
+ const pdfs:Part[]=[];const walk=(p?:Part)=>{if(!p)return;if(/\.pdf$/i.test(p.filename||'')&&p.body?.attachmentId&&(p.body.size||0)<2_000_000)pdfs.push(p);p.parts?.forEach(walk);};walk(m.payload);
+ if(!pdfs.length)return undefined;
+ try{const {pdfText,pdfOrder}=await import('@/lib/pdf');const a=await gmail('messages/'+encodeURIComponent(m.id)+'/attachments/'+encodeURIComponent(pdfs[0].body!.attachmentId!));
+  const bytes=Uint8Array.from(Buffer.from(String(a.data||''),'base64url'));const info=pdfOrder(await pdfText(bytes));return info.order||info.items.length?info:undefined;}catch{return undefined;}}
