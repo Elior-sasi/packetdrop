@@ -254,7 +254,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const q=search.trim().toLowerCase();const shownAll=(view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  // Delivered courier notices with no product (HFD etc.) fold into one row at the bottom of "נמסרו".
  const nameless=(p:Parcel)=>!p.image&&!p.images&&/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(p.name)&&!!p.carrier&&!titles[p.id];
- const folded=view==='done'&&foldCourier&&!q?shownAll.filter(nameless):[];const shown=folded.length?shownAll.filter(p=>!folded.includes(p)):shownAll;
+ const heroId=showNext&&view==='active'&&filter==='all'&&!q&&nextP?nextP.p.id:'';
+ const folded=view==='done'&&foldCourier&&!q?shownAll.filter(nameless):[];const shown=(folded.length?shownAll.filter(p=>!folded.includes(p)):shownAll).filter(p=>p.id!==heroId);
  const pickup=active.filter(isPickup).length;const open=parcels.find(p=>p.id===openId)||null;
  // Phone notifications (Web Push through the service worker).
  const [push,setPush]=useState<'checking'|'install'|'unsupported'|'nodb'|'denied'|'off'|'on'|'busy'>('checking'),[pushMsg,setPushMsg]=useState('');const pushKey=useRef('');const pushOn=useRef(false);pushOn.current=push==='on';
@@ -398,8 +399,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
     {stats.shops.length>0&&<section className="box"><h3>חנויות ב{stats.label}</h3>{stats.shops.map(([shop,n])=><div key={shop} className="shopRow"><span dir="auto">{shop}</span><i style={{width:Math.max(8,100*n/stats.shops[0][1])+'%'}}/><b>{n}</b></div>)}</section>}
     {stats.n>0&&<section className="box"><h3>זמן הגעה</h3><p className="setNote">מההזמנה ועד שהחבילה אצלך: בממוצע {stats.avg} ימים. הכי מהירה {stats.fast}, הכי איטית {stats.slow}. לפי {stats.n} חבילות שהגיעו.</p></section>}
     {!stats.ordered&&!stats.delivered&&<section className="panel empty"><ChartColumn size={40}/><h2>אין הזמנות ב{stats.label}</h2></section>}</div>}
-   {!(waiting)&&section==='list'&&showNext&&view==='active'&&filter==='all'&&!search&&nextP&&<NextCard p={nextP.p} when={nextP.t} onOpen={()=>setOpenId(nextP.p.id)}/>}
    {!(waiting)&&section==='list'&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+   {showNext&&view==='active'&&filter==='all'&&!search&&nextP&&<NextCard p={nextP.p} when={nextP.t} onOpen={()=>setOpenId(nextP.p.id)}/>}
    {error&&<div className="error" role="alert"><span>{error}</span>{['NO_GMAIL','RECONNECT','UNAUTHORIZED'].includes(errorCode)?<form action={login}><button className="primary">חידוש הרשאת Google</button></form>:<button className="ghost" onClick={()=>sync()}>נסה שוב</button>}</div>}
    <div className="list">{shown.map(p=><button key={p.id} className={'card '+(isPickup(p)||outToday(p)?'focus':'')} {...longPress(p)} aria-label={p.name+', '+statusText(p)}>
     <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span>{p.stage===3&&p.pickup?.place&&!p.cancelled?<span className="eta">איסוף ב<b>{p.pickup.place}</b></span>:p.eta&&!p.cancelled?<span className="eta">הגעה <b>{p.eta}</b></span>:showEst&&(()=>{const e=est(p);return e&&<span className="eta">{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>{customsDue(p)&&<div className="guardTag customsTag"><ShieldAlert size={16}/> לתשלום מכס{p.customs!.amount?' '+p.customs!.amount:''}</div>}{guardOf(p)&&<div className="guardTag"><ShieldAlert size={16}/> ההזמנה תיסגר בקרוב, החבילה לא הגיעה</div>}</div></div>
