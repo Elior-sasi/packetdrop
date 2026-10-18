@@ -19,3 +19,7 @@ test('Urbanica confirmation with "#number" and quantity',()=>{
 test('Israel Post notice without an icon is a generic parcel',()=>{
  const p=parseMessage(msg('p2','noReply@postil.co.il','הודעה על משלוח שמספרו RU0140292467Z','<div>משלוח RU0140292467Z מחו"ל בדרכו לארץ.</div>','2026-09-03T08:25:15Z'))!;
  assert.equal(p.name,'חבילה');});
+import {parseSms} from '../lib/parcels';
+test('courier SMS for an Israeli store joins the order',()=>{
+ const s=parseSms('תפוז משלוחים: המשלוח שלך מאורבניקה, הזמנה 302834565, מספר משלוח 7712345 יצא למסירה היום')!;
+ assert.ok(s);assert.equal(s.tracking,'7712345');assert.ok(s.keys.includes('order:302834565'));assert.equal(s.shop,'Urbanica');assert.equal(s.stage,3);});

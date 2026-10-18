@@ -29,7 +29,7 @@ const NOT_PARCEL=/eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesplanet|ר
 const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נקודת (?:ה)?חלוקה|כתובת למשלוח|shipping|shipped|shipment|delivery|tracking|מעקב|parcel|package/i;
 const STAGE_RULES:[number,RegExp][]=[
  [4,/איך הלך|לכתוב ביקורת|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
- [3,/מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|טרם נאסף|יצאה למסירה|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
+ [3,/מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|טרם נאסף|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
  [2,/במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
  [1,/נשלחה|נשלח|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
  [0,/אושרה|מאושרת|התקבלה|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
@@ -173,7 +173,7 @@ export function mergeParcels(rows:Parcel[]){
 // An SMS from the post office or a courier (pasted, or sent by an iPhone Shortcut) turned into a parcel update.
 export function parseSms(raw:string,now=new Date()):Parcel|null{
  const text=raw.replace(/\s+/g,' ').trim().slice(0,1200);if(text.length<8)return null;
- const tracking=(text.match(/(?:מספר\s*(?:ה?מעקב|ה?משלוח|ה?חבילה|פריט)|מס['׳]?\s*(?:מעקב|משלוח|חבילה)|tracking(?:\s*(?:number|no\.?))?|פריט)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{7,34})/i)?.[1]
+ const tracking=(text.match(/(?:מספר\s*(?:ה?מעקב|ה?משלוח|ה?חבילה|פריט)|מס['׳]?\s*(?:מעקב|משלוח|חבילה)|tracking(?:\s*(?:number|no\.?))?|פריט)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{5,34})/i)?.[1]
   ||text.match(/\b([A-Z]{2}\d{9}[A-Z]{2}|1Z[0-9A-Z]{16}|RS\d{9,}Y?|LP\d{10,}|AP\d{8,}|AE\d{8,})\b/i)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
  if(!tracking)return null;
  const code=text.match(/(?:קוד(?:\s*(?:ה?איסוף|ה?משיכה|לקבלת\s*ה?חבילה|אישור|סודי))?|code)\s*[:\-]?\s*(\d{4,8})\b/i)?.[1]||'';
@@ -184,4 +184,6 @@ export function parseSms(raw:string,now=new Date()):Parcel|null{
  const carrier=carrierFrom(text,'');
  const pickup=place||code?{place,address,code,url:'',hours:hours||undefined}:null;
  const label=stage===3&&pickup?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===4?'נמסרה':stage===3?'יצאה למסירה':'עדכון מ־SMS';
- return {id:'tracking:'+tracking,keys:['tracking:'+tracking],name:'חבילה '+tracking,shop:'',carrier,image:'',url:'',tracking,order:'',eta:'',stage,cancelled:false,pickup,events:[{id:'sms:'+tracking+':'+stage+':'+now.toISOString().slice(0,13),label,time:now.toISOString()}]};}
+ // Israeli stores' couriers (Tapuz, KSP…) mention the store's order number; it joins the SMS to the order mail.
+ const order=text.match(/הזמנ\S*\s*(?:מס['׳]?|מספר)?\s*:?\s*#?\s*(\d{6,12})/)?.[1]||'';const shop=shops.find(([r])=>r.test(text))?.[1]||'';
+ return {id:'tracking:'+tracking,keys:['tracking:'+tracking,...(order&&order!==tracking?['order:'+order]:[])],name:'חבילה '+tracking,shop,carrier,image:'',url:'',tracking,order,eta:'',stage,cancelled:false,pickup,events:[{id:'sms:'+tracking+':'+stage+':'+now.toISOString().slice(0,13),label,time:now.toISOString()}]};}
