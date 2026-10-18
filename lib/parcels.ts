@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 export type Event={id:string;label:string;time:string};
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
-export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string};
+export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;images?:string[]};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
@@ -140,13 +140,15 @@ export function mergeParcels(rows:Parcel[]){
   const generic=(n:string)=>/^(?:הזמנה|חבילה|לחבילה|your order|הודעה מ)/i.test(n);
   const perOrder=new Map<string,string>();for(const p of sorted)if(p.order&&!generic(p.name)&&!perOrder.has(p.order))perOrder.set(p.order,p.name);
   const items=[...new Set([...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')))];
+  // One picture per order in the package.
+  const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set(perImg.values())];
   const title=items.length>1?items.slice(0,2).join(' + ')+(items.length>2?' ועוד '+(items.length-2):''):named.name;
   const stage=Math.max(0,...list.map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
   const cancelled=latest.cancelled||(list.some(p=>p.cancelled)&&stage<1);
   out.push({...latest,id:keys[0],keys,name:title,image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
-   url:[...sorted].reverse().find(p=>p.url)?.url||'',price:sorted.find(p=>p.price)?.price,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
+   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,price:sorted.find(p=>p.price)?.price,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }
  return out.sort((a,b)=>b.events.at(-1)!.time.localeCompare(a.events.at(-1)!.time));
 }
