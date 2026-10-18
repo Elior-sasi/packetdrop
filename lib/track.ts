@@ -9,6 +9,19 @@ type Raw={number:string;track_info?:{latest_status?:{status?:string};time_metric
 async function call(path:string,body:unknown,key:string){const r=await fetch(BASE+path,{method:'POST',headers:{'17token':key,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('TRACK_HTTP_'+r.status);return r.json();}
 // Carrier events usually arrive in English; common phrasings are translated here (no translation quota, no outside service).
 const HE:[RegExp,string][]=[
+ [/(?:departed|leaving|left|depart) (?:from )?(?:the )?departure country|(?:departed|left) (?:the )?(?:country|region) of origin|export (?:customs )?(?:clearance )?(?:completed|success)/i,'יצאה מארץ המוצא'],
+ [/arrived at (?:the )?departure (?:transport )?(?:hub|center|centre|facility)|arrived at (?:the )?(?:origin|export) (?:hub|facility|center|centre)/i,'הגיעה למרכז השילוח בארץ המוצא'],
+ [/arrived at (?:the )?line-?haul|line-?haul (?:office|arrival)|received by line-?haul/i,'הגיעה לחברת ההובלה הבינלאומית'],
+ [/hand(?:ed)? over to (?:the )?line-?haul|line-?haul (?:departure|dispatched)/i,'נמסרה לחברת ההובלה הבינלאומית'],
+ [/import customs clearance (?:started|in progress)|import clearance (?:started|in progress)/i,'בתהליך שחרור מהמכס'],
+ [/import customs clearance (?:complete|completed|success)|customs released/i,'שוחררה מהמכס'],
+ [/arrived at (?:the )?destination (?:country|region|transport hub|airport)|arrived in (?:the )?destination (?:country|region)/i,'הגיעה לארץ היעד'],
+ [/(?:outbound|departed) (?:from |in )?(?:the )?sorting (?:center|centre)|left (?:the )?sorting (?:center|centre)/i,'יצאה ממרכז המיון'],
+ [/(?:inbound|arrived) (?:in|at) (?:the )?sorting (?:center|centre)/i,'הגיעה למרכז מיון'],
+ [/ready for (?:delivery|dispatch)|package (?:is )?ready to be delivered/i,'מוכנה למסירה'],
+ [/accepted by (?:the )?carrier|carrier (?:has )?accepted/i,'נאספה על ידי חברת השילוח'],
+ [/(?:seller|merchant) (?:has )?(?:shipped|sent)|package (?:has been )?shipped by (?:the )?seller/i,'המוכר שלח את החבילה'],
+ [/(?:order|parcel|package) (?:information )?(?:received|created)|awaiting (?:the )?(?:carrier|pick ?up by carrier)/i,'פרטי המשלוח נקלטו אצל חברת השילוח'],
  [/delivery (?:attempt|failed|unsuccessful)|unable to deliver|failed (?:delivery )?attempt|addressee not available/i,'ניסיון מסירה לא הצליח'],
  [/return(?:ed)? to (?:sender|shipper)|being returned/i,'החבילה מוחזרת לשולח'],
  [/\bdelivered\b|delivery completed|signed (?:for|by)/i,'נמסרה'],

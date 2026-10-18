@@ -3,7 +3,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
-import type {TrackInfo} from '@/lib/track';
+import {heEvent,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean};
 type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
@@ -16,7 +16,10 @@ const isPickup=(p:Parcel)=>p.stage===3&&!p.cancelled&&(p.carrierStatus==='Availa
 const bidi=(t:string)=>t.replace(/[A-Za-z0-9][A-Za-z0-9 .\/()+&'"-]*[A-Za-z0-9)]/g,m=>'\u2066'+m+'\u2069');
 // "Out for delivery" only means today; after a day without news the courier is just holding it.
 const lastAt=(p:Parcel)=>new Date(p.events.at(-1)?.time||0).getTime();
-const outToday=(p:Parcel)=>p.stage===3&&!p.cancelled&&!isPickup(p)&&new Date(lastAt(p)).toDateString()===new Date().toDateString();
+const OUT_RE=/יצאה למסירה|יצא למסירה|בדרך למסירה|השליח בדרך|במסירה היום|out for delivery|with (?:the )?courier/i;
+const PICK_RE=/לאיסוף|איסוף|pick ?up|collection/i;
+// "Out for delivery today" needs an actual out-for-delivery update dated today, not just any update today.
+const outToday=(p:Parcel)=>p.stage===3&&!p.cancelled&&!isPickup(p)&&p.events.some(e=>OUT_RE.test(e.label)&&new Date(e.time).toDateString()===new Date().toDateString());
 const statusText=(p:Parcel)=>p.cancelled?'ההזמנה בוטלה':p.got?'התקבלה':p.stale?'בלי עדכון מ־'+day(p.events.at(-1)?.time):p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
@@ -35,7 +38,7 @@ const etaText=(e:TrackInfo['eta'])=>{if(!e)return '';const a=day(e.from),b=day(e
 // Carrier data (17TRACK) refines what the mails say: later step, carrier name, estimate, extra timeline events.
 function withCarrier(p:MailParcel,t?:TrackInfo):Parcel{if(!t||!p.tracking)return p;
  const stage=p.cancelled?p.stage:Math.max(p.stage,t.stage);
- const events:Event[]=[...p.events,...t.events.map(e=>({id:'trk:'+e.time+e.text,label:e.text+(e.location?' · '+e.location:''),time:new Date(e.time).toISOString(),src:t.carrier||'חברת השילוח'}))].sort((a,b)=>a.time.localeCompare(b.time));
+ const events:Event[]=[...p.events,...t.events.map(e=>({id:'trk:'+e.time+e.text,label:heEvent(e.text)+(e.location?' · '+e.location:''),time:new Date(e.time).toISOString(),src:t.carrier||'חברת השילוח'}))].sort((a,b)=>a.time.localeCompare(b.time));
  return {...p,stage,carrier:p.carrier||t.carrier,eta:stage>=4?'':p.eta||etaText(t.eta),events,carrierStatus:t.status,trackPending:t.pending};}
 // Navigation to a pickup point: Google Maps, Waze and Moovit (Moovit needs coordinates, looked up once per address).
 const placeQuery=(pk:{place:string;address:string})=>[pk.place,pk.address].filter(Boolean).join(' ');
@@ -116,8 +119,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function loadTracks(list:MailParcel[]){const numbers=list.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,40);if(!numbers.length)return;
   try{const r=await fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({numbers}),cache:'no-store'});const d=await r.json();if(d.sources)setSources(d.sources);if(!d.enabled){setTrackState('off');return;}if(!r.ok)throw Error();setTracks(old=>({...old,...d.tracks}));setTrackState('on');}catch{setTrackState('error');}}
  async function copy(v:string){try{await navigator.clipboard.writeText(v);setCopied(v);setTimeout(()=>setCopied(''),1500);}catch{}}
- const parcels=useMemo(()=>(manual.length?mergeParcels([...(data?.parcels||[]),...manual]):(data?.parcels||[])).filter(m=>!(marks[m.id]==='hide'||m.keys.some(k=>marks[k]==='hide'))).map(m=>{const got=marks[m.id]==='got'||m.keys.some(k=>marks[k]==='got');const p=withCarrier(m,tracks[m.tracking]);const last=new Date(p.events.at(-1)?.time||0).getTime();
+ const parcels=useMemo(()=>(manual.length?mergeParcels([...(data?.parcels||[]),...manual]):(data?.parcels||[])).filter(m=>!(marks[m.id]==='hide'||m.keys.some(k=>marks[k]==='hide'))).map(m=>{const got=marks[m.id]==='got'||m.keys.some(k=>marks[k]==='got');const p={...withCarrier(m,tracks[m.tracking])};const last=new Date(p.events.at(-1)?.time||0).getTime();
   // Pickup points return parcels after ~2 weeks and shops stop writing once it arrives: after 21 days of silence treat it as received.
+  // Step 4 (pickup / delivery) only when an update actually says so; otherwise it is still on its way.
+  if(p.stage===3&&!p.carrierStatus?.match(/OutForDelivery|AvailableForPickup/)&&!p.pickup&&!p.events.some(e=>OUT_RE.test(e.label)||PICK_RE.test(e.label)))p.stage=2;
   const stale=p.stage<4&&!p.cancelled&&Date.now()-last>(p.stage===3?14:30)*864e5;
   return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};})
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
