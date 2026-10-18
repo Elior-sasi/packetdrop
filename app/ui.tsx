@@ -100,16 +100,23 @@ function pairCouriers<T extends Parcel&{stale?:boolean}>(P:T[],titles:Record<str
 const SHIP_RE=/נשלח|יצאה מהמחסן|shipped|dispatched|נאספ/i;
 const shippedAt=(p:Parcel)=>new Date((p.events.find(e=>SHIP_RE.test(e.label))||p.events[0])?.time||0).getTime();
 const routeKey=(p:Parcel)=>p.shop+'|'+(p.carrier&&!/AliExpress|Cainiao/i.test(p.carrier)?p.carrier:'');
-type Est={from:number;to:number;n:number;avg:number;late:boolean;scope:'route'|'shop'};
+type Est={from:number;to:number;n:number;avg:number;late:boolean;scope:'route'|'shop';stage:string};
+// Milestones along the way; the estimate starts from the latest one the parcel has reached, using how long YOUR past parcels took from there.
+const MILES:[string,RegExp][]=[['מהמשלוח',SHIP_RE],['מיציאה מארץ המוצא',/יצאה מארץ המוצא|יצאה בטיסה|נמסרה לחברת ההובלה|יצאה מאזור המוצא|בתעבורה/i],['מההגעה לישראל',/הגיעה לארץ|נחתה|הגיעה לחברת ההובלה|במדינה|באזור שלכם|הגיע לארץ/i],['מהשחרור ממכס',/שוחררה מהמכס/i],['מחברת המסירה',/חברת המסירה|חברת המשלוחים המקומית|המקומית/i]];
+const mileAt=(p:Parcel,k:number)=>{if(k===0)return shippedAt(p);const e=p.events.find(e=>MILES[k][1].test(e.label));return e?new Date(e.time).getTime():0;};
 function learn(all:Parcel[]){const days:Record<string,number[]>={};
- for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got)continue;const d=(new Date(p.events.at(-1)!.time).getTime()-shippedAt(p))/864e5;if(!(d>0.5&&d<90))continue;
-  for(const k of [routeKey(p),p.shop+'|*'])(days[k]??=[]).push(d);}
+ for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got)continue;const end=new Date(p.events.at(-1)!.time).getTime();
+  MILES.forEach((_,k)=>{const t=mileAt(p,k);if(!t)return;const d=(end-t)/864e5;if(!(d>0.1&&d<90))return;for(const key of [routeKey(p),p.shop+'|*'])(days[key+'#'+k]??=[]).push(d);});}
  return days;}
 const pct=(a:number[],q:number)=>{const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1))))];};
+// Israel Post and couriers do not deliver on Saturday.
+const noSat=(t:number)=>{const d=new Date(t);return d.getDay()===6?t+864e5:t;};
 function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=3||p.cancelled||p.stage<1)return null;
- let a=days[routeKey(p)],scope:'route'|'shop'='route';if(!a||a.length<3){a=days[p.shop+'|*'];scope='shop';}if(!a||a.length<3)return null;
- const t0=shippedAt(p);let from=t0+pct(a,.2)*864e5,to=t0+pct(a,.8)*864e5;const now=Date.now();const late=now>to+864e5;
- if(from<now)from=now+864e5;if(to<from)to=from;return {from,to,n:a.length,avg:Math.round(a.reduce((x,y)=>x+y,0)/a.length),late,scope};}
+ for(let k=MILES.length-1;k>=0;k--){const t0=mileAt(p,k);if(!t0)continue;
+  let a=days[routeKey(p)+'#'+k],scope:'route'|'shop'='route';if(!a||a.length<3){a=days[p.shop+'|*#'+k];scope='shop';}if(!a||a.length<3)continue;
+  let from=t0+pct(a,.25)*864e5,to=t0+pct(a,.75)*864e5;const now=Date.now();const late=now>t0+pct(a,.9)*864e5+864e5;
+  if(from<now)from=now+864e5/2;if(to<from)to=from;return {from:noSat(from),to:noSat(to),n:a.length,avg:Math.round(a.reduce((x,y)=>x+y,0)/a.length),late,scope,stage:MILES[k][0]};}
+ return null;}
 const dd=(t:number)=>{const d=new Date(t);return d.getDate()+'.'+(d.getMonth()+1);};
 const estText=(e:Est)=>e.late?'מתעכבת מהרגיל':dd(e.from)===dd(e.to)?dd(e.from):dd(e.from)+'-'+dd(e.to);
 // ---- AliExpress buyer protection: the order is about to be closed but the parcel has not arrived ----
@@ -382,7 +389,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <div className="sheetTop"><button className="ib" aria-label="חזרה" onClick={()=>setOpenId(null)}><ChevronRight/></button><button className="ib" aria-label="עריכת שם" disabled={!storage} title={!storage?'שמירת שמות דורשת גיבוי בענן':undefined} onClick={()=>{setEdit(open);setDraft(open.name);setEditError('');}}><Pencil size={20}/></button></div>
   <Thumb p={open} big/>
   <div className="dt"><h2>{bidi(open.name)}</h2><Meta p={open}/></div>
-  <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled?<span className="eta">הגעה <b>{open.eta}</b></span>:showEst&&(()=>{const e=est(open);return e&&<span className="eta" title={'לפי '+e.n+' חבילות קודמות שלך'}>{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>
+  <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled?<span className="eta">הגעה <b>{open.eta}</b></span>:showEst&&(()=>{const e=est(open);return e&&<span className="eta" title={'לפי '+e.n+' חבילות קודמות שלך, '+e.stage}>{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>
    {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':open.stage/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<open.stage?'d':i===open.stage?'c':'')}><span/>{i===3&&open.stage>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
   {(()=>{const c=customsDue(open);if(!c)return null;return <section className="box guardBox customsBox"><h3><ShieldAlert size={18}/> לתשלום מכס ומסים</h3>
    <p className="setNote">החבילה מחכה לתשלום לפני שחרור{c.amount?': '+c.amount:''}. בלי תשלום היא לא תמשיך ועלולה לחזור לשולח.</p>
