@@ -62,7 +62,7 @@ function Thumb({p,big}:{p:Parcel;big?:boolean}){if(p.images&&p.images.length>1){
  if(!big)return <div className="thumb multi n2">{p.images.slice(0,2).map(src=><img key={src} src={src} alt="" loading="lazy" referrerPolicy="no-referrer"/>)}</div>;
  return <div className={'hero multi n'+Math.min(p.images.length,4)}>{p.images.slice(0,4).map(src=><img key={src} src={src} alt="" loading="lazy" referrerPolicy="no-referrer"/>)}</div>;}
  return <ThumbOne p={p} big={big}/>;}
-function ThumbOne({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop);
+function ThumbOne({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop)||domainOf(p.carrier);
  return <div className={big?'hero':'thumb'}>{p.image&&!failed?<>{big&&<img className="backdrop" src={p.image} alt="" aria-hidden="true" referrerPolicy="no-referrer"/>}<img className="photo" src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/></>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
 function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop}/><span dir="auto">{p.shop}</span>{p.carrier&&<><span className="sep">·</span><span dir="auto">{p.carrier}</span></>}</div>;}
 // Detailed route, like the carrier sites: each milestone is lit by a real event (or by a later one), with its date.
