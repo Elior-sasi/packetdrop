@@ -170,7 +170,7 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
   <div className="nc-row"><svg className="ring" viewBox="0 0 92 92" aria-hidden="true"><defs><linearGradient id="ncg"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs>
    <circle cx="46" cy="46" r="40" fill="none" stroke="#ffffff18" strokeWidth="8"/><circle cx="46" cy="46" r="40" fill="none" stroke="url(#ncg)" strokeWidth="8" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-T)} transform="rotate(-90 46 46)"/>
    <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?20:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
-   <div className="nc-info"><div className="nc-k">{k}</div></div><Thumb p={p}/></div>
+   <div className="nc-info"><div className="nc-k">{today?'מגיעה היום':'החבילה הבאה'}</div></div><Thumb p={p}/></div>
   <div className="nc-nm nc-full">{bidi(p.name)}</div>
   <div className="nc-chips" aria-hidden="true"><span>{statusText(p)}</span>{!today&&<span>{'צפי '+dd(when)}</span>}</div></button>;}
  const x=348-T*338;
