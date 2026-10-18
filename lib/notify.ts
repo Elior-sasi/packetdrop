@@ -2,7 +2,7 @@
 import type {Parcel} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
 export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck'|'guard'|'customs';title:string;body:string;tag:string};
-export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>;reminded?:Record<string,number[]>;weekly?:string};
+export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>;reminded?:Record<string,number[]>;weekly?:string;morning?:string};
 const DAY=864e5;
 export const GUARD=/בהמתנה לאישור|תסומן בקרוב כהזמנה שהושלמה|will be marked as completed|confirm receipt/i;
 const PICKUP=/לאיסוף|איסוף|pick ?up|collection/i;
@@ -71,3 +71,15 @@ export function weekly(state:State,now=new Date()):{note:Note|null;week:string}{
  const pick=live.filter(waitingAtPickup);if(!live.length)return {note:null,week};
  const body=[live.length-pick.length?(live.length-pick.length)+' בדרך':'',pick.length?pick.length+' מחכות לאיסוף'+(pick[0].pickup?.place?' ('+pick[0].pickup.place+')':''):''].filter(Boolean).join(' · ');
  return {note:{id:'weekly',kind:'new',title:'החבילות שלך השבוע',body,tag:'w:'+week},week};}
+// Morning heads-up (Israel time, 8:00-9:59), once a day and only on days with something to do: out for delivery today, or waiting at a pickup point.
+// Sunday is left to the weekly summary.
+export function morning(state:State,now=new Date()):{note:Note|null;day:string}{
+ const il=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Jerusalem'}));const day=il.getFullYear()+'-'+(il.getMonth()+1)+'-'+il.getDate();
+ if(il.getDay()===0||il.getHours()<8||il.getHours()>=10||state.morning===day)return {note:null,day:state.morning||''};
+ const marks=state.marks||{};const live=state.parcels.filter(p=>p.stage===3&&!p.cancelled&&!marks[p.id]&&!p.keys.some(k=>marks[k])&&now.getTime()-last(p)<16*DAY);
+ const pick=live.filter(waitingAtPickup);const out=live.filter(p=>!waitingAtPickup(p)&&OUT.test(latestLabel(p))&&now.getTime()-last(p)<DAY);
+ if(!pick.length&&!out.length)return {note:null,day};
+ const title=out.length&&pick.length?'למסירה היום: '+out.length+' · לאיסוף: '+pick.length:out.length?(out.length===1?'חבילה יוצאת למסירה היום':out.length+' חבילות יוצאות למסירה היום'):(pick.length===1?'חבילה מחכה לך לאיסוף':pick.length+' חבילות מחכות לך לאיסוף');
+ const line=(p:Parcel)=>nameOf(p)+(waitingAtPickup(p)?(p.pickup?.place?' ב'+p.pickup.place:'')+(p.pickup?.code?' · קוד '+p.pickup.code:''):'');
+ const body=[...out,...pick].slice(0,3).map(line).join('\n')+(out.length+pick.length>3?'\nועוד '+(out.length+pick.length-3):'');
+ return {note:{id:(out[0]||pick[0]).id,kind:'pickup',title,body,tag:'m:'+day},day};}
