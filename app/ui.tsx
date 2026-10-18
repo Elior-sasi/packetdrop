@@ -235,7 +235,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled);
- const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(isPickup):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
+ // On the way: what is due first comes first (carrier date, else your own estimate); pickups and today's deliveries stay on top.
+ const etaAt=(p:Parcel)=>{const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(m){const y=new Date().getFullYear();let t=new Date(y,+m[2]-1,+m[1]).getTime();if(t<Date.now()-60*864e5)t=new Date(y+1,+m[2]-1,+m[1]).getTime();return t;}const e=est(p);return e&&!e.late?e.from:e?.late?Date.now():Infinity;};
+ const byEta=(list:Parcel[])=>[...list].sort((a,b)=>{const u=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return u(a)-u(b)||etaAt(a)-etaAt(b)||(b as {last?:number}).last!-(a as {last?:number}).last!;});
+ const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  const pickup=active.filter(isPickup).length;const open=parcels.find(p=>p.id===openId)||null;
  // Phone notifications (Web Push through the service worker).
  const [push,setPush]=useState<'checking'|'install'|'unsupported'|'nodb'|'denied'|'off'|'on'|'busy'>('checking'),[pushMsg,setPushMsg]=useState('');const pushKey=useRef('');const pushOn=useRef(false);pushOn.current=push==='on';
