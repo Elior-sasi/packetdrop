@@ -292,6 +292,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    if(net&&!retried.current){retried.current=true;setTimeout(()=>void syncRef.current(),4000);}
    else setError(net?'אין חיבור כרגע. החבילות שמורות, ננסה שוב בפתיחה הבאה.':e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setReading(false);setTimeout(()=>setProgress(null),700);}}
  // Safety net: if nothing has started 6 seconds after opening (a stuck request), start reading anyway; after 15 seconds offer a retry.
+ // Every short message at the bottom goes away by itself (longer text stays a little longer).
+ useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),Math.min(9000,3500+toast.length*40));return()=>clearTimeout(t);},[toast]);
  const [slow,setSlow]=useState(false);const retried=useRef(false);
  // iOS still pinch-zooms the whole screen despite the viewport setting; stop it everywhere except the photo viewer.
  useEffect(()=>{const stop=(e:globalThis.Event)=>{if(!(e.target as Element)?.closest?.('.zoomArea'))e.preventDefault();};document.addEventListener('gesturestart',stop,{passive:false});document.addEventListener('gesturechange',stop,{passive:false});return()=>{document.removeEventListener('gesturestart',stop);document.removeEventListener('gesturechange',stop);};},[]);
