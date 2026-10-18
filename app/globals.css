@@ -146,7 +146,7 @@ nav.none:before{opacity:0}
 .tile.on{background:#16314d;border-color:#4aa8ff;color:#d6ebff}.tile.on b{color:#fff}.tile.p.on{background:#0f3433;border-color:#2ed3c6;color:#b5fff8}
 /* bottom bar (4 sections) */
 .app{padding-bottom:calc(var(--nav-h) + 44px + env(safe-area-inset-bottom))}html{scroll-padding-bottom:calc(var(--nav-h) + 40px)}
-nav:before{right:calc(5px + var(--tab)*(100% - 10px)/4);width:calc((100% - 10px)/4)}
+
 nav.none:before{opacity:0}
 .card{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .navLinks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.navLinks .ghost{margin:0;display:flex;align-items:center;justify-content:center;min-height:48px;font-size:calc(15px*min(var(--fs),1.15));text-decoration:none}
@@ -234,3 +234,4 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .nc-ring .nc-info .nc-k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nc-top{margin-bottom:10px;font-size:calc(16px*var(--fs))}
 .nc-ring .thumb{width:72px!important;height:72px!important}
+.listH{margin:10px 4px 0;font-size:calc(17px*var(--fs));color:var(--mut);font-weight:600}
