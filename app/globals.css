@@ -229,12 +229,4 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .nc-ring{border-radius:26px;padding:18px;background:radial-gradient(120% 90% at 100% 0,#1d4d7a,#0e1c2a 70%);border-color:#3a76b0;box-shadow:0 0 0 1px #4aa8ff22,0 14px 40px #4aa8ff33}
 .nc-ring .ring{width:92px;height:92px;flex:none}.nc-ring .thumb{width:56px;height:56px}
 .nc-chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.nc-chips span{padding:5px 11px;border-radius:99px;background:#ffffff12;font-size:calc(14px*var(--fs));color:#cfe4f7}
-.nc-ticket{background:#f3f6fa;color:#0d1a26;border:0;border-radius:22px;padding:0;overflow:hidden}
-.nc-ticket .nc-row{padding:16px}.nc-ticket .nc-k{color:#2a6fb0}
-.nc-perf{border-top:2px dashed #b7c4d2;margin:0 18px;position:relative}
-.nc-perf:before,.nc-perf:after{content:"";position:absolute;top:-12px;width:22px;height:22px;border-radius:50%;background:var(--bg)}
-.nc-perf:before{right:-30px}.nc-perf:after{left:-30px}
-.nc-bot{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;padding:14px 18px 16px}
-.nc-l{font-size:calc(13px*var(--fs));color:#5a6b7c}.nc-big{font-size:calc(38px*var(--fs));font-weight:800;line-height:1.05}
-.nc-mid{font-size:calc(24px*var(--fs));font-weight:800;line-height:1.1}.nc-end{text-align:left;min-width:0}
-.nc-plane{color:#2a6fb0;font-size:22px;padding-bottom:6px}
+.nc-ring .nc-row .thumb:first-child{width:72px;height:72px}
