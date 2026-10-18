@@ -177,10 +177,11 @@ export function mergeParcels(rows:Parcel[]){
   const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set([...list.flatMap(p=>p.images||[]),...perImg.values()])];
   // Orders in the package whose mails carry no product name still count ("… ועוד 2").
   const orderCount=keys.filter(k=>k.startsWith('order:')).length;const unnamed=items.length?Math.max(0,orderCount-Math.max(perOrder.size,items.length)):0;
-  const more=Math.max(0,items.length-2)+unnamed;
+  // Up to four products are named on the card; only beyond that does it say "ועוד N".
+  const more=Math.max(0,items.length-4)+unnamed;
   // Every order in the package, so each one can be found and listed (unnamed ones by their order number).
   const contents=orderCount>1||items.length>1?[...items,...keys.filter(k=>k.startsWith('order:')).map(k=>k.slice(6)).filter(o=>!perOrder.has(o)).slice(0,unnamed).map(o=>'הזמנה …'+o.slice(-6))]:[];
-  const title=items.length>1||unnamed?items.slice(0,2).join(' + ')+(more?' ועוד '+more:''):named.name;
+  const title=items.length>1||unnamed?items.slice(0,4).join(' + ')+(more?' ועוד '+more:''):named.name;
   const stage=Math.max(0,...list.map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
   const cancelled=latest.cancelled||(list.some(p=>p.cancelled)&&stage<1);
