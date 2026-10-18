@@ -30,11 +30,11 @@ const NOT_PARCEL=/eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesplanet|ר
 // Physical shipping words; unknown senders must mention one of these to count as a parcel.
 const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נקודת (?:ה)?חלוקה|כתובת למשלוח|shipping|shipped|shipment|delivery|tracking|מעקב|parcel|package/i;
 const STAGE_RULES:[number,RegExp][]=[
- [4,/איך הלך|לכתוב ביקורת|חוויתכם חשובה|שלחו את דעתכם|דרגו את החוויה|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
- [3,/מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|ממתין ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|ממתינה ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|טרם נאסף|בדרכו לכתובת|בדרכה לכתובת|השליח יצור קשר|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
- [2,/נקלט במחסני|נקלטה במחסני|במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
- [1,/נשלחה(?! לאימות)|נשלח(?! SMS| לאימות| קוד| אליך קוד)|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
- [0,/אושרה|מאושרת|התקבלה|תטופל בהקדם|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
+ [4,/^delivered\s*:|איך הלך|לכתוב ביקורת|חוויתכם חשובה|שלחו את דעתכם|דרגו את החוויה|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
+ [3,/^out for delivery\s*:|מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|ממתין ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|ממתינה ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|טרם נאסף|בדרכו לכתובת|בדרכה לכתובת|השליח יצור קשר|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
+ [2,/שוחרר(?:ה)? (?:בהצלחה )?מהמכס|עם חברת המשלוחים המקומית|על ידי חברת המשלוחים המקומית|למרכז המסירה|נקלט במחסני|נקלטה במחסני|במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
+ [1,/^shipped\s*:|נשלחה(?! לאימות)|נשלח(?! SMS| לאימות| קוד| אליך קוד)|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
+ [0,/^ordered\s*:|אושרה|מאושרת|התקבלה|תטופל בהקדם|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
 const CANCEL=/is closed|בוטלה|בוטל|ביטול ה?הזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי|הודעה על זיכוי|הזמנתך זוכתה|has been refunded/i;
 // "Packed and waiting for the courier to collect it" is the store's side, not a parcel waiting for the user.
 function stageOf(s:string){if(/(?:ממתינה|ממתין)\s+לאיסוף\s+(?:על ידי|ע["״']י)\s+ה?שליח/.test(s))return 1;for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
@@ -133,7 +133,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
    const d=c[col]||'';if(d.length>4&&!/GIFTPACK|קמפיין|דואר שליחים|משלוח|הובלה|תשלומים|הטבה|סה['"]?כ/i.test(d+' '+c.join(' '))&&c.some(x=>/^\d{4,9}$/.test(x))){const t=tidyName(d);if(!name)name=t;if(!listed.includes(t))listed.push(t);}}if(name)return;});
  if(pdf&&pdf.items.length>1)for(const t of pdf.items)if(!listed.includes(t))listed.push(t);
  if(!name&&pdf?.items.length)name=pdf.items.slice(0,2).join(' + ')+(pdf.items.length>2?' ועוד '+(pdf.items.length-2):'');
- if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').trim()||'חבילה';
+ if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').replace(/[\u2066-\u2069\u200e\u200f]/g,'').replace(/^(?:shipped|ordered|delivered|out for delivery|arriving \w+)\s*:\s*(?:\d+\s+)?/i,'').replace(/\s+items?$/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
  const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
  let stage=stageOf(subject);if(stage<0)stage=stageOf(lead);
@@ -152,7 +152,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const genericSubject=(/^הודעה (?:מ|ב)|notification/i.test(subject)&&!/\d{6,}/.test(subject))||/^הודעה על (?:ה?משלוח|דבר דואר|ה?חבילה)/.test(subject);
  // A notice whose subject says only "הודעה על משלוח …": the news is the sentence after the number in the body ("הגיע לארץ ובדרכו אליך").
  const said=genericSubject?(text.slice(subject.length).match(/\b[A-Z]{2}\d{8,}[A-Z]{0,2}\b\s*(?:מחו["״]ל\s*)?([\u0590-\u05FF][^.\n]{3,70})/)?.[1]||'').replace(/\s+/g,' ').trim():'';
- const label=postSaid?postSaid:!genericSubject?subject:said?said:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
+ const label=postSaid?postSaid:/^(?:shipped|ordered|delivered|out for delivery)\s*:/i.test(subject)&&stage>=0?stages[stage]:!genericSubject?subject:said?said:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
  // Customs / VAT to pay before release. Only official payment links are kept (customs-payment scams are common).
  const due=/(?:תשלום|לתשלום|חיוב|לשלם)\s+(?:ה?מסים|ה?מיסים|ה?מכס|מע"?מ|דמי (?:ה)?מכס|דמי טיפול ומסים)|(?:customs|import) (?:duty|duties|tax|fees?|charges?)|duties (?:and|&) taxes|pay (?:the )?(?:customs|duty|vat)/i.test(subject+' '+text.slice(0,3000))&&(knownSender||/postil|israelpost|gov\.il|dhl|ups|fedex|hfd/i.test(from));
  const OFFICIAL=/^https:\/\/(?:[a-z0-9-]+\.)*(?:israelpost\.co\.il|gov\.il|dhl\.co\.il|dhl\.com|ups\.com|fedex\.com|hfd\.co\.il)\//i;
