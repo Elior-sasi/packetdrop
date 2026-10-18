@@ -14,6 +14,14 @@ const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
 const step=(p:Parcel)=>p.stale?(p.real??p.stage):p.stage;
 const tone=(p:Parcel)=>p.stale?'unk':p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3&&(isPickup(p)||outToday(p))?'warn':'';
 // Waiting at a pickup point (as opposed to a courier bringing it to the door).
+// The day a calendar entry is for: today for a parcel waiting at a pickup point, else the first day of the expected window ("25.10-29.10").
+function calDay(p:Parcel):{date:string;title:string}|null{if(p.cancelled||p.got||p.stage>=4)return null;const iso=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ if(isPickup(p))return {date:iso(new Date()),title:'לאסוף חבילה: '+p.name};
+ const m=p.eta?.match(/(\d{1,2})\.(\d{1,2})/);if(!m)return null;const now=new Date();let y=now.getFullYear();if(+m[2]<now.getMonth()+1-2)y++;const d=new Date(y,+m[2]-1,+m[1]);if(isNaN(d.getTime())||d.getTime()<now.getTime()-864e5)return null;
+ return {date:iso(d),title:'צפי הגעה: '+p.name};}
+function addToCalendar(p:Parcel){const c=calDay(p);if(!c)return;const f=document.createElement('form');f.method='POST';f.action='/api/ics';
+ const v:Record<string,string>={date:c.date,title:c.title,place:p.pickup?.place||'',address:p.pickup?.address||'',code:p.pickup?.code||'',hours:p.pickup?.hours||'',tracking:p.tracking||''};
+ for(const [k,val] of Object.entries(v)){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=val;f.appendChild(i);}document.body.appendChild(f);f.submit();f.remove();}
 const isPickup=(p:Parcel)=>p.stage===3&&!p.cancelled&&(p.carrierStatus==='AvailableForPickup'||p.carrierStatus!=='OutForDelivery'&&(!!p.pickup?.place||p.events.some(e=>/איסוף|pickup|collection/i.test(e.label))));
 // Latin runs (model names, sizes) are isolated so a Hebrew title does not scramble them, e.g. "AirPods 5/4/Pro (2026)".
 const bidi=(t:string)=>t.replace(/[A-Za-z0-9][A-Za-z0-9 .\/()+&'"-]*[A-Za-z0-9)]/g,m=>'\u2066'+m+'\u2069');
@@ -525,7 +533,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {open.order&&<div className="kv"><span>מספר הזמנה</span><button className="copy" onClick={()=>copy(open.order)}><b dir="ltr">{open.order}</b>{copied===open.order?' ✓':<Copy size={15}/>}</button></div>}
    {open.url&&<a className="link" href={open.url} target="_blank" rel="noopener noreferrer">מעקב באתר החנות <ExternalLink size={15}/></a>}
   </section>}
-  <div className="sheetActions">{open.got?<button className="ghost" onClick={()=>mark(open,null)}><Undo2 size={18}/> בטל "קיבלתי"</button>:open.stage<4&&<button className="primary" onClick={()=>mark(open,'got')}><PackageCheck size={18}/> קיבלתי</button>}
+  <div className="sheetActions">{calDay(open)&&<button className="ghost" onClick={()=>addToCalendar(open)}><CalendarCheck size={18}/> הוספה ליומן</button>}{open.got?<button className="ghost" onClick={()=>mark(open,null)}><Undo2 size={18}/> בטל "קיבלתי"</button>:open.stage<4&&<button className="primary" onClick={()=>mark(open,'got')}><PackageCheck size={18}/> קיבלתי</button>}
    {open.stage>=4&&!open.cancelled&&<a className="ghost" href={orderUrl(open)||'https://www.google.com/search?q='+encodeURIComponent((open.shop||'')+' '+open.name)} target="_blank" rel="noopener noreferrer"><RotateCcw size={18}/> הזמן שוב</a>}
    <button className="ghost" onClick={()=>mark(open,'hide')}><EyeOff size={18}/> הסתר, זו לא חבילה</button></div>
  </div>}
