@@ -335,7 +335,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const waiting=(!data&&!error)||(busy&&(reading||!data));
  const hiddenCount=Object.values(marks).filter(v=>v==='hide').length;
 
- return <main className={['app','app large','app xlarge'][size]}>
+ return <main className={['app','app large','app xlarge'][size]+(view==='account'||open?' nonav':'')}>
  {splash!=='off'&&<div className={'splash'+(splash==='out'?' out':'')} aria-hidden="true"><Mark cls="smark" anim="open"/><div className="sname" dir="ltr">Unbox</div></div>}
  {user&&pull>0&&view!=='account'&&<div className={'ptr'+(pull>=80?' ready':'')} style={{transform:'translate(-50%,'+Math.max(0,pull-46)+'px)',opacity:Math.min(1,pull/80)}} aria-hidden="true"><RefreshCw style={{transform:'rotate('+pull*3+'deg)'}}/></div>}
  <header className="top">
@@ -416,7 +416,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
     {today.some(p=>!isPickup(p))&&<h3 className="listH">מגיעות היום</h3>}{today.filter(p=>!isPickup(p)).map(p=><button key={p.id} className="card focus" {...longPress(p)} aria-label={p.name+', '+statusText(p)}>
     <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><div className="st"><span className={'pill '+tone(p)}>{isPickup(p)||outToday(p)?statusText(p):'צפויה היום'}</span></div>
      {isPickup(p)&&p.pickup?.place&&<p className="todayWhere">איסוף ב<b>{p.pickup.place}</b></p>}{isPickup(p)&&p.pickup?.code&&<p className="todayCode">קוד <b dir="ltr">{p.pickup.code}</b></p>}</div></div></button>)}</>
-    :<section className="panel empty"><MapIcon size={40}/><h2>אין חבילות לאיסוף</h2><p>כשחבילה תגיע לנקודת איסוף, תופיע כאן עם מפה, קוד וניווט.</p></section>}</div>}
+    :<section className="panel empty"><MapPin size={40}/><h2>אין חבילות לאיסוף</h2><p>כשחבילה תגיע לנקודת איסוף, תופיע כאן עם מפה, קוד וניווט.</p></section>}</div>}
    {!(waiting)&&section==='stats'&&<div className="statsWrap">
     <div className="seg" role="radiogroup" aria-label="חודש">{['החודש','החודש שעבר'].map((l,i)=><button key={i} role="radio" aria-checked={month===i} className={month===i?'on':''} onClick={()=>setMonth(i)}>{l}</button>)}</div>
     <div className="statGrid"><div className="stat"><b>{stats.ordered}</b><span>הזמנות</span></div><div className="stat"><b>{stats.delivered}</b><span>הגיעו</span></div><div className="stat"><b>{stats.avg||'–'}</b><span>ימים בממוצע</span></div></div>
@@ -490,6 +490,6 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <label htmlFor="addName">שם (לא חובה)</label><input id="addName" value={addName} onChange={e=>setAddName(e.target.value)} placeholder="למשל: אוזניות"/>
   {addErr&&<p className="error" role="alert">{addErr}</p>}
   <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button></>}<button type="button" className="menuCancel" onClick={()=>setAdding(false)}>ביטול</button></form></div>}
- {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" style={{'--tab':['list','today','stats'].indexOf(section)} as React.CSSProperties}>{([['list','חבילות',Package,0],['today','איסוף',MapIcon,today.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
+ {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" style={{'--tab':['list','today','stats'].indexOf(section)} as React.CSSProperties}>{([['list','חבילות',Package,0],['today','איסוף',MapPin,today.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
  </main>;
 }
