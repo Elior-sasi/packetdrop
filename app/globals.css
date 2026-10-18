@@ -247,3 +247,6 @@ nav{touch-action:none}nav.dragging:before{transition:none}
 .phoneIn{width:100%;height:50px;border-radius:14px;background:var(--card);border:1px solid var(--line);color:var(--ink);font-size:calc(18px*var(--fs));padding:0 14px;margin:6px 0 10px;text-align:left}
 .linkBtn{background:transparent;border:0;color:#9fcfff;font-weight:600;font-size:calc(16px*var(--fs));padding:8px 4px;min-height:40px}
 .pill.unk{background:#33280f;color:#ffd27a;border-color:#6b5420}.bar.unk i.on{background:#e0a93a}
+.items ul{margin:0;padding:0;list-style:none}
+.items li{padding:10px 0;border-top:1px solid var(--line);font-size:calc(17px*var(--fs))}
+.items li:first-child{border-top:0}

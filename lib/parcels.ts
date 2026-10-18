@@ -2,7 +2,7 @@ import {baldarHost} from '@/lib/tapuz';
 import * as cheerio from 'cheerio';
 export type Event={id:string;label:string;time:string};
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
-export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];customs?:{amount:string;url:string;at:string}};
+export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];customs?:{amount:string;url:string;at:string}};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
@@ -170,6 +170,8 @@ export function mergeParcels(rows:Parcel[]){
   // Orders in the package whose mails carry no product name still count ("… ועוד 2").
   const orderCount=keys.filter(k=>k.startsWith('order:')).length;const unnamed=items.length?Math.max(0,orderCount-Math.max(perOrder.size,items.length)):0;
   const more=Math.max(0,items.length-2)+unnamed;
+  // Every order in the package, so each one can be found and listed (unnamed ones by their order number).
+  const contents=orderCount>1?[...items,...keys.filter(k=>k.startsWith('order:')).map(k=>k.slice(6)).filter(o=>!perOrder.has(o)).map(o=>'הזמנה …'+o.slice(-6))]:[];
   const title=items.length>1||unnamed?items.slice(0,2).join(' + ')+(more?' ועוד '+more:''):named.name;
   const stage=Math.max(0,...list.map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
@@ -177,7 +179,7 @@ export function mergeParcels(rows:Parcel[]){
   // The shop comes from the order mails, not from a carrier's notice (Israel Post writes as itself).
   const isCarrier=(n:string)=>!n||n==='הזמנה מהדוא״ל'||carriers.some(([,c])=>c===n);
   const shop=sorted.find(p=>p.order&&!isCarrier(p.shop))?.shop||sorted.find(p=>!isCarrier(p.shop))?.shop||latest.shop;
-  out.push({...latest,shop,id:keys[0],keys,name:title,image:named.image||list.find(p=>p.image)?.image||'',
+  out.push({...latest,shop,id:keys[0],keys,name:title,...(contents.length>1?{items:contents}:{}),image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
    url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }

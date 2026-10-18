@@ -27,3 +27,9 @@ test('KSP order table gives the product name; review request means delivered',()
  const p=parseMessage(msg('k1','noreply@ksp.co.il','תודה שבחרתם KSP - הזמנה מספר: 954662518','<p>הזמנתך מספר 954662518 תטופל בהקדם בין התאריכים 23-09-2026 ועד 04-10-2026</p><table><tr><td>מקט</td><td>תיאור</td><td>מחיר</td></tr><tr><td>402969</td><td>בר מים טאץ\' דגם Spirit מבית HDS Water - צבע לבן</td><td>1290 ₪</td></tr><tr><td>GIFTPACK</td><td>[קמפיין #72583]</td><td>300</td></tr></table>','2026-09-17T11:31:10Z'))!;
  assert.ok(p.name.startsWith("בר מים טאץ'"),p.name);assert.equal(p.eta,'23.9-4.10');
  const r=parseMessage(msg('k2','noreply@ksp.co.il','חוויתכם חשובה לנו! שלחו את דעתכם על KSP','<p>בהמשך להזמנה מספר 954662518</p>','2026-09-22T11:52:00Z'))!;assert.equal(r.stage,4);});
+test('a package lists every order in it',()=>{const ev=(id:string,t:string)=>[{id,label:'נשלחה',time:t}];
+ const base={shop:'AliExpress',carrier:'',image:'',url:'',tracking:'',eta:'',stage:1,cancelled:false,pickup:null};
+ const a={...base,id:'order:1',keys:['order:1','tracking:AP1'],name:'שלט',order:'1',tracking:'AP1',events:ev('a','2026-10-01T00:00:00Z')};
+ const b={...base,id:'order:2',keys:['order:2','tracking:AP1'],name:'חולצת BLEACH',order:'2',tracking:'AP1',events:ev('b','2026-10-01T00:00:01Z')};
+ const c={...base,id:'order:3',keys:['order:3','tracking:AP1'],name:'הזמנה מ־AliExpress',order:'3',tracking:'AP1',events:ev('c','2026-10-01T00:00:02Z')};
+ const [m]=mergeParcels([a,b,c] as never);assert.deepEqual(m.items,['שלט','חולצת BLEACH','הזמנה …3']);});

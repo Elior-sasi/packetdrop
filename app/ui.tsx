@@ -293,7 +293,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const etaAt=(p:Parcel)=>{const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(m){const y=new Date().getFullYear();let t=new Date(y,+m[2]-1,+m[1]).getTime();if(t<Date.now()-60*864e5)t=new Date(y+1,+m[2]-1,+m[1]).getTime();return t;}const e=est(p);return e&&!e.late?e.from:e?.late?Date.now():Infinity;};
  const byEta=(list:Parcel[])=>[...list].sort((a,b)=>{const u=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return u(a)-u(b)||etaAt(a)-etaAt(b)||(b as {last?:number}).last!-(a as {last?:number}).last!;});
  const nextP=(()=>{const l=byEta(active).filter(p=>isPickup(p)||outToday(p)||!!p.eta||(est(p)&&!est(p)!.late));const p=l[0];if(!p)return null;const t=isPickup(p)||outToday(p)?Date.now():etaAt(p);return Number.isFinite(t)?{p,t}:null;})();
- const q=search.trim().toLowerCase();const shownAll=(view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
+ const q=search.trim().toLowerCase();const shownAll=(view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order,...(p.items||[]),...p.keys].join(' ').toLowerCase().includes(q));
  // Delivered courier notices with no product (HFD etc.) fold into one row at the bottom of "נמסרו".
  const nameless=(p:Parcel)=>!p.image&&!p.images&&/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(p.name)&&!!p.carrier&&!titles[p.id];
  const heroId=showNext&&view==='active'&&filter==='all'&&!q&&nextP?nextP.p.id:'';
@@ -489,6 +489,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <div className="sheetTop"><button className="ib" aria-label="חזרה" onClick={()=>setOpenId(null)}><ChevronRight/></button><button className="ib" aria-label="עריכת שם" disabled={!storage} title={!storage?'שמירת שמות דורשת גיבוי בענן':undefined} onClick={()=>{setEdit(open);setDraft(open.name);setEditError('');}}><Pencil size={20}/></button></div>
   <Thumb p={open} big/>
   <div className="dt"><h2>{bidi(open.name)}</h2><Meta p={open}/></div>
+  {open.items&&open.items.length>1&&<section className="box items"><h3>מה בחבילה</h3><ul>{open.items.map(n=><li key={n}>{bidi(heName(polishName(n)))}</li>)}</ul></section>}
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled?<span className="eta">הגעה <b>{open.eta}</b></span>:showEst&&(()=>{const e=est(open);return e&&<span className="eta" title={'לפי '+e.n+' חבילות קודמות שלך, '+e.stage}>{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>
    {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':step(open)/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<step(open)?'d':i===step(open)?'c':'')}><span/>{i===3&&step(open)>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
   {(()=>{const c=customsDue(open);if(!c)return null;return <section className="box guardBox customsBox"><h3><ShieldAlert size={18}/> לתשלום מכס ומסים</h3>
