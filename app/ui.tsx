@@ -206,17 +206,12 @@ function Journey({p}:{p:Parcel}){if(p.cancelled||!/AliExpress|Temu|SHEIN|Amazon|
   {step<5&&<><circle cx={x} cy={y} r="18" fill="#2ed3c6" opacity=".22"><animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite"/></circle><circle cx={x} cy={y} r="9" fill="#2ed3c6"/></>}
   <text x="180" y="186" fill="#fff" fontSize="15" fontWeight="700" textAnchor="middle">{labels[step]}</text></svg></details>;}
 // Scriptable widget source with the personal link inside.
-const widgetScript=(url:string)=>`// Unbox widget
-const r=await new Request(${JSON.stringify(url)}).loadJSON().catch(()=>null)
-const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');w.url='https://packetdrop.vercel.app'
-const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadImage().catch(()=>null);if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*28/img.size.height,28);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}w.addSpacer(6)
-if(!r||!r.ok||!r.lines){const e=w.addText('אין נתונים כרגע');e.textColor=Color.gray()}else{
- const F={big:20,mid:16,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#b5fff8',gray:'#8a96a3'}
- const max=config.widgetFamily==='large'?10:4
- r.lines.slice(0,max).forEach((x,i)=>{if(i&&x.s!=='small')w.addSpacer(2);const t=w.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||16);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=1;t.minimumScaleFactor=0.7})}
-w.refreshAfterDate=new Date(Date.now()+15*60000)
-if(config.runsInWidget)Script.setWidget(w);else await w.presentSmall()
-Script.complete()`;
+const widgetScript=(url:string)=>`// Unbox widget: loads its drawing code from Unbox, so updates arrive by themselves.
+const u=${JSON.stringify(url)}
+const r=await new Request(u).loadJSON().catch(()=>null)
+const code=await new Request(u+'&js=1').loadString().catch(()=>'')
+const AF=Object.getPrototypeOf(async function(){}).constructor
+if(code&&code.includes('ListWidget')){await new AF('r',code)(r)}else{const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');const t=w.addText(r&&r.lines?r.lines.map(x=>x.t).join('\\n'):'אין נתונים כרגע');t.textColor=Color.white();t.font=Font.boldSystemFont(15);if(config.runsInWidget)Script.setWidget(w);else await w.presentSmall();Script.complete()}`;
 // Hero card: the next parcel to reach you, with a countdown and its place on the way.
 function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
  const pick=isPickup(p),today=outToday(p);const days=Math.max(0,Math.round((when-Date.now())/864e5));
