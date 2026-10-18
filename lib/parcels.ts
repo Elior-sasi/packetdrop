@@ -6,7 +6,7 @@ export type Message={id:string;threadId?:string;internalDate?:string;snippet?:st
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
 
-const shops:[RegExp,string][]=[[/aliexpress|עלי ?אקספרס/i,'AliExpress'],[/amazon\./i,'Amazon'],[/temu/i,'Temu'],[/shein/i,'SHEIN'],[/ebay/i,'eBay'],[/iherb/i,'iHerb'],[/asos/i,'ASOS'],[/zara\./i,'Zara'],[/next\.(?:co\.il|com)/i,'NEXT'],[/ksp\.co\.il/i,'KSP'],[/ivory\.co\.il/i,'Ivory'],[/shufersal/i,'שופרסל'],[/terminalx/i,'Terminal X'],[/urbanica|אורבניקה/i,'Urbanica'],[/apple\.com/i,'Apple']];
+const shops:[RegExp,string][]=[[/aliexpress|עלי ?אקספרס/i,'AliExpress'],[/amazon\./i,'Amazon'],[/temu/i,'Temu'],[/shein/i,'SHEIN'],[/ebay/i,'eBay'],[/iherb/i,'iHerb'],[/asos/i,'ASOS'],[/zara\./i,'Zara'],[/next\.(?:co\.il|com)/i,'NEXT'],[/ksp\.co\.il/i,'KSP'],[/ivory\.co\.il/i,'Ivory'],[/shufersal/i,'שופרסל'],[/terminalx/i,'Terminal X'],[/urbanica|אורבניקה/i,'Urbanica'],[/apple\.com/i,'Apple'],[/payngo|pay ?& ?go|פיי אנד גו/i,'Pay&Go'],[/bug\.co\.il/i,'BUG'],[/castro\.com/i,'Castro'],[/foxhome|פוקס הום/i,'Fox Home']];
 const carriers:[RegExp,string][]=[[/israelpost|postil\.co\.il|דואר ישראל/i,'דואר ישראל'],[/\bups\b|ups\.com/i,'UPS'],[/\bdhl\b/i,'DHL'],[/fedex/i,'FedEx'],[/cainiao/i,'Cainiao'],[/yunexpress/i,'YunExpress'],[/\b4px\b/i,'4PX'],[/\bhfd\b|אחד עד אחד|epost/i,'HFD'],[/cheetah|chita-il|צ['׳]יטה/i,"צ'יטה"],[/tapuz|תפוז שליחויות|תפוז משלוחים/i,'תפוז'],[/flying ?cargo|פליינג קרגו/i,'Flying Cargo'],[/getpackage|גט ?פאקג/i,'GetPackage'],[/boxit|בוקסיט/i,'Boxit'],[/yango/i,'Yango']];
 export const brandDomains:Record<string,string>={AliExpress:'aliexpress.com',Amazon:'amazon.com',Temu:'temu.com',SHEIN:'shein.com',eBay:'ebay.com',iHerb:'iherb.com',ASOS:'asos.com',Zara:'zara.com',NEXT:'next.co.il',KSP:'ksp.co.il',Ivory:'ivory.co.il','שופרסל':'shufersal.co.il','Terminal X':'terminalx.com',Urbanica:'urbanica-wh.com','תפוז':'tapuzdelivery.co.il','Flying Cargo':'flyingcargo.co.il',GetPackage:'getpackage.com',Apple:'apple.com','דואר ישראל':'israelpost.co.il',UPS:'ups.com',DHL:'dhl.com',FedEx:'fedex.com',Cainiao:'cainiao.com',YunExpress:'yunexpress.com','4PX':'4px.com',HFD:'hfd.co.il',"צ'יטה":'chita-il.com',Boxit:'boxit.co.il',Yango:'yango.com',Wolt:'wolt.com'};
 
@@ -75,6 +75,8 @@ export function parseMessage(m:Message):Parcel|null{
  const orders=new Set<string>();
  const orderText=(subject+' '+text).match(/(?:order(?:\s*(?:number|no\.?|id|#))?|מספר\s*הזמנה|הזמנ(?:ה|תכם|תך)(?:\s*(?:מס['׳]?|מספר))?)\s*[:#.]?\s*#?\s*(\d[\d-]{5,34})/i)?.[1];
  if(orderText)orders.add(orderText.replace(/-/g,''));
+ // Israeli stores often write just "#302834565" or "המספר שלה: #…".
+ if(!orders.size&&knownSender){const h=text.match(/(?:המספר שלה|מספר(?:\s+ה)?הזמנה)\s*:?\s*#?\s*(\d{6,12})/)?.[1]||text.match(/#\s?(\d{6,12})\b/)?.[1];if(h)orders.add(h);}
  for(const href of hrefs){const a=href.match(/[?&]orderId=(\d{8,})/i)?.[1];if(a)orders.add(a);const b=href.match(/[?&]o_ids=([\d,]+)/i)?.[1];if(b)b.split(',').filter(x=>x.length>=8).forEach(x=>orders.add(x));}
  // Summary mails about several packages at once would glue unrelated parcels together.
  if(orders.size>1&&/\d+\s*(?:ה?חבילות|packages|parcels)/i.test(subject))return null;
@@ -108,7 +110,7 @@ export function parseMessage(m:Message):Parcel|null{
  // Shopify stores: the item title cell ("כסא ארגונומי … × 1").
  if(!name){const t=$('.order-list__item-title').first().text().replace(/\s+/g,' ').trim();if(t.length>3)name=tidyName(t.replace(/\s*[x×]\s*\d{1,3}\s*$/,''));const img=$('.order-list__product-image').first().attr('src');if(name&&img&&!image)image=secureUrl(img);}
  if(!name)$('img').each((_,el)=>{if(image)return;const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking|נגישות|accessib|webview|inforu|^תמונה$/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein|completed|delivered|shipped|ordered|success|check ?mark|in transit)$/i.test(alt)){name=alt;image=src;}});
- if(!name)name=/^הודעה (?:מ|ב)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').trim()||'חבילה';
+ if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
  const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
  let stage=stageOf(subject);if(stage<0)stage=stageOf(lead);
@@ -127,7 +129,7 @@ export function parseMessage(m:Message):Parcel|null{
  const customs=due?{amount:(text.match(/(?:סך|סה"?כ|סכום|בסך|לתשלום|amount|total)[^₪$\d]{0,25}(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?(?:₪|ש"ח|שקלים))/i)?.[1]||'').replace(/\s+/g,'').replace(/ש"ח|שקלים/,'₪'),url:$('a').toArray().map(a=>secureUrl($(a).attr('href')||'')).find(u=>OFFICIAL.test(u))||'',at:time}:undefined;
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
- const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qty=qm.length===1&&qm[0]>1?qm[0]:undefined;
+ const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qh=[...text.matchAll(/כמות:\s*(\d{1,2})(?!\d)/g)].map(x=>+x[1]);const qa=qm.length?qm:qh;const qty=qa.length===1&&qa[0]>1?qa[0]:undefined;
  return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
