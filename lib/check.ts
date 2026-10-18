@@ -5,7 +5,7 @@ import {QUERY,gmailClient,pdfInfo} from '@/lib/gmail';
 import {parseMessage,mergeParcels,type Parcel,type Message} from '@/lib/parcels';
 import {trackAll} from '@/lib/track';
 import {baldarByPhone} from '@/lib/tapuz';
-import {diff,withTrack,reminders,weekly,morning,checkups,nameOf,type State} from '@/lib/notify';
+import {diff,withTrack,reminders,weekly,morning,nameOf,type State} from '@/lib/notify';
 import {open,send,db,type Sub} from '@/lib/push';
 import {prettyNames} from '@/lib/names';
 export type Row={user_id:string;refresh:string;subs:Sub[];state:State;seen:string[];checked_at:string|null};
@@ -18,7 +18,7 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  const list=await gmail('messages?'+new URLSearchParams({maxResults:'100',q:'after:'+since+' '+QUERY,fields:'messages/id'}));
  const seen=new Set(u.seen||[]);const ids=((list.messages||[]) as {id:string}[]).map(m=>m.id).filter(id=>!seen.has(id)).slice(0,60);
  const msgs:Message[]=[];for(let i=0;i<ids.length;i+=10){const got=await Promise.allSettled(ids.slice(i,i+10).map(id=>gmail('messages/'+encodeURIComponent(id)+'?format=full')));for(const g of got)if(g.status==='fulfilled')msgs.push(g.value);}
- const state:State={parcels:u.state?.parcels||[],stuck:u.state?.stuck||[],marks:u.state?.marks||{},reminded:u.state?.reminded||{},weekly:u.state?.weekly||'',morning:u.state?.morning||'',checked:u.state?.checked||[]};
+ const state:State={parcels:u.state?.parcels||[],stuck:u.state?.stuck||[],marks:u.state?.marks||{},reminded:u.state?.reminded||{},weekly:u.state?.weekly||'',morning:u.state?.morning||''};
  const phone=String((u.state as {phone?:string})?.phone||'');
  const pdfs=await Promise.all(msgs.map(m=>pdfInfo(gmail,m as never).catch(()=>undefined)));
  let parcels=mergeParcels([...state.parcels,...msgs.map((m,i)=>parseMessage(m,pdfs[i])).filter((p):p is Parcel=>!!p),...(phone?await baldarByPhone(phone).catch(()=>[]):[])]);
@@ -26,7 +26,7 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY,phone).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]||(p.tracking?t['KX:'+p.tracking]:undefined)||(!p.tracking&&p.order?(p.via||[]).map(h=>t['TZ:'+h+':'+p.order]).find(Boolean):undefined)));}
  // With no baseline yet, the first check only records the current state.
  const {notes,stuck}=state.parcels.length?diff(state,parcels):{notes:[],stuck:state.stuck};
- const rem=reminders({...state,parcels});const wk=weekly({...state,parcels});const mo=morning({...state,parcels});const checkupOn=(u.state as {checkup?:boolean})?.checkup!==false;const ck=checkupOn?checkups({...state,parcels}):{notes:[],checked:state.checked||[]};const allNotes=[...notes,...rem.notes,...(wk.note?[wk.note]:[]),...(mo.note?[mo.note]:[]),...ck.notes];
+ const rem=reminders({...state,parcels});const wk=weekly({...state,parcels});const mo=morning({...state,parcels});const allNotes=[...notes,...rem.notes,...(wk.note?[wk.note]:[]),...(mo.note?[mo.note]:[])];
  // Notifications use the same short Hebrew names the app shows, not the store's long title.
  if(allNotes.length){const ps=parcels.filter(p=>allNotes.some(n=>n.id===p.id)||(mo.note&&p.stage===3)).slice(0,30);const pretty=await prettyNames(ps,sql).catch(()=>new Map<string,string>());
   for(const n of allNotes)for(const p of (n.tag.startsWith('m:')?ps:ps.filter(x=>x.id===n.id))){const v=pretty.get(p.id);const old=nameOf(p);if(v&&old&&old!==v){n.body=n.body.split(old).join(v);n.title=n.title.split(old).join(v);}}}
@@ -35,7 +35,7 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  for(const n of batch){const alive:Sub[]=[];for(const s of subs){const ok=await send(s,n).catch(()=>true);if(ok)alive.push(s);}subs=alive;sent++;}
  const keep=parcels.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
  const newSeen=[...seen,...msgs.map(m=>m.id)].slice(-1500);
- await sql`update push_users set state=${JSON.stringify({parcels:keep,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,morning:mo.day,checked:ck.checked,checkup:(u.state as {checkup?:boolean})?.checkup,view:(u.state as {view?:unknown})?.view,phone})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
+ await sql`update push_users set state=${JSON.stringify({parcels:keep,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,morning:mo.day,view:(u.state as {view?:unknown})?.view,phone})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
  return {sent};
 }
 // Gmail instant push: ask Gmail to tell our Pub/Sub topic about new mail. A watch lasts 7 days, so it is renewed every 6.
