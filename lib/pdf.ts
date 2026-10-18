@@ -16,6 +16,11 @@ export async function pdfText(data:Uint8Array):Promise<string>{
   for(const y of [...rows.keys()].sort((a,b)=>b-a))lines.push(rows.get(y)!.sort((a,b)=>b.x-a.x).map(i=>i.s.replace(/\s+/g,' ').trim()).join(' ¦ '));}
  const all=lines.join('\n');const fwd=(all.match(FWD)||[]).length,rev=(all.match(REV)||[]).length;
  return rev>fwd?lines.map(flipLine).join('\n'):all;}
+// Some invoices keep each word right but put the runs in display order: "לבן RXS-390-AS בר מים אלקטרה שבת".
+// A leading color before a model code is that sign; the runs are put back in reading order.
+const COLOR=/^(?:לבן|לבנה|שחור|שחורה|כסוף|כסופה|כסף|אפור|אפורה|נירוסטה|אדום|אדומה|כחול|כחולה|זהב|ירוק|ירוקה|בז'|חום|ורוד|גרפיט|טיטניום)$/;
+export function runOrder(c:string){const m=c.match(/^(\S+(?:\s\S+)?)\s+([A-Za-z0-9][A-Za-z0-9\-\/.]*)\s+(.*[֐-׿].*)$/);
+ return m&&COLOR.test(m[1])&&/\d/.test(m[2])?m[3]+' '+m[2]+' '+m[1]:c;}
 // Order number, product lines and delivery-note numbers from an order copy or invoice.
 export function pdfOrder(text:string){
  const order=text.match(/(?:מס['׳]?\s*הזמנה|הזמנה\s*מספר)[\s¦:-]*(?:מס['׳]?[\s¦]*)?(\d{8,12})/)?.[1]||'';
@@ -26,5 +31,5 @@ export function pdfOrder(text:string){
  for(const line of text.split('\n')){const cells=line.split(' ¦ ').map(c=>c.trim()).filter(Boolean);const flat=cells.join(' ');
   if(!/\b\d{5,7}\b/.test(flat)||!/\d+\.\d{2}/.test(flat))continue;
   const desc=cells.filter(c=>HEB.test(c)&&c.length>=6&&!NOISE.test(c)&&!/^\d/.test(c)).sort((a,b)=>b.length-a.length)[0];
-  if(desc&&!items.includes(desc))items.push(desc);}
+  const fixed=desc&&runOrder(desc);if(fixed&&!items.includes(fixed))items.push(fixed);}
  return {order,ship,items:items.slice(0,4)};}
