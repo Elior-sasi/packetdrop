@@ -86,8 +86,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  // Summary mails about several packages at once would glue unrelated parcels together.
  if(orders.size>1&&/\d+\s*(?:ה?חבילות|packages|parcels)/i.test(subject))return null;
  const tracking=((subject+' '+text).match(/(?:tracking(?:\s+(?:number|no\.?|id|code))?|מספר\s*(?:ה?מעקב|ה?משלוח)|קוד\s*מעקב)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{7,34})/i)?.[1]
-  ||(subject+' '+text).match(/(?:ל?חבילה|החבילה שלכם|החבילה שלך|משלוח|דבר דואר|פריט דואר|package|parcel|shipment)\s*(?:מס['׳]|מספר|שמספרה|no\.?|#)?\s*:?\s*([A-Z]{1,4}\d{6,}[A-Z0-9]*)/i)?.[1]
-  ||(subject+' '+text).match(/\b([A-Z]{2}\d{9}[A-Z]{2}|1Z[0-9A-Z]{16}|RS\d{9,12}Y|AP\d{12,16}|LP\d{10,16})\b/)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
+  ||(subject+' '+text).match(/(?:ל?חבילה|החבילה שלכם|החבילה שלך|משלוח|דבר דואר|פריט דואר|package|parcel|shipment)\s*(?:מס['׳]|מספר|שמספרה|שמספרו|no\.?|#)?\s*:?\s*([A-Z]{1,4}\d{6,}[A-Z0-9]*)/i)?.[1]
+  ||(subject+' '+text).match(/\b([A-Z]{2}\d{9}[A-Z]{2}|[A-Z]{2}\d{10}[A-Z]|1Z[0-9A-Z]{16}|RS\d{9,12}Y|AP\d{12,16}|LP\d{10,16})\b/)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
  // Details from a PDF attachment (invoice / order copy) when the mail body has none.
  if(pdf?.order&&!orders.size)orders.add(pdf.order);
  const order=[...orders][0]||'';
@@ -102,7 +102,11 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const code=text.match(/קוד (?:לקבלת|לאיסוף|איסוף)(?: ה?חבילה)?\s*:?\s*(\d{4,8})/)?.[1]||'';
  const pickupUrl=(text.match(/https?:\/\/(?:hfd\.sh|[a-z0-9.-]*hfd\.co\.il|[a-z0-9.-]*chita-il\.com|[a-z0-9.-]*tapuzdelivery\.co\.il)\/[^\s"'<>]+/i)?.[0]||'').replace(/^http:/,'https:');
  const hours=chita?.[4]?.replace(/\s+/g,' ').trim().replace(/[.\s]+$/,'')||'';
- const pickup:Pickup|null=place||code?{place,address,code,url:pickupUrl,hours}:null;
+// Israel Post notices: the place it waits at, and the short shelf code ("ג 11") to give at the counter.
+ const post=/postil\.co\.il|israelpost/i.test(from);
+ const postWait=post?text.match(/ממתין ב\s*(.{3,80}?)\s*\.\s*(?:למידע|לתשומת|$)/):null;
+ const postShelf=post?text.match(/[A-Z]{2}\d{8,12}[A-Z]{0,2}\s*([\u05D0-\u05EA]\s?\d{1,4})(?=\s|[\u05D0-\u05EA])/)?.[1]||'':'';
+ const pickup:Pickup|null=postWait?{place:postWait[1].trim(),address:'',code:postShelf,url:'',hours:''}:place||code?{place,address,code,url:pickupUrl,hours}:null;
  // No order and no parcel number: newsletters, surveys and receipts without shipping. Not a parcel.
  if(!order&&!tracking&&!extra.size)return null;
  let name='',image='';
@@ -132,8 +136,13 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const lead=text.slice(0,700);
  const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
  let stage=stageOf(subject);if(stage<0)stage=stageOf(lead);
+ // Israel Post's own wording, in plain words; "תודה שאספת" means the user already collected it.
+ const postBody=post?text.slice(subject.length):'';
+ const postSaid=!post?'':/תודה שאספת/.test(postBody)?'נאספה':postWait?'ממתינה לאיסוף ב'+postWait[1].trim():/יוחזר לשולח|הוחזר לשולח|לא נדרש בידי הנמען/.test(postBody)?'הוחזרה לשולח':/הגיע לארץ/.test(postBody)?'הגיעה לארץ ובדרך אליך':/בדרכו לארץ/.test(postBody)?'בדרך לארץ':'';
+ if(postSaid==='נאספה')stage=4;else if(postWait)stage=3;else if(postSaid&&stage<2)stage=2;
  const range=text.match(/בין התאריכים\s*(\d{1,2})[./-](\d{1,2})(?:[./-]\d{2,4})?\s*(?:ו?עד|-)\s*(\d{1,2})[./-](\d{1,2})/);
  const eta=range?(+range[1]+'.'+(+range[2])+'-'+(+range[3])+'.'+(+range[4])):etaOf(text.match(/(?:estimated delivery|expected delivery|arriving|delivery date|הגעה משוערת|מועד הגעה|צפויה להגיע)\s*[:\-]?\s*([^.!?|]{4,65})/i)?.[1]||'');
+ const late=post?text.match(/לא יאוחר מתאריך\s*(\d{1,2})\/(\d{1,2})/):null;const etaAll=eta||(late?(+late[1])+'.'+(+late[2]):'');
  const url=$('a').toArray().map(a=>({text:$(a).text(),url:secureUrl($(a).attr('href')||'')})).find(l=>l.url&&/track|מעקב|לעקוב/i.test(l.text))?.url||'';
  const time=new Date(Number(m.internalDate)||Date.now()).toISOString();
  const keys=[...new Set([...[...orders].map(o=>'order:'+o),...(tracking?['tracking:'+tracking]:[]),...[...extra].map(x=>'tracking:'+x)])];
@@ -142,7 +151,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const genericSubject=(/^הודעה (?:מ|ב)|notification/i.test(subject)&&!/\d{6,}/.test(subject))||/^הודעה על (?:ה?משלוח|דבר דואר|ה?חבילה)/.test(subject);
  // A notice whose subject says only "הודעה על משלוח …": the news is the sentence after the number in the body ("הגיע לארץ ובדרכו אליך").
  const said=genericSubject?(text.slice(subject.length).match(/\b[A-Z]{2}\d{8,}[A-Z]{0,2}\b\s*(?:מחו["״]ל\s*)?([\u0590-\u05FF][^.\n]{3,70})/)?.[1]||'').replace(/\s+/g,' ').trim():'';
- const label=!genericSubject?subject:said?said:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
+ const label=postSaid?postSaid:!genericSubject?subject:said?said:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
  // Customs / VAT to pay before release. Only official payment links are kept (customs-payment scams are common).
  const due=/(?:תשלום|לתשלום|חיוב|לשלם)\s+(?:ה?מסים|ה?מיסים|ה?מכס|מע"?מ|דמי (?:ה)?מכס|דמי טיפול ומסים)|(?:customs|import) (?:duty|duties|tax|fees?|charges?)|duties (?:and|&) taxes|pay (?:the )?(?:customs|duty|vat)/i.test(subject+' '+text.slice(0,3000))&&(knownSender||/postil|israelpost|gov\.il|dhl|ups|fedex|hfd/i.test(from));
  const OFFICIAL=/^https:\/\/(?:[a-z0-9-]+\.)*(?:israelpost\.co\.il|gov\.il|dhl\.co\.il|dhl\.com|ups\.com|fedex\.com|hfd\.co\.il)\//i;
@@ -150,7 +159,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
  const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qh=[...text.matchAll(/כמות:\s*(\d{1,2})(?!\d)/g)].map(x=>+x[1]);const qa=qm.length?qm:qh;const qty=qa.length===1&&qa[0]>1?qa[0]:undefined;
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
