@@ -503,11 +503,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <button className="menuCancel" onClick={()=>setMenu(null)}>ביטול</button></div></div>}
  {adding&&<div className="menuWrap" onClick={()=>setAdding(false)}><form className="menu addForm" onClick={e=>e.stopPropagation()} onSubmit={e=>{e.preventDefault();addManual();}}>
   <p className="menuTitle">הוספת חבילה</p>
-  <label htmlFor="addSms">הדבקת SMS מהדואר או מהשליח</label><textarea id="addSms" rows={3} value={addSms} onChange={e=>setAddSms(e.target.value)} placeholder="המספר והקוד יזוהו לבד"/>
+  <label htmlFor="addSms">הדבקת SMS מהדואר או מהשליח</label><textarea id="addSms" rows={3} value={addSms} onChange={e=>setAddSms(e.target.value)}/>
   {addSms.trim()?<><button type="button" className="primary" onClick={()=>{if(applySms([addSms])){setAddSms('');setAdding(false);setAddErr('');}else setAddErr('לא נמצא מספר מעקב בהודעה');}}>הוספה מה־SMS</button>{addErr&&<p className="error" role="alert">{addErr}</p>}</>:<>
   <p className="orLine">או לפי מספר מעקב</p>
-  <label htmlFor="addNum">מספר מעקב</label><input id="addNum" dir="ltr" autoFocus autoCapitalize="characters" autoComplete="off" value={addNum} onChange={e=>setAddNum(e.target.value)} placeholder="RR123456789IL"/>
-  <label htmlFor="addName">שם (לא חובה)</label><input id="addName" value={addName} onChange={e=>setAddName(e.target.value)} placeholder="למשל: אוזניות"/>
+  <label htmlFor="addNum">מספר מעקב</label><input id="addNum" dir="ltr" autoFocus autoCapitalize="characters" autoComplete="off" value={addNum} onChange={e=>setAddNum(e.target.value)}/>
+  <label htmlFor="addName">שם (לא חובה)</label><input id="addName" value={addName} onChange={e=>setAddName(e.target.value)}/>
   {addErr&&<p className="error" role="alert">{addErr}</p>}
   <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button></>}<button type="button" className="menuCancel" onClick={()=>setAdding(false)}>ביטול</button></form></div>}
  {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" className={navDrag!==null?'dragging':''} style={{'--tab':navDrag??['list','today','stats'].indexOf(section)} as React.CSSProperties}
