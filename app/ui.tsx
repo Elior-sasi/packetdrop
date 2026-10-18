@@ -75,9 +75,11 @@ function Thumb({p,big}:{p:Parcel;big?:boolean}){if(p.images&&p.images.length>1){
  // Card: the first item fills the square, the second sits as a small inset so neither is cut in half.
  if(!big)return <div className="thumb multi n2">{p.images.slice(0,2).map(src=><img key={src} src={src} alt="" loading="lazy" referrerPolicy="no-referrer"/>)}</div>;
  return <Gallery imgs={p.images.slice(0,12)}/>;}
+// Product photos go through our server, which cuts off the white bars stores pad them with.
+const trimmed=(src:string)=>/^https:\/\/[^/]*(?:aliexpress-media\.com|alicdn\.com|media-amazon\.com|ssl-images-amazon\.com|cdn\.shopify\.com)\//i.test(src)?'/api/img?u='+encodeURIComponent(src):src;
 // Several photos: one at a time, swiped sideways, with dots that show where you are.
 function Gallery({imgs}:{imgs:string[]}){const [at,setAt]=useState(0);
- return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={src} alt={'תמונה '+(i+1)+' מתוך '+imgs.length} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer"/>)}</div>
+ return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={trimmed(src)} alt={'תמונה '+(i+1)+' מתוך '+imgs.length} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer"/>)}</div>
   <div className="dots" aria-hidden="true">{imgs.map((_,i)=><i key={i} className={i===at?'on':''}/>)}</div></div>;}
  return <ThumbOne p={p} big={big}/>;}
 function ThumbOne({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const d=domainOf(p.shop)||domainOf(p.carrier);
