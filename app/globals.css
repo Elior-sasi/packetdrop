@@ -230,4 +230,4 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .nc-ring .ring{width:92px;height:92px;flex:none}.nc-ring .thumb{width:56px;height:56px}
 .nc-chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.nc-chips span{padding:5px 11px;border-radius:99px;background:#ffffff12;font-size:calc(14px*var(--fs));color:#cfe4f7}
 .nc-ring .nc-row .thumb:first-child{width:72px;height:72px}
-.nc-full{margin-top:12px;-webkit-line-clamp:3}.nc-ring .nc-k{font-size:calc(16px*var(--fs))}
+.nc-full{margin-top:12px;-webkit-line-clamp:3}.nc-ring .nc-k{font-size:calc(16px*var(--fs));white-space:nowrap}
