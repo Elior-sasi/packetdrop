@@ -12,7 +12,7 @@ export async function GET(req:NextRequest){try{
  const ids:string[]=[];let token='';
  for(let page=0;page<10;page++){const params=new URLSearchParams({maxResults:'500',q:window+' '+QUERY,fields:'messages/id,nextPageToken'});if(token)params.set('pageToken',token);const list=await gmail('messages?'+params);for(const m of list.messages||[])ids.push(m.id);token=list.nextPageToken||'';if(!token)break;}
  // One-time repair: mail that earlier rules skipped (refunds, Israeli store confirmations) is read again.
- let recheck:string[]=[];if(req.nextUrl.searchParams.get('recheck')){const list=await gmail('messages?'+new URLSearchParams({maxResults:'200',q:window+' {subject:זיכוי subject:refund subject:refunded subject:בוטלה subject:cancelled "הזמנתך זוכתה" from:urbanica-wh.com from:payngo.co.il from:postil.co.il from:ksp.co.il}',fields:'messages/id'}));recheck=(list.messages||[]).map((m:{id:string})=>m.id);}
+ let recheck:string[]=[];if(req.nextUrl.searchParams.get('recheck')){const list=await gmail('messages?'+new URLSearchParams({maxResults:'200',q:window+' {subject:זיכוי subject:refund subject:refunded subject:בוטלה subject:cancelled "הזמנתך זוכתה" from:urbanica-wh.com from:payngo.co.il from:postil.co.il from:ksp.co.il subject:"יש עדכון" subject:"עדכונים לגבי"}',fields:'messages/id'}));recheck=(list.messages||[]).map((m:{id:string})=>m.id);}
  return Response.json({ids,recheck,updated:new Date().toISOString()},{headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return fail(e);}}
 const body=z.object({ids:z.array(z.string().regex(/^[a-zA-Z0-9]{6,40}$/)).min(1).max(40)});

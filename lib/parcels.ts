@@ -110,6 +110,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  $('a').each((_,el)=>{if(name)return;const a=$(el),href=a.attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;
   const bits=a.find('*').addBack().contents().toArray().filter(n=>n.type==='text').map(n=>$(n).text().replace(/\s+/g,' ').trim()).filter(t=>t.length>6&&!/^[₪$€]|\d+[.,]\d{2}\s*$|^x\d+$|משלוח אל|סך הכל|לפרטי|פרטי ה(?:חבילה|הזמנה|משלוח)|order details|package details/i.test(t));
   if(bits[0]){name=tidyName(bits[0]);}});
+ // Package notices list every product in the box (AliExpress "פרטי החבילה"); keep them all, not just the first.
+ const listed=[...new Set($('.EDM-SYSTEM-TEXT-productName').toArray().map(el=>tidyName($(el).text().replace(/\s+/g,' ').trim())).filter(t=>t.length>3))].slice(0,12);
  // The photo often sits in its own anchor next to the title anchor; take the first real product photo from those links (skip tiny badge icons).
  const productImg=(el:any)=>{const src=$(el).attr('src')||$(el).attr('data-src')||'';const u=secureUrl(src.startsWith('//')?'https:'+src:src.replace(/^http:\/\/(?=[^/]*(?:alicdn|aliexpress-media|media-amazon|ssl-images-amazon|temu|shein|ebayimg))/i,'https://'));const w=Number($(el).attr('width')||0);
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
@@ -143,7 +145,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
  const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qh=[...text.matchAll(/כמות:\s*(\d{1,2})(?!\d)/g)].map(x=>+x[1]);const qa=qm.length?qm:qh;const qty=qa.length===1&&qa[0]>1?qa[0]:undefined;
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
@@ -164,14 +166,14 @@ export function mergeParcels(rows:Parcel[]){
   // Several orders shipped in one package: name the package after all of them ("שחמט + אזעקה").
   const generic=(n:string)=>/^(?:הזמנה|חבילה|לחבילה|your order|הודעה מ)/i.test(n);
   const perOrder=new Map<string,string>();for(const p of sorted)if(p.order&&!generic(p.name)&&!perOrder.has(p.order))perOrder.set(p.order,p.name);
-  const items=[...new Set([...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')))];
+  const items=[...new Set([...[...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')),...list.flatMap(p=>p.items||[])])];
   // One picture per order in the package.
   const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set([...list.flatMap(p=>p.images||[]),...perImg.values()])];
   // Orders in the package whose mails carry no product name still count ("… ועוד 2").
   const orderCount=keys.filter(k=>k.startsWith('order:')).length;const unnamed=items.length?Math.max(0,orderCount-Math.max(perOrder.size,items.length)):0;
   const more=Math.max(0,items.length-2)+unnamed;
   // Every order in the package, so each one can be found and listed (unnamed ones by their order number).
-  const contents=orderCount>1?[...items,...keys.filter(k=>k.startsWith('order:')).map(k=>k.slice(6)).filter(o=>!perOrder.has(o)).map(o=>'הזמנה …'+o.slice(-6))]:[];
+  const contents=orderCount>1||items.length>1?[...items,...keys.filter(k=>k.startsWith('order:')).map(k=>k.slice(6)).filter(o=>!perOrder.has(o)).slice(0,unnamed).map(o=>'הזמנה …'+o.slice(-6))]:[];
   const title=items.length>1||unnamed?items.slice(0,2).join(' + ')+(more?' ועוד '+more:''):named.name;
   const stage=Math.max(0,...list.map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
