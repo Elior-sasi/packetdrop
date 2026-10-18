@@ -23,3 +23,7 @@ import {parseSms} from '../lib/parcels';
 test('courier SMS for an Israeli store joins the order',()=>{
  const s=parseSms('תפוז משלוחים: המשלוח שלך מאורבניקה, הזמנה 302834565, מספר משלוח 7712345 יצא למסירה היום')!;
  assert.ok(s);assert.equal(s.tracking,'7712345');assert.ok(s.keys.includes('order:302834565'));assert.equal(s.shop,'Urbanica');assert.equal(s.stage,3);});
+test('KSP order table gives the product name; review request means delivered',()=>{
+ const p=parseMessage(msg('k1','noreply@ksp.co.il','תודה שבחרתם KSP - הזמנה מספר: 954662518','<p>הזמנתך מספר 954662518 תטופל בהקדם בין התאריכים 23-09-2026 ועד 04-10-2026</p><table><tr><td>מקט</td><td>תיאור</td><td>מחיר</td></tr><tr><td>402969</td><td>בר מים טאץ\' דגם Spirit מבית HDS Water - צבע לבן</td><td>1290 ₪</td></tr><tr><td>GIFTPACK</td><td>[קמפיין #72583]</td><td>300</td></tr></table>','2026-09-17T11:31:10Z'))!;
+ assert.ok(p.name.startsWith("בר מים טאץ'"),p.name);assert.equal(p.eta,'23.9-4.10');
+ const r=parseMessage(msg('k2','noreply@ksp.co.il','חוויתכם חשובה לנו! שלחו את דעתכם על KSP','<p>בהמשך להזמנה מספר 954662518</p>','2026-09-22T11:52:00Z'))!;assert.equal(r.stage,4);});

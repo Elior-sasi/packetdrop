@@ -30,7 +30,7 @@ const NOT_PARCEL=/eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesplanet|ר
 // Physical shipping words; unknown senders must mention one of these to count as a parcel.
 const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נקודת (?:ה)?חלוקה|כתובת למשלוח|shipping|shipped|shipment|delivery|tracking|מעקב|parcel|package/i;
 const STAGE_RULES:[number,RegExp][]=[
- [4,/איך הלך|לכתוב ביקורת|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
+ [4,/איך הלך|לכתוב ביקורת|חוויתכם חשובה|שלחו את דעתכם|דרגו את החוויה|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
  [3,/מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|טרם נאסף|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
  [2,/במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
  [1,/נשלחה|נשלח|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
@@ -117,6 +117,11 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  // Shopify stores: the item title cell ("כסא ארגונומי … × 1").
  if(!name){const t=$('.order-list__item-title').first().text().replace(/\s+/g,' ').trim();if(t.length>3)name=tidyName(t.replace(/\s*[x×]\s*\d{1,3}\s*$/,''));const img=$('.order-list__product-image').first().attr('src');if(name&&img&&!image)image=secureUrl(img);}
  if(!name)$('img').each((_,el)=>{if(image)return;const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking|נגישות|accessib|webview|inforu|^תמונה$/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein|completed|delivered|shipped|ordered|success|check ?mark|in transit)$/i.test(alt)){name=alt;image=src;}});
+ // Order tables ("מקט | תיאור | מחיר | כמות", KSP and similar): the description of the first real product row.
+ if(!name)$('table').each((_,t)=>{if(name)return;const rows=$(t).children('tbody').children('tr').toArray().concat($(t).children('tr').toArray());
+  const cellsOf=(r:any)=>$(r).children('td,th').toArray().map(c=>$(c).text().replace(/\s+/g,' ').trim());let col=-1;
+  for(const r of rows){const c=cellsOf(r);if(col<0){col=c.findIndex(x=>/^(?:תיאור(?: פריט| מוצר)?|שם (?:ה)?מוצר|מוצר|פריט)$/.test(x));continue;}
+   const d=c[col]||'';if(d.length>4&&!/GIFTPACK|קמפיין|דואר שליחים|משלוח|הובלה|תשלומים|הטבה|סה['"]?כ/i.test(d+' '+c.join(' '))&&c.some(x=>/^\d{4,9}$/.test(x))){name=tidyName(d);return;}}});
  if(!name&&pdf?.items.length)name=pdf.items.slice(0,2).join(' + ')+(pdf.items.length>2?' ועוד '+(pdf.items.length-2):'');
  if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
