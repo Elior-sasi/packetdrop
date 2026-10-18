@@ -19,11 +19,11 @@ export function lines(all:Parcel[],names:Record<string,string>,when:Record<strin
  return L;}
 
 // Runs inside Scriptable (fetched by the small script on the phone). `r` is this route's JSON.
-// Scriptable mirrors alignment for Hebrew, so "left" puts things on the right; texts follow the natural (right) side.
+// The logo stays where it always was (top left on the phone); texts follow the natural (right) side.
 export const RENDER=`
 const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');w.url='https://packetdrop.vercel.app';w.setPadding(14,14,12,14)
 const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadImage().catch(()=>null)
-if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*24/img.size.height,24);i.leftAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
+if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*24/img.size.height,24);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
 w.addSpacer(8)
 if(!r||!r.ok||!r.lines){const e=w.addText('אין נתונים כרגע');e.textColor=Color.gray();e.font=Font.mediumSystemFont(14)}else{
  const F={big:22,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#b5fff8',gray:'#8a96a3'}
