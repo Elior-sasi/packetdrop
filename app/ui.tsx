@@ -279,7 +279,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   if(p.stage===3&&!p.carrierStatus?.match(/OutForDelivery|AvailableForPickup/)&&!p.pickup&&!p.events.some(e=>OUT_RE.test(e.label)||PICK_RE.test(e.label)))p.stage=2;
   // Israeli stores track by SMS only: after the promised time the card asks "הגיעה?" instead of guessing; 30 days of silence = received.
   const local=!abroad(p)&&!p.tracking&&p.stage<3;const age=Date.now()-last;
-  const ask=local&&!got&&!p.cancelled&&age>9*864e5&&age<30*864e5&&!((snooze[p.id]||0)>Date.now());
+  const em=[...p.eta.matchAll(/(\d{1,2})\.(\d{1,2})/g)].at(-1);let due=last+9*864e5;if(em){const y=new Date(last).getFullYear();let t=new Date(y,+em[2]-1,+em[1]).getTime();if(t<last-60*864e5)t=new Date(y+1,+em[2]-1,+em[1]).getTime();due=t+864e5;}
+  const ask=local&&!got&&!p.cancelled&&Date.now()>due&&age<30*864e5&&!((snooze[p.id]||0)>Date.now());
   const stale=p.stage<4&&!p.cancelled&&age>(p.stage===3?14:abroad(p)?30:local?30:p.stage>=1?10:21)*864e5;
   return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,ask,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
