@@ -257,3 +257,6 @@ nav{touch-action:none}nav.dragging:before{transition:none}
 .gal .dots{display:flex;justify-content:center;gap:7px;margin-top:10px}
 .gal .dots i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:width .2s,background .2s}
 .gal .dots i.on{width:20px;border-radius:4px;background:var(--acc,#3b9cff)}
+/* One photo fills the frame edge to edge, like the gallery (the white padding is trimmed on the server). */
+.hero>img.photo.fill{object-fit:cover;background:#fff}
+.hero,.galTrack{height:min(80vw,380px)}
