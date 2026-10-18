@@ -14,3 +14,11 @@ const cases:[string,string][]=[
 ];
 test('hebrew names',()=>{for(const [a,b] of cases)assert.equal(heName(a),b,a);});
 test('trailing catalog number after Hebrew is dropped',()=>{assert.equal(heName('מארז 4 כוסות מאג זכוכית 246'),'מארז 4 כוסות מאג זכוכית');assert.equal(heName('iPhone 15 Pro 256'),'iPhone 15 Pro 256');});
+import {tidyName} from '../lib/parcels';
+test('AliExpress title fixes',()=>{
+ assert.equal(tidyName('אנימה וואן 1 פיס סנג\'י קוספלי...'),'תחפושת One Piece סנג\'י');
+ assert.equal(tidyName('חולצת הוואי של פרנקי וואן פיס...'),'חולצת הוואי של פרנקי One Piece');
+ assert.equal(tidyName('תחפושת קוספליי של רורונואה זו...'),'תחפושת רורונואה');
+ assert.equal(tidyName('פרוק קוספלי מותאם אישית למסיב...'),'פאה');
+ assert.equal(tidyName('2187172 דלת מקרר תואמת למקרר ...'),'דלת מקרר');
+ assert.equal(tidyName('לווייתן כריש איש ג \'ינב קוספל...'),'תחפושת לווייתן כריש איש ג\'ינב');});

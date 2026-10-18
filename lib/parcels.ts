@@ -42,15 +42,21 @@ function stageOf(s:string){if(/(?:ממתינה|ממתין)\s+לאיסוף\s+(?:�
 // Final touch on any title: no dangling connector word, no lone fragment after the last comma.
 export function polishName(n:string){let t=n.trim();
  for(let i=0;i<3;i++){const before=t;
-  t=t.replace(/(?:\s+(?:בסגנון|בעל|בעלת|עם|של|עבור|מתאים|מתאימה|לשימוש|חדש|חדשה|for|with|and|of|the|ל|ב|ו|מ|ה))+$/i,'').trim();
+  t=t.replace(/(?:\s+(?:בסגנון|בעל|בעלת|עם|של|עבור|מתאים|מתאימה|תואם|תואמת|עמיד|עמידה|לשימוש|חדש|חדשה|for|with|and|of|the|ל|ב|ו|מ|ה))+$/i,'').trim();
   const m=t.match(/^(.{8,}?)[,،]\s*([^,،\s]+)$/);if(m&&m[2].length<=10)t=m[1].trim();
   t=t.replace(/[\s,،\-–(]+$/,'');if(t===before)break;}
  return t.length>=4?t:n.trim();}
 export function tidyName(raw:string){let n=raw.replace(/\s+x\d+$/i,'').trim();
- if(/(\.\.\.|…)\s*$/.test(n)){n=n.replace(/(\.\.\.|…)\s*$/,'').trim();const cut=n.replace(/[\s,،\-–(]+\S+$/,'').replace(/[\s,،\-–(]+$/,'').trim();if(cut.length>=8)n=cut;n=n.replace(/(?:\s+(?:עם|של|עבור|את|for|with|and|of|the|ל|ב|ו|מ))+$/i,'').trim();}
+ // AliExpress machine-translation fixes, on the full title before it is shortened.
+ n=n.replace(/(\S) '(\S)/g,"$1'$2").replace(/וואן\s*1?\s*פיס/g,'One\u2060Piece').replace(/^\d{5,}\s+/,'').replace(/^פרוק(?=\s)/,'פאה').replace(/\s+(?:מותאם|מותאמת|בהתאמה)\s+אישית/g,'');
+ // "Cosplay" titles: the costume is the product ("אנימה X קוספליי…" → "תחפושת X", "תחפושת קוספליי של X" → "תחפושת X").
+ n=n.replace(/^(תחפושת|תחפושות|חליפת|חליפה)\s+קוספל\S*\s+(?:של\s+)?/,'$1 ');
+ if(!/^(?:תחפושת|תחפושות|חליפת|חליפה|פאה)/.test(n)){const c=n.match(/^(?:אנימה\s+)?(.{3,45}?)\s+קוספל\S*/);if(c){const rest=n.slice(c[0].length);n='תחפושת '+c[1]+(/^\s*(?:\.\.\.|…)\s*$/.test(rest)?'':rest);}}
+ n=n.replace(/^(פאה)\s+קוספל\S*/,'$1');
+ if(/(\.\.\.|…)\s*$/.test(n)){n=n.replace(/(\.\.\.|…)\s*$/,'').trim();const cut=n.replace(/[\s,،\-–(]+\S+$/,'').replace(/[\s,،\-–(]+$/,'').trim();if((cut.length>=8||/^(?:פאה|תיק|סט|כבל)$/.test(cut))&&!/\u2060\S*$/.test(n))n=cut;n=n.replace(/(?:\s+(?:עם|של|עבור|את|for|with|and|of|the|ל|ב|ו|מ))+$/i,'').trim();}
  // Store titles are keyword lists; keep the part before the second comma so the card reads like a name.
  if(n.length>42){const parts=n.split(/\s*[,،|]\s*/);let out=parts[0];for(const p of parts.slice(1)){if((out+', '+p).length>42)break;out+=', '+p;}n=out.length>=12?out:n.slice(0,42).replace(/\s+\S*$/,'');}
- return polishName(n);}
+ return polishName(n).replace(/\u2060/g,' ');}
 const MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
 // Keep only the date part of "arriving September 6 Elior - ..." and write it the Israeli way (6.9).
 export function etaOf(raw:string){const t=raw.trim();

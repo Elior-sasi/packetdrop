@@ -32,7 +32,9 @@ function part(raw:string){let s=raw.replace(/[|]/g,' ').replace(/\s+/g,' ').trim
  let out=w.join(' ').replace(/[\s,،\-–]+$/,'');
  if(aud&&out&&!out.includes(aud)&&out.split(' ').length<=4)out+=' '+aud;
  return out;}
-export function heName(n:string){const src=n.trim();if(!src)return src;
+// The same AliExpress fixes as when a title is first read, so names saved before the fix read right too.
+function fixOld(n:string){return n.replace(/(\S) '(\S)/g,"$1'$2").replace(/וואן\s*1?\s*פיס/g,'One Piece').replace(/\s+וואן$/,'').replace(/^\d{5,}\s+/,'').replace(/^פרוק(?=\s|$)/,'פאה').replace(/\s+(?:מותאם|מותאמת|בהתאמה)\s+אישית/g,'').replace(/^(תחפושת|תחפושות|חליפת|חליפה)\s+קוספל\S*\s+(?:של\s+)?/,'$1 ').replace(/^פאה\s+קוספל\S*.*$/,'פאה').replace(/\s+(?:תואם|תואמת|עמיד|עמידה)$/,'').trim();}
+export function heName(n:string){const src=fixOld(n.trim());if(!src)return src;
  // A bare catalog number after a Hebrew word ("מאג זכוכית 246") is a SKU, not part of the name.
  const out=src.split(/\s+\+\s+/).map(part).filter(Boolean).join(' + ').replace(/([\u0590-\u05FF][\u0590-\u05FF"'׳״]*)\s+\d{3,6}$/,'$1');
  return out.length>=3?out:src;}
