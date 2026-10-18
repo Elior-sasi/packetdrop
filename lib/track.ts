@@ -9,6 +9,9 @@ type Raw={number:string;track_info?:{latest_status?:{status?:string};time_metric
 async function call(path:string,body:unknown,key:string){const r=await fetch(BASE+path,{method:'POST',headers:{'17token':key,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('TRACK_HTTP_'+r.status);return r.json();}
 // Carrier events usually arrive in English; common phrasings are translated here (no translation quota, no outside service).
 const HE:[RegExp,string][]=[
+ [/ready for shipping|packed (?:at|in) (?:the )?warehouse|warehouse (?:processing|packed)|outbound (?:from |in )?(?:the )?warehouse.*ready/i,'נארזה במחסן ומוכנה למשלוח'],
+ [/shipped out from (?:the )?warehouse|left (?:the )?warehouse|departed (?:from )?(?:the )?warehouse|outbound from (?:the )?warehouse/i,'יצאה מהמחסן'],
+ [/arrived at (?:the )?warehouse|received (?:at|by) (?:the )?warehouse|inbound (?:at|in) (?:the )?warehouse/i,'הגיעה למחסן'],
  [/(?:departed|leaving|left|depart) (?:from )?(?:the )?departure country|(?:departed|left) (?:the )?(?:country|region) of origin|export (?:customs )?(?:clearance )?(?:completed|success)/i,'יצאה מארץ המוצא'],
  [/arrived at (?:the )?departure (?:transport )?(?:hub|center|centre|facility)|arrived at (?:the )?(?:origin|export) (?:hub|facility|center|centre)/i,'הגיעה למרכז השילוח בארץ המוצא'],
  [/arrived at (?:the )?line-?haul|line-?haul (?:office|arrival)|received by line-?haul/i,'הגיעה לחברת ההובלה הבינלאומית'],
@@ -45,12 +48,15 @@ export function toInfo(a:Raw):TrackInfo{const t=a.track_info||{};const status=t.
  const seen=new Set<string>();const uniq=events.filter(e=>{const k=e.time+e.text;if(seen.has(k))return false;seen.add(k);return true;}).sort((x,y)=>x.time.localeCompare(y.time));
  const ed=t.time_metrics?.estimated_delivery_date;
  return {number:a.number,status,stage:STATUS_STAGE[status]??-1,carrier:providers.at(-1)?.provider?.name||'',eta:ed&&(ed.from||ed.to)?{from:ed.from||undefined,to:ed.to||undefined}:null,events:uniq.slice(-40),pending:!t.latest_status};}
+// Carriers sometimes jump to "out for delivery" while the parcel is still in the origin country; trust step 3 only when the latest event says so.
+const STEP3=/יצאה למסירה|מוכנה לאיסוף|ממתינה לאיסוף|out for delivery|ready for (?:pick ?up|collection)|available for pick|awaiting (?:pick ?up|collection)|with (?:the )?courier/i;
+export function sane(t:TrackInfo):TrackInfo{if(t.stage!==3)return t;const last=t.events.at(-1);if(last&&STEP3.test(last.text))return t;return {...t,stage:t.events.length?2:-1,status:'InTransit'};}
 export async function track(numbers:string[],key:string){
  const list=[...new Set(numbers.map(n=>n.trim().toUpperCase()).filter(n=>/^[A-Z0-9-]{8,40}$/.test(n)))].slice(0,40);if(!list.length)return {};
  // Registering a number that is already registered is rejected (-18019901), so repeats do not use quota again.
  await call('/register',list.map(number=>({number,lang:'he'})),key).catch(()=>null);
  const d=await call('/gettrackinfo',list.map(number=>({number})),key);
- const out:Record<string,TrackInfo>={};for(const a of (d?.data?.accepted||[]) as Raw[])out[a.number]=toInfo(a);
+ const out:Record<string,TrackInfo>={};for(const a of (d?.data?.accepted||[]) as Raw[])out[a.number]=sane(toInfo(a));
  for(const n of list)if(!out[n])out[n]={number:n,status:'NotFound',stage:-1,carrier:'',eta:null,events:[],pending:true};
  return out;}
 // Cainiao (AliExpress logistics) public tracking page data. Unofficial and best-effort: any failure just returns nothing.
@@ -70,7 +76,7 @@ export type CnStatus='ok'|'blocked'|'none';
 export async function cainiao(numbers:string[]):Promise<{tracks:Record<string,TrackInfo>;status:CnStatus}>{const out:Record<string,TrackInfo>={};let status:CnStatus='none';
  const list=[...new Set(numbers.map(n=>n.trim().toUpperCase()).filter(n=>/^[A-Z0-9]{8,40}$/.test(n)))].slice(0,40);
  for(let i=0;i<list.length;i+=10){try{const r=await fetch('https://global.cainiao.com/global/detail.json?'+new URLSearchParams({mailNos:list.slice(i,i+10).join(','),lang:'en-US'}),{headers:{'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',Accept:'application/json',Referer:'https://global.cainiao.com/'},cache:'no-store',signal:AbortSignal.timeout(10000)});
-  if(!r.ok){if(status!=='ok')status='blocked';continue;}const d=await r.json().catch(()=>null);if(!d||!Array.isArray(d.module)){if(status!=='ok')status='blocked';continue;}status='ok';for(const m of (d?.module||[]) as CnMod[]){const t=fromCainiao(m);if(t)out[t.number]=t;}}catch{if(status!=='ok')status='blocked';}}
+  if(!r.ok){if(status!=='ok')status='blocked';continue;}const d=await r.json().catch(()=>null);if(!d||!Array.isArray(d.module)){if(status!=='ok')status='blocked';continue;}status='ok';for(const m of (d?.module||[]) as CnMod[]){const t=fromCainiao(m);if(t)out[t.number]=sane(t);}}catch{if(status!=='ok')status='blocked';}}
  return {tracks:out,status};}
 // Both sources together: the further-along status wins, and the event lists are combined.
 export function combine(a?:TrackInfo,b?:TrackInfo):TrackInfo|undefined{if(!a||a.pending&&!a.events.length)return b||a;if(!b)return a;
