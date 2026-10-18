@@ -37,7 +37,7 @@ const PICK_RE=/לאיסוף|איסוף|pick ?up|collection/i;
 // "Out for delivery today" needs an actual out-for-delivery update dated today, not just any update today.
 const outToday=(p:Parcel)=>p.stage===3&&!p.cancelled&&!isPickup(p)&&p.events.some(e=>OUT_RE.test(e.label)&&new Date(e.time).toDateString()===new Date().toDateString());
 const RETURNED=/יוחזר לשולח|הוחזר(?:ה)? לשולח|הוחזר(?:ה)? לשולח|return(?:ed)? to (?:the )?sender|לא נדרש בידי הנמען/i;
-const statusText=(p:Parcel)=>p.ret?(p.stage>=4?'ההחזרה הגיעה לחנות':'החזרה, השליח יאסוף ממך'):p.cancelled?'ההזמנה בוטלה':p.returned?'הוחזרה לשולח':p.got?'התקבלה':p.stale?'בלי עדכון מ־'+day(p.events.at(-1)?.time):p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
+const statusText=(p:Parcel)=>p.ret?(p.stage>=4?'ההחזרה הגיעה לחנות':'החזרה, השליח יאסוף ממך'):p.cancelled&&p.refund?'ההזמנה זוכתה':p.cancelled?'ההזמנה בוטלה':p.returned?'הוחזרה לשולח':p.got?'התקבלה':p.stale?'בלי עדכון מ־'+day(p.events.at(-1)?.time):p.stage<4&&p.carrierStatus==='Exception'?'בעיה במשלוח':p.stage<4&&p.carrierStatus==='DeliveryFailure'?'המסירה נכשלה':p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3&&!isPickup(p)?(outToday(p)?'יצאה למסירה היום':'אצל חברת המסירה'):p.stage===3&&p.carrierStatus==='AvailableForPickup'?'מוכנה לאיסוף':p.stage===3?'מוכנה לאיסוף':STATUS[p.stage];
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 // Mail subjects are long ("הזמנתך 21327277 בחנות X - המוצר נשלח"); the history shows just what happened.
 const SHORT:[RegExp,string][]=[[/בוטל|cancel/i,'ההזמנה בוטלה'],[/נמסר|delivered/i,'נמסרה'],[/לאיסוף|ready for pick ?up/i,'מוכנה לאיסוף'],[/יצא[הו]? למסירה|בדרך למסירה|out for delivery/i,'יצאה למסירה'],
@@ -367,7 +367,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
- const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled);
+ const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled||p.cancelled&&!!p.refund);
  // On the way: what is due first comes first (carrier date, else your own estimate); pickups and today's deliveries stay on top.
  const etaAt=(p:Parcel)=>{const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(m){const y=new Date().getFullYear();let t=new Date(y,+m[2]-1,+m[1]).getTime();if(t<Date.now()-60*864e5)t=new Date(y+1,+m[2]-1,+m[1]).getTime();return t;}const e=est(p);return e&&!e.late?e.from:e?.late?Date.now():Infinity;};
  const byEta=(list:Parcel[])=>[...list].sort((a,b)=>{const u=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return u(a)-u(b)||etaAt(a)-etaAt(b)||(b as {last?:number}).last!-(a as {last?:number}).last!;});

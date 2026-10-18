@@ -12,8 +12,8 @@ export function lines(all:Parcel[],names:Record<string,string>,when:Record<strin
  const list=all.filter(p=>!p.ret);const generic=(n:string)=>/^(?:הזמנה|חבילה)/.test(n);const nm=(p:Parcel)=>(names[p.id]||(generic(p.name)?(p.shop?'הזמנה מ־'+p.shop:'חבילה'):p.name)).slice(0,30);
  const out=list.filter(p=>isOut(p,now)),pick=list.filter(isPick),rest=list.filter(p=>!out.includes(p)&&!pick.includes(p));const L:Line[]=[];
  if(out.length){L.push({t:'למסירה היום',s:'big',c:'teal'});for(const p of out.slice(0,2))L.push({t:nm(p),s:'small',c:'light'});}
- if(pick.length){L.push({t:pick.length+' לאיסוף',s:out.length?'mid':'big',c:'teal'});for(const p of pick.slice(0,2))L.push({t:(p.pickup?.place||nm(p))+(p.pickup?.code?' · '+p.pickup.code:''),s:'small',c:'light'});}
+ if(pick.length){L.push({t:pick.length+' לאיסוף',s:out.length?'mid':'big',c:'teal'});for(const p of pick.slice(0,2)){L.push({t:p.pickup?.place||nm(p),s:'small',c:'light'});if(p.pickup?.code)L.push({t:'קוד '+p.pickup.code,s:'small',c:'teal'});}}
  if(rest.length)L.push({t:(out.length||pick.length?'עוד ':'')+rest.length+' בדרך',s:out.length||pick.length?'mid':'big',c:'white'});
- if(!out.length&&!pick.length){const next=rest.filter(p=>when[p.id]).sort((a,b)=>when[a.id]-when[b.id])[0];if(next)L.push({t:'הבאה: '+nm(next)+' · '+whenText(when[next.id],now),s:'small',c:'light'});}
+ if(!out.length&&!pick.length){const next=rest.filter(p=>when[p.id]).sort((a,b)=>when[a.id]-when[b.id])[0];if(next){L.push({t:'הבאה '+whenText(when[next.id],now),s:'mid',c:'teal'});L.push({t:nm(next),s:'small',c:'light'});}}
  if(!L.length)L.push({t:'אין חבילות בדרך',s:'mid',c:'gray'});
  return L;}
