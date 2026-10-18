@@ -1,4 +1,8 @@
 // 17TRACK carrier tracking (server side only; the key never reaches the browser).
+// "ישראל,ירושלים,מחוז ירושלים" → "ירושלים": no country, no district that repeats the city, spaces after commas.
+export function tidyPlace(raw:string){const parts=raw.split(/\s*,\s*/).map(x=>x.trim()).filter(Boolean).filter(x=>!/^(?:ישראל|israel|IL)$/i.test(x));
+ const out:string[]=[];for(const x of parts){const bare=x.replace(/^(?:מחוז|district of)\s+/i,'').replace(/\s+(?:district|מחוז)$/i,'');if(out.some(o=>o===bare||o===x))continue;out.push(bare===x||!parts.includes(bare)?x:bare);}
+ return [...new Set(out.map(x=>x.replace(/^מחוז\s+(.+)$/,(m,c)=>out.includes(c)?'':m)).filter(Boolean))].join(', ');}
 export type TrackEvent={time:string;text:string;location:string};
 export type TrackInfo={number:string;status:string;stage:number;carrier:string;eta:{from?:string;to?:string}|null;events:TrackEvent[];pending?:boolean};
 import {tapuz,kexpress} from '@/lib/tapuz';
@@ -51,7 +55,7 @@ const HE:[RegExp,string][]=[
 ];
 export function heEvent(text:string):string{const m=text?.match(/^\s*\[([^\]]{1,40})\]\s*(.+)$/);if(m){const t=heEvent(m[2]);return t===m[2]?text:t+' · '+m[1];}if(!text||/[֐-׿]/.test(text))return text;for(const [r,he] of HE)if(r.test(text))return he;return text;}
 export function toInfo(a:Raw):TrackInfo{const t=a.track_info||{};const status=t.latest_status?.status||'NotFound';const providers=t.tracking?.providers||[];
- const events=providers.flatMap(p=>(p.events||[]).map(e=>({time:e.time_utc||e.time_iso||'',text:heEvent((e.description_translation?.description||e.description||'').trim()),location:(e.location||'').trim()}))).filter(e=>e.time&&e.text);
+ const events=providers.flatMap(p=>(p.events||[]).map(e=>({time:e.time_utc||e.time_iso||'',text:heEvent((e.description_translation?.description||e.description||'').trim()),location:tidyPlace(e.location||'')}))).filter(e=>e.time&&e.text);
  const seen=new Set<string>();const uniq=events.filter(e=>{const k=e.time+e.text;if(seen.has(k))return false;seen.add(k);return true;}).sort((x,y)=>x.time.localeCompare(y.time));
  const ed=t.time_metrics?.estimated_delivery_date;
  return {number:a.number,status,stage:STATUS_STAGE[status]??-1,carrier:providers.at(-1)?.provider?.name||'',eta:ed&&(ed.from||ed.to)?{from:ed.from||undefined,to:ed.to||undefined}:null,events:uniq.slice(-40),pending:!t.latest_status};}

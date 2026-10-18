@@ -4,7 +4,7 @@ import {heName} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
-import {heEvent,type TrackInfo} from '@/lib/track';
+import {heEvent,tidyPlace,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean;real?:number};
 type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
@@ -55,7 +55,7 @@ const etaText=(e:TrackInfo['eta'])=>{if(!e)return '';const a=day(e.from),b=day(e
 // Carrier data (17TRACK) refines what the mails say: later step, carrier name, estimate, extra timeline events.
 function withCarrier(p:MailParcel,t?:TrackInfo):Parcel{if(!t||!p.tracking&&!t.number.startsWith('TZ:'))return p;
  const stage=p.cancelled?p.stage:Math.max(p.stage,t.stage);
- const events:Event[]=[...p.events,...t.events.map(e=>({id:'trk:'+e.time+e.text,label:heEvent(e.text)+(e.location?' · '+e.location:''),time:new Date(e.time).toISOString(),src:t.carrier||'חברת השילוח'}))].sort((a,b)=>a.time.localeCompare(b.time));
+ const events:Event[]=[...p.events,...t.events.map(e=>({id:'trk:'+e.time+e.text,label:heEvent(e.text)+(tidyPlace(e.location||'')?' · '+tidyPlace(e.location||''):''),time:new Date(e.time).toISOString(),src:t.carrier||'חברת השילוח'}))].sort((a,b)=>a.time.localeCompare(b.time));
  return {...p,stage,carrier:p.carrier||t.carrier,eta:stage>=4?'':p.eta||etaText(t.eta),events,carrierStatus:t.status,trackPending:t.pending};}
 // Navigation to a pickup point: Google Maps, Waze and Moovit (Moovit needs coordinates, looked up once per address).
 const placeQuery=(pk:{place:string;address:string})=>[pk.place,pk.address].filter(Boolean).join(' ');
