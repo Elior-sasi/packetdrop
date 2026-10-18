@@ -175,7 +175,7 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
  const x=348-T*338;
  return <button className="nextCard nc-ring" onClick={onOpen} aria-label={label}>
   <div className="nc-row"><Thumb p={p}/><div className="nc-info"><div className="nc-k">{k}</div><div className="nc-nm">{bidi(p.name)}</div>
-   <div className="nc-cd">{pick?<><b>{p.pickup?.code||'✓'}</b><span>{p.pickup?.code?'קוד · ':''}{p.pickup?.place||''}</span></>:today||days<=0?<b>היום</b>:days===1?<><b>מחר</b><span>{'צפי '+dd(when)}</span></>:<><b>{days}</b><span>{'ימים · צפי '+dd(when)}</span></>}</div></div></div>
+   <div className="nc-cd">{pick?<><b>{p.pickup?.code||'✓'}</b>{p.pickup?.place&&<span>{p.pickup.place}</span>}</>:today||days<=0?<b>היום</b>:days===1?<><b>מחר</b><span>{'צפי '+dd(when)}</span></>:<><b>{days}</b><span>{'ימים · צפי '+dd(when)}</span></>}</div></div></div>
   <svg className="nc-trk" viewBox="0 0 358 40" aria-hidden="true"><line x1="10" y1="16" x2="348" y2="16" stroke="#2a4a66" strokeWidth="3" strokeDasharray="6 6"/><line x1="348" y1="16" x2={x} y2="16" stroke="#2ed3c6" strokeWidth="4" strokeLinecap="round"/>
    <circle cx="348" cy="16" r="6" fill="#4aa8ff"/><circle cx="10" cy="16" r="6" fill={T>=1?'#3fd49a':'#33414f'}/><circle cx={x} cy="16" r="9" fill="#2ed3c6"><animate attributeName="r" values="7;10;7" dur="1.8s" repeatCount="indefinite"/></circle>
    <text x="348" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">{abroad(p)?'חו"ל':'החנות'}</text><text x="12" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">אתה</text></svg></button>;}
