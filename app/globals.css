@@ -264,3 +264,8 @@ nav{touch-action:none}nav.dragging:before{transition:none}
 .hero,.galTrack{height:auto;aspect-ratio:5/4;max-height:420px}
 .hero>img.photo.fill,.galTrack img{object-fit:contain;background:#fff}
 .hero:has(>img.photo.fill){background:#fff}
+/* The photo exactly as the store shows it: whole, uncropped, the frame takes the photo's own shape (like the AliExpress page). */
+.hero:has(>img.photo.fill){height:auto;aspect-ratio:auto;max-height:none;display:block;background:transparent}
+.hero>img.photo.fill{position:static;width:100%;height:auto;object-fit:initial;display:block}
+.galTrack{height:auto;aspect-ratio:1/1;max-height:none}
+.galTrack img{object-fit:cover}

@@ -8,8 +8,8 @@ import {heEvent,tidyPlace,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean;real?:number;returned?:boolean};
 type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
-// Product photos go through our server, which cuts off the white bars stores pad them with.
-function trimmed(src:string,f='w'){return /^https:\/\/[^/]*(?:aliexpress-media\.com|alicdn\.com|media-amazon\.com|ssl-images-amazon\.com|cdn\.shopify\.com)\//i.test(src)?'/api/img?f='+f+'&u='+encodeURIComponent(src):src;}
+// Product photos are shown exactly as the store serves them.
+function trimmed(src:string,_f='w'){return src;}
 const STATUS=['ההזמנה התקבלה','נשלחה','בדרך','מוכנה לאיסוף / במסירה','נמסרה'];
 const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
 // A parcel that went quiet is not delivered; its steps stay where the last real update left them.
