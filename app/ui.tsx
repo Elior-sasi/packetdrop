@@ -167,6 +167,13 @@ function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=3|
   let from=t0+pct(a,.25)*864e5,to=t0+pct(a,.75)*864e5;const now=Date.now();const late=now>t0+pct(a,.9)*864e5+864e5;
   if(from<now)from=now+864e5/2;if(to<from)to=from;return {from:noSat(from),to:noSat(to),n:a.length,avg:Math.round(a.reduce((x,y)=>x+y,0)/a.length),late,scope,stage:MILES[k][0]};}
  return null;}
+// The store's delivery window is written when the parcel leaves China and is often far too cautious.
+// Once the parcel is in Israel, YOUR past parcels from the same point say better: if they say it comes sooner, that wins.
+const ISRAEL_MILES=new Set(['מההגעה לישראל','מהשחרור ממכס','מחברת המסירה']);let learnCache:{all:Parcel[];days:Record<string,number[]>}|null=null;
+function freshEta(p:Parcel,all:Parcel[]):Parcel{if(!p.eta||p.stage>=3||p.cancelled)return p;const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(!m)return p;
+ if(learnCache?.all!==all)learnCache={all,days:learn(all)};const e=estimate({...p,eta:''},learnCache.days);if(!e||e.late||!ISRAEL_MILES.has(e.stage))return p;
+ const y=new Date().getFullYear();let start=new Date(y,+m[2]-1,+m[1]).getTime();if(start<Date.now()-60*864e5)start=new Date(y+1,+m[2]-1,+m[1]).getTime();
+ return e.to<start-864e5?{...p,eta:''}:p;}
 const dd=(t:number)=>{const d=new Date(t);return d.getDate()+'.'+(d.getMonth()+1);};
 const estText=(e:Est)=>e.late?'מתעכבת מהרגיל':dd(e.from)===dd(e.to)?dd(e.from):dd(e.from)+'-'+dd(e.to);
 // ---- AliExpress buyer protection: the order is about to be closed but the parcel has not arrived ----
@@ -375,7 +382,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const returned=!got&&RETURNED.test(p.events.at(-1)?.label||'');
   return {...p,got,returned,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got&&!returned,ask:ask&&!returned,last,stage:stale||got||returned?4:p.stage,real:p.stage,name:titles[p.id]||byPhoto(m)||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
-  .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames]);
+  .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}).map((p,_,all)=>freshEta(p,all)),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled||p.cancelled&&!!p.refund);
  // On the way: what is due first comes first (carrier date, else your own estimate); pickups and today's deliveries stay on top.
