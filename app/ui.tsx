@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {heName} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
@@ -30,7 +31,7 @@ const shortLabel=(s:string)=>{if(s.length<=22&&!/\d{5,}/.test(s))return s;for(co
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
 const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|הזמנתך|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^(?:תודה|אישור (?:ה)?הזמנה|order confirm|thank you for your order|thanks for your order)/i.test(name)||/^\S*\d{8,}/.test(name);
 const isGenericName=(p:{name:string})=>/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(p.name);
-const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):polishName(p.name);
+const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):heName(polishName(p.name));
 // Bump when mail parsing changes: mail from the last 180 days is then read again with the new rules.
 const PARSER=4;
 const keepOld=(list:MailParcel[])=>list.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()>175*864e5);
@@ -84,6 +85,10 @@ function Route({p}:{p:Parcel}){if(p.cancelled)return null;const evs=[...p.events
  const hit=ROUTE.map(([,r],i)=>i===0?evs[0]:i===9&&p.stage>=4?(evs.find(e=>r.test(e.label))||evs.at(-1)):i===8&&p.stage>=3?(evs.find(e=>r.test(e.label))||null):evs.find(e=>r.test(e.label))||null);
  let last=-1;hit.forEach((h,i)=>{if(h)last=i;});if(p.stage>=4)last=9;
  return <section className="box"><h3>מסלול</h3><ol className="route">{steps.map(i=>{const label=i===2&&!abroad(p)?'נשלחה':ROUTE[i][0];const done=i<=last;const h=hit[i];return <li key={label} className={(done?'d ':'')+(i===last?'c':'')}><span className="rdot"/><b>{label}</b>{done&&h&&<time>{new Date(h.time).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})}</time>}</li>;})}</ol></section>;}
+// Steps still ahead, shown greyed at the bottom of the timeline.
+function upcoming(p:Parcel){if(p.cancelled||p.stage>=4)return [] as string[];const evs=p.events;const steps=abroad(p)?ROUTE.map((_,i)=>i):LOCAL;
+ let last=0;ROUTE.forEach(([,r],i)=>{if(i>0&&i<9&&evs.some(e=>r.test(e.label)))last=Math.max(last,i);});if(p.stage>=3)last=Math.max(last,8);else if(p.stage>=1)last=Math.max(last,2);
+ return steps.filter(i=>i>last).map(i=>i===2&&!abroad(p)?'נשלחה':ROUTE[i][0]);}
 // Courier mails (HFD, Cheetah...) often lack the product: pair each with a different AliExpress order that was on its way just before
 // (closest first, one order per courier parcel) and show the two as one parcel.
 function pairCouriers<T extends Parcel&{stale?:boolean}>(P:T[],titles:Record<string,string>):T[]{
@@ -452,14 +457,13 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <button className="primary" onClick={()=>{void copy(disputeText(open));const u=orderUrl(open);if(u)window.open(u,'_blank','noopener');}}>{copied===disputeText(open)?'הועתק ✓ ':''}העתק הודעה ופתח את ההזמנה</button>
    <button className="ghost" onClick={()=>mark(open,'got')}>החבילה הגיעה</button></section>;})()}
   {showMap&&<Journey p={open}/>}
-  <Route p={open}/>
   {open.pickup&&open.stage<4&&!open.cancelled&&<section className="box pickup"><h3><MapPin size={18}/> נקודת איסוף</h3>
    {open.pickup.place&&<p className="place">{open.pickup.place}</p>}{open.pickup.address&&<p className="addr">{open.pickup.address}</p>}{open.pickup.hours&&<p className="addr">שעות: {open.pickup.hours}</p>}
    {open.pickup.code&&<button className="code" onClick={()=>copy(open.pickup!.code)} aria-label={'קוד איסוף '+open.pickup.code.split('').join(' ')+', העתקה'}><KeyRound size={20}/><span>קוד איסוף</span><b dir="ltr">{open.pickup.code}</b>{copied===open.pickup.code?' ✓':<Copy size={17}/>}</button>}
    {(open.pickup.address||open.pickup.place)&&<NavLinks pk={open.pickup} geo={geo[placeQuery(open.pickup)]}/>}
    {open.pickup.url&&<div className="pickActions"><a className="ghost" href={open.pickup.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/> שעות פתיחה</a></div>}</section>}
   {open.tracking&&trackState==='on'&&open.trackPending&&open.stage<4&&<p className="trackNote">מספר המעקב נרשם אצל חברת השילוח. העדכונים שלה יופיעו כאן בדקות הקרובות.</p>}
-  <section className="box"><h3>היסטוריה</h3>{[...timeline(open.events)].reverse().map((e,i)=><div key={e.id} className={'ev '+(!i?'l':'')}><span className="dot"/><div><strong dir="auto">{e.src?cleanLabel(e.label):shortLabel(cleanLabel(e.label))}</strong>{e.src?<span className="src">מ־{e.src}</span>:e.id.startsWith('manual:')?null:<a href={'https://mail.google.com/mail/u/?authuser='+encodeURIComponent(user?.email||'')+'#all/'+encodeURIComponent(e.id)} target="_blank" rel="noopener noreferrer">המייל המקורי <ExternalLink size={13}/></a>}</div><time dateTime={e.time}>{when(e.time)}</time></div>)}</section>
+  <section className="box"><h3>מסלול</h3>{[...timeline(open.events)].reverse().map((e,i)=><div key={e.id} className={'ev '+(!i?'l':'')}><span className="dot"/><div><strong dir="auto">{e.src?cleanLabel(e.label):shortLabel(cleanLabel(e.label))}</strong>{e.src?<span className="src">מ־{e.src}</span>:e.id.startsWith('manual:')?null:<a href={'https://mail.google.com/mail/u/?authuser='+encodeURIComponent(user?.email||'')+'#all/'+encodeURIComponent(e.id)} target="_blank" rel="noopener noreferrer">המייל המקורי <ExternalLink size={13}/></a>}</div><time dateTime={e.time}>{when(e.time)}</time></div>)}{upcoming(open).length>0&&<div className="ahead" aria-label={'השלבים הבאים: '+upcoming(open).join(', ')}>{upcoming(open).map((l,i)=><div key={l} className={'ev f'+(!i?' n':'')}><span className="dot"/><div><strong>{!i?'הבא: '+l:l}</strong></div></div>)}</div>}</section>
   {(open.tracking||open.order||open.url)&&<section className="box">
    {open.tracking&&<div className="kv"><span>מספר מעקב</span><button className="copy" onClick={()=>copy(open.tracking)}><b dir="ltr">{open.tracking}</b>{copied===open.tracking?' ✓':<Copy size={15}/>}</button></div>}
    {open.order&&<div className="kv"><span>מספר הזמנה</span><button className="copy" onClick={()=>copy(open.order)}><b dir="ltr">{open.order}</b>{copied===open.order?' ✓':<Copy size={15}/>}</button></div>}
