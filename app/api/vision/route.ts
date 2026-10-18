@@ -22,7 +22,7 @@ export async function POST(req:NextRequest){const H={'Cache-Control':'no-store'}
  for(const u of todo.slice(0,Math.max(0,40-used))){try{
    const img=await fetch(u,{signal:AbortSignal.timeout(8000)});if(!img.ok)continue;const buf=Buffer.from(await img.arrayBuffer());if(buf.length>4_000_000)continue;
    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:img.headers.get('content-type')?.split(';')[0]||'image/jpeg',data:buf.toString('base64')}},{text:PROMPT}]}],generationConfig:{temperature:0.2,maxOutputTokens:40}})});
+    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:img.headers.get('content-type')?.split(';')[0]||'image/jpeg',data:buf.toString('base64')}},{text:PROMPT}]}],generationConfig:{temperature:0.2,maxOutputTokens:40,thinkingConfig:{thinkingBudget:0}}})});
    if(!r.ok)continue;const j=await r.json();const t=String(j?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/["'״׳.\n]/g,' ').replace(/\s+/g,' ').trim();
    if(!t||t.length>40||!/[֐-׿]/.test(t))continue;const k=key(u);names[k]=t;if(sql)await sql`insert into photo_names(k,name) values(${k},${t}) on conflict(k) do nothing`;
   }catch{}}

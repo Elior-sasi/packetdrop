@@ -1,8 +1,8 @@
 // Decides which phone notifications a change in parcels deserves. Pure, so it can be tested without Gmail.
 import type {Parcel} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
-export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck'|'guard'|'customs';title:string;body:string;tag:string};
-export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>;reminded?:Record<string,number[]>;weekly?:string;morning?:string};
+export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck'|'guard'|'customs'|'check';title:string;body:string;tag:string};
+export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>;reminded?:Record<string,number[]>;weekly?:string;morning?:string;checked?:string[]};
 const DAY=864e5;
 export const GUARD=/בהמתנה לאישור|תסומן בקרוב כהזמנה שהושלמה|will be marked as completed|confirm receipt/i;
 const PICKUP=/לאיסוף|איסוף|pick ?up|collection/i;
@@ -43,7 +43,9 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
  }
  // A parcel with no news for 10 days gets one heads-up; 30+ days counts as received, so it is left alone.
  for(const p of after){if(marked(p)||p.ret)continue;const age=now-last(p);
-  if(p.stage<3&&!p.cancelled&&age>10*DAY&&age<30*DAY&&!stuck.has(p.id)){stuck.add(p.id);notes.push({id:p.id,kind:'stuck',title:'אין עדכון כבר 10 ימים',body:name10(p),tag:'s:'+p.id});}
+  // Paid but the seller has not shipped after a week: still easy to cancel and get the money back.
+  {const placed=now-new Date(p.events[0]?.time||0).getTime();if(p.stage===0&&!p.cancelled&&placed>7*DAY&&placed<20*DAY&&!stuck.has('ns:'+p.id)){stuck.add('ns:'+p.id);notes.push({id:p.id,kind:'stuck',title:'המוכר עוד לא שלח, עבר שבוע',body:nameOf(p)+' · אפשר לבטל ולקבל את הכסף בחזרה',tag:'ns:'+p.id});}}
+  if(p.stage<3&&!p.cancelled&&age>10*DAY&&age<30*DAY&&!stuck.has(p.id)&&!stuck.has('ns:'+p.id)){stuck.add(p.id);notes.push({id:p.id,kind:'stuck',title:'אין עדכון כבר 10 ימים',body:name10(p),tag:'s:'+p.id});}
   if(p.stage>=3)stuck.delete(p.id);}
  return {notes,stuck:[...stuck].slice(-300)};
 }
@@ -86,3 +88,14 @@ export function morning(state:State,now=new Date()):{note:Note|null;day:string}{
  const line=(p:Parcel)=>nameOf(p)+(waitingAtPickup(p)?(p.pickup?.place?' ב'+p.pickup.place:'')+(p.pickup?.code?' · קוד '+p.pickup.code:''):'');
  const body=[...out,...pick].slice(0,3).map(line).join('\n')+(out.length+pick.length>3?'\nועוד '+(out.length+pick.length-3):'');
  return {note:{id:(out[0]||pick[0]).id,kind:'pickup',title,body,tag:'m:'+day},day};}
+// After delivery, one reminder to check the item while it can still be returned:
+// marketplaces (dispute) on day 3; Israeli stores on day 10 of the 14 days the consumer protection law gives for cancelling an online purchase.
+const MARKET=/AliExpress|Temu|SHEIN|eBay|Amazon|iHerb/i;
+export function checkups(state:State,now=Date.now()):{notes:Note[];checked:string[]}{
+ const done=new Set(state.checked||[]);const notes:Note[]=[];const marks=state.marks||{};
+ for(const p of state.parcels){if(p.stage!==4||p.cancelled||p.ret||p.refund||done.has(p.id)||marks[p.id]==='hide'||p.keys.some(k=>marks[k]==='hide'))continue;
+  const age=now-last(p);const market=MARKET.test(p.shop||'');const at=market?3:10;
+  if(age<at*DAY||age>=(at+2)*DAY)continue;done.add(p.id);
+  notes.push(market?{id:p.id,kind:'check',title:'בדקת שהכל תקין?',body:nameOf(p)+' · אם יש בעיה, כדאי לפתוח מחלוקת עכשיו',tag:'k:'+p.id}
+   :{id:p.id,kind:'check',title:'נשארו 4 ימים להחזרה',body:nameOf(p)+' · לפי חוק הגנת הצרכן, ברוב המוצרים אפשר לבטל קנייה באינטרנט עד 14 יום מהקבלה',tag:'k:'+p.id});}
+ return {notes,checked:[...done].slice(-400)};}

@@ -17,7 +17,7 @@ export async function shortNames(input:string[],sql:Sql|null):Promise<Record<str
  const todo=titles.filter(t=>!out[t]);
  if(todo.length){try{
   const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',signal:AbortSignal.timeout(25000),headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-   body:JSON.stringify({contents:[{parts:[{text:PROMPT+'\n\n'+JSON.stringify(todo)}]}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}})});
+   body:JSON.stringify({contents:[{parts:[{text:PROMPT+'\n\n'+JSON.stringify(todo)}]}],generationConfig:{temperature:0.2,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}})});
   if(r.ok){const j=await r.json();const arr=JSON.parse(String(j?.candidates?.[0]?.content?.parts?.[0]?.text||'[]'));
    if(Array.isArray(arr)&&arr.length===todo.length)for(let i=0;i<todo.length;i++){const n=String(arr[i]||'').replace(/\s+/g,' ').trim();if(n&&n.length<=45){out[todo[i]]=n;if(sql)await sql`insert into name_cache(k,title,name) values(${h(todo[i])},${todo[i]},${n}) on conflict(k) do nothing`;}}}
  }catch{}}

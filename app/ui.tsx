@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {heName} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
-import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X} from 'lucide-react';
+import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X,Share2,Wallet} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,photoKey,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,tidyPlace,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean;real?:number;returned?:boolean};
@@ -49,6 +49,8 @@ const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|הזמנתך|your o
 const isGenericName=(p:{name:string})=>/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(p.name);
 // Names Gemini wrote for store titles (when it is on); each part of a "A + B" title is looked up on its own.
 const GEM:Record<string,string>={};
+// Photo descriptions for VoiceOver (from /api/describe), by image URL.
+const DESC:Record<string,string>={};
 const nice=(raw:string)=>raw.split(' + ').map(x=>{const m=x.match(/^(.*?)( ועוד \d+)?$/)!;return (GEM[m[1]]||heName(polishName(m[1])))+(m[2]||'');}).join(' + ');
 const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא|^דואר ישראל$/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):nice(p.name)+(p.qty&&p.qty>1?' ×'+p.qty:'');
 // Bump when mail parsing changes: mail from the last 180 days is then read again with the new rules.
@@ -96,7 +98,7 @@ function Zoom({src,alt,onClose}:{src:string;alt:string;onClose:()=>void}){const 
    <img ref={img} src={src} alt={alt} referrerPolicy="no-referrer" draggable={false} style={{transform:`translate(${t.x}px,${t.y}px) scale(${t.s})`}}/></div></div>;}
 // Several photos: one at a time, swiped sideways, with dots that show where you are.
 function Gallery({imgs}:{imgs:string[]}){const [at,setAt]=useState(0);const [big,setBig]=useState<number|null>(null);
- return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={trimmed(src)} alt={'תמונה '+(i+1)+' מתוך '+imgs.length} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer" role="button" tabIndex={0} onClick={()=>setBig(i)}/>)}</div>{big!==null&&<Zoom src={imgs[big]} alt={'תמונה '+(big+1)+' מתוך '+imgs.length} onClose={()=>setBig(null)}/>}
+ return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={trimmed(src)} alt={'תמונה '+(i+1)+' מתוך '+imgs.length+(DESC[src]?': '+DESC[src]:'')} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer" role="button" tabIndex={0} onClick={()=>setBig(i)}/>)}</div>{big!==null&&<Zoom src={imgs[big]} alt={'תמונה '+(big+1)+' מתוך '+imgs.length+(DESC[imgs[big]]?': '+DESC[imgs[big]]:'')} onClose={()=>setBig(null)}/>}
   <div className="dots" aria-hidden="true">{imgs.map((_,i)=><i key={i} className={i===at?'on':''}/>)}</div></div>;}
 function Thumb({p,big}:{p:Parcel;big?:boolean}){if(p.images&&p.images.length>1){
  // Card: the first item fills the square, the second sits as a small inset so neither is cut in half.
@@ -104,7 +106,7 @@ function Thumb({p,big}:{p:Parcel;big?:boolean}){if(p.images&&p.images.length>1){
  return <Gallery imgs={p.images.slice(0,12)}/>;}
  return <ThumbOne p={p} big={big}/>;}
 function ThumbOne({p,big}:{p:Parcel;big?:boolean}){const [failed,setFailed]=useState(false),[brandFailed,setBrandFailed]=useState(false);const [zoom,setZoom]=useState(false);const d=domainOf(p.shop)||domainOf(p.carrier);
- return <div className={big?'hero':'thumb'}>{p.image&&!failed?<>{<img className={'photo'+(big?' fill':'')} src={trimmed(p.image,big?'w':'sq')} alt={big?'תמונת המוצר':''} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)} {...(big?{role:'button',tabIndex:0,onClick:()=>setZoom(true)}:{})}/>}{big&&zoom&&<Zoom src={p.image} alt="תמונת המוצר" onClose={()=>setZoom(false)}/>}</>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
+ return <div className={big?'hero':'thumb'}>{p.image&&!failed?<>{<img className={'photo'+(big?' fill':'')} src={trimmed(p.image,big?'w':'sq')} alt={big?'תמונת המוצר'+(DESC[p.image]?': '+DESC[p.image]:''):''} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)} {...(big?{role:'button',tabIndex:0,onClick:()=>setZoom(true)}:{})}/>}{big&&zoom&&<Zoom src={p.image} alt={'תמונת המוצר'+(DESC[p.image]?': '+DESC[p.image]:'')} onClose={()=>setZoom(false)}/>}</>:d&&!brandFailed?<img className="brandThumb" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=128'} alt="" referrerPolicy="no-referrer" onError={()=>setBrandFailed(true)}/>:<Package size={big?72:34}/>}</div>;}
 function Meta({p}:{p:Parcel}){return <div className="meta"><Favicon name={p.shop}/><span dir="auto">{p.shop}</span>{p.carrier&&<><span className="sep">·</span><span dir="auto">{p.carrier}</span></>}</div>;}
 // Detailed route, like the carrier sites: each milestone is lit by a real event (or by a later one), with its date.
 const ROUTE:[string,RegExp][]=[
@@ -171,6 +173,11 @@ const estText=(e:Est)=>e.late?'מתעכבת מהרגיל':dd(e.from)===dd(e.to)?
 const GUARD_RE=/בהמתנה לאישור|תסומן בקרוב כהזמנה שהושלמה|will be marked as completed|confirm receipt/i;
 const guardOf=(p:Parcel)=>{if(p.stage>=4||p.cancelled||!/AliExpress/i.test(p.shop))return null;const e=[...p.events].reverse().find(e=>GUARD_RE.test(e.label));if(!e)return null;const age=(Date.now()-new Date(e.time).getTime())/864e5;return age<15?{since:e.time,age}:null;};
 // Customs is open while nothing later than the customs notice happened.
+// Text for whoever collects a parcel on the user's behalf: what, where, the code and the hours.
+function sharePickup(p:Parcel){const k=p.pickup;if(!k)return;const text=['חבילה לאיסוף: '+p.name,k.place?'איפה: '+k.place+(k.address?', '+k.address:''):'',k.code?'קוד איסוף: '+k.code:'',k.hours?'שעות: '+k.hours:'',p.tracking?'מספר מעקב: '+p.tracking:''].filter(Boolean).join('\n');
+ const nav=navigator as Navigator&{share?:(d:{text:string})=>Promise<void>};if(nav.share)void nav.share({text}).catch(()=>{});else void navigator.clipboard?.writeText(text).catch(()=>{});}
+// Money: "₪49.95", "49.95₪", "$5" -> shekels (dollars are left out rather than guessed).
+const shekels=(v?:string)=>{if(!v||!/₪/.test(v))return 0;const n=parseFloat(v.replace(/[^\d.]/g,''));return Number.isFinite(n)?n:0;};
 const refundText=(p:Parcel)=>!p.refund?'':(p.refund.bonus?'הוחזר כבונוס באתר':p.refund.amount?'הוחזרו':'בוצע החזר כספי')+(p.refund.amount?' '+p.refund.amount:'')+' · '+day(p.refund.at);
 const customsDue=(p:Parcel)=>p.customs&&p.stage<3&&!p.cancelled&&!p.events.some(e=>e.time>p.customs!.at&&/שוחררה|נמסר|לאיסוף|יצאה למסירה|released|delivered/i.test(e.label))?p.customs:null;
 const orderUrl=(p:Parcel)=>p.order&&/AliExpress/i.test(p.shop)?'https://www.aliexpress.com/p/order/detail.html?orderId='+p.order:'';
@@ -347,6 +354,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  useEffect(()=>{const want:string[]=[];for(const m of data?.parcels||[]){if(!isGeneric(m.name)||m.stage>=4||m.cancelled)continue;const imgs=[m.image,...(m.images||[])].filter(Boolean) as string[];if(!imgs.length||imgs.some(u=>photoNames[photoKey(u)]))continue;for(const u of imgs)if(!visionNames[photoKey(u)]&&!asked.current.has(u)&&/aliexpress-media|alicdn|media-amazon|cdn\.shopify/.test(u))want.push(u);}
   if(!want.length)return;want.forEach(u=>asked.current.add(u));
   fetch('/api/vision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:want.slice(0,6)})}).then(r=>r.json()).then(d=>{if(d?.names&&Object.keys(d.names).length)setVisionNames(v=>{const n={...v,...d.names};try{localStorage.setItem('pd_vision',JSON.stringify(n));}catch{}return n;});}).catch(()=>{});},[data,photoNames,visionNames]);
+ const [,setDescTick]=useState(()=>{try{Object.assign(DESC,JSON.parse(localStorage.getItem('pd_desc')||'{}'));}catch{}return 0;});const descAsked=useRef(new Set<string>());
+ useEffect(()=>{if(!openId)return;const p=(data?.parcels||[]).find(x=>x.id===openId);if(!p)return;const want=[...new Set([...(p.images||[]),p.image].filter(u=>u&&!DESC[u]&&!descAsked.current.has(u)))].slice(0,6);if(!want.length)return;want.forEach(u=>descAsked.current.add(u));
+  fetch('/api/describe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:want}),signal:AbortSignal.timeout(40000)}).then(r=>r.json()).then(d=>{if(d?.desc&&Object.keys(d.desc).length){Object.assign(DESC,d.desc);try{const keep=Object.fromEntries(Object.entries(DESC).slice(-300));localStorage.setItem('pd_desc',JSON.stringify(keep));}catch{}setDescTick(x=>x+1);}}).catch(()=>{});},[openId,data]);
  const [gemTick,setGemTick]=useState(()=>{try{Object.assign(GEM,JSON.parse(localStorage.getItem('pd_gem')||'{}'));}catch{}return 0;});const gemAsked=useRef(new Set<string>());
  useEffect(()=>{const want:string[]=[];for(const m of data?.parcels||[]){if(isGeneric(m.name)||!/AliExpress|Temu|SHEIN/i.test(m.shop))continue;for(const t of [...m.name.replace(/ ועוד \d+$/,'').split(' + '),...(m.items||[])])if(t&&!GEM[t]&&!gemAsked.current.has(t)&&!/^הזמנה …/.test(t))want.push(t);}
   if(!want.length)return;const batch=[...new Set(want)].slice(0,25);batch.forEach(t=>gemAsked.current.add(t));
@@ -456,7 +466,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const shops=Object.entries(ordered.reduce((m,p)=>{const k=p.shop||'אחר';m[k]=(m[k]||0)+1;return m;},{} as Record<string,number>)).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const durs=all.filter(p=>p.stage===4&&!p.stale&&!p.got&&!p.returned&&p.events.length>1).map(p=>(new Date(p.events.at(-1)!.time).getTime()-new Date(first(p)).getTime())/864e5).filter(x=>x>0.5&&x<120);
   const avg=durs.length?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):0;
-  return {label:ref.toLocaleDateString('he-IL',{month:'long',year:'numeric'}),ordered:ordered.length,delivered:delivered.length,shops,avg,fast:durs.length?Math.round(Math.min(...durs)):0,slow:durs.length?Math.round(Math.max(...durs)):0,n:durs.length};},[parcels,month]);
+  // Spending: orders placed this month (cancelled ones too) minus money that came back this month.
+  const paid=parcels.filter(p=>!p.ret&&inMonth(first(p)));const spent=paid.reduce((a,p)=>a+shekels(p.price),0);const byShop=Object.entries(paid.reduce((m,p)=>{const v=shekels(p.price);if(v){const k=p.shop||'אחר';m[k]=(m[k]||0)+v;}return m;},{} as Record<string,number>)).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const back=parcels.filter(p=>p.refund&&inMonth(p.refund.at));const refunded=back.filter(p=>!p.refund!.bonus).reduce((a,p)=>a+shekels(p.refund!.amount),0),bonus=back.filter(p=>p.refund!.bonus).reduce((a,p)=>a+shekels(p.refund!.amount),0);const unknown=paid.filter(p=>!shekels(p.price)).length;
+  return {spent,byShop,refunded,bonus,unknown,label:ref.toLocaleDateString('he-IL',{month:'long',year:'numeric'}),ordered:ordered.length,delivered:delivered.length,shops,avg,fast:durs.length?Math.round(Math.min(...durs)):0,slow:durs.length?Math.round(Math.max(...durs)):0,n:durs.length};},[parcels,month]);
 // The animation replaces the list on first load and while new mail is read; a quick check on return keeps the list.
  // The loader only covers an empty screen; parcels already known stay visible while new mail is read.
  const waiting=(!data&&!error)||(busy&&!data?.parcels.length);
@@ -555,6 +568,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {!(waiting)&&section==='stats'&&<div className="statsWrap">
     <div className="seg" role="radiogroup" aria-label="חודש" onTouchStart={e=>rowSlide(e,2,setMonth,false)} onTouchMove={e=>rowSlide(e,2,i=>{if(i!==month)setMonth(i);},true)}>{['החודש','החודש שעבר'].map((l,i)=><button key={i} role="radio" aria-checked={month===i} className={month===i?'on':''} onClick={()=>setMonth(i)}>{l}</button>)}</div>
     <div className="statGrid"><div className="stat"><b>{stats.ordered}</b><span>הזמנות</span></div><div className="stat"><b>{stats.delivered}</b><span>הגיעו</span></div><div className="stat" aria-label={stats.avg?'בממוצע '+stats.avg+' ימים להגעה':'אין עדיין ממוצע'}><b>{stats.avg||'–'}{stats.avg?<small> ימים</small>:null}</b><span>בממוצע</span></div></div>
+    {(stats.spent>0||stats.refunded>0)&&<section className="box money"><h3><Wallet size={18}/> הוצאות ב{stats.label}</h3>
+     <p className="moneyBig" aria-label={'הוצאת '+Math.round(stats.spent)+' שקלים'+(stats.refunded?', הוחזרו '+Math.round(stats.refunded)+' שקלים':'')}><b>₪{Math.round(stats.spent).toLocaleString('he-IL')}</b>{stats.refunded>0&&<span>הוחזרו ₪{Math.round(stats.refunded).toLocaleString('he-IL')}</span>}</p>
+     {stats.byShop.map(([shop,v])=><div key={shop} className="shopRow"><span dir="auto">{shop}</span><i style={{width:Math.max(8,100*v/stats.byShop[0][1])+'%'}}/><b>₪{Math.round(v)}</b></div>)}
+     {(stats.bonus>0||stats.unknown>0)&&<p className="setNote">{stats.bonus>0?'עוד ₪'+Math.round(stats.bonus)+' הוחזרו כבונוס באתר. ':''}{stats.unknown>0?stats.unknown+' הזמנות בלי סכום בשקלים לא נספרו.':''}</p>}</section>}
     {stats.shops.length>0&&<section className="box"><h3>חנויות ב{stats.label}</h3>{stats.shops.map(([shop,n])=><div key={shop} className="shopRow"><span dir="auto">{shop}</span><i style={{width:Math.max(8,100*n/stats.shops[0][1])+'%'}}/><b>{n}</b></div>)}</section>}
     {stats.n>0&&<section className="box"><h3>זמן הגעה</h3><p className="setNote">מההזמנה ועד שהחבילה אצלך: בממוצע {stats.avg} ימים. הכי מהירה {stats.fast}, הכי איטית {stats.slow}. לפי {stats.n} חבילות שהגיעו.</p></section>}
     {!stats.ordered&&!stats.delivered&&<section className="panel empty"><ChartColumn size={40}/><h2>אין הזמנות ב{stats.label}</h2></section>}</div>}
@@ -573,7 +590,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
 
  {open&&<div className="sheet" role="dialog" aria-modal="true" aria-label={open.name}>
   <div className="sheetTop"><button className="ib" aria-label="חזרה" onClick={()=>setOpenId(null)}><ChevronRight/></button><button className="ib" aria-label="עריכת שם" disabled={!storage} title={!storage?'שמירת שמות דורשת גיבוי בענן':undefined} onClick={()=>{setEdit(open);setDraft(open.name);setEditError('');}}><Pencil size={20}/></button></div>
-  <Thumb p={open} big/>
+  <Thumb p={open} big/>{(()=>{const d=DESC[open.image]||(open.images?.[0]&&DESC[open.images[0]]);return d?<p className="photoDesc">{d}</p>:null;})()}
   <div className="dt"><h2>{bidi(open.name)}</h2><Meta p={open}/></div>
   {open.items&&open.items.length>1&&<section className="box items"><h3>מה בחבילה</h3><ul>{open.items.map(n=><li key={n}>{bidi(nice(n))}</li>)}</ul></section>}
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled?<span className="eta">הגעה <b>{open.eta}</b></span>:showEst&&(()=>{const e=est(open);return e&&<span className="eta" title={'לפי '+e.n+' חבילות קודמות שלך, '+e.stage}>{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>{open.refund&&<div className="guardTag refundTag"><Undo2 size={16}/> {refundText(open)}</div>}
@@ -592,7 +609,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {open.pickup.place&&<p className="place">{open.pickup.place}</p>}{open.pickup.address&&<p className="addr">{open.pickup.address}</p>}{open.pickup.hours&&<p className="addr">שעות: {open.pickup.hours}</p>}
    {open.pickup.code&&<button className="code" onClick={()=>copy(open.pickup!.code)} aria-label={'קוד איסוף '+open.pickup.code.split('').join(' ')+', העתקה'}><KeyRound size={20}/><span>קוד איסוף</span><b dir="ltr">{open.pickup.code}</b>{copied===open.pickup.code?' ✓':<Copy size={17}/>}</button>}
    {(open.pickup.address||open.pickup.place)&&<NavLinks pk={open.pickup} geo={geo[placeQuery(open.pickup)]}/>}
-   {open.pickup.url&&<div className="pickActions"><a className="ghost" href={open.pickup.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/> שעות פתיחה</a></div>}</section>}
+   <div className="pickActions"><button className="ghost" onClick={()=>sharePickup(open)}><Share2 size={18}/> שליחה למי שיאסוף</button>{open.pickup.url&&<a className="ghost" href={open.pickup.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/> שעות פתיחה</a>}</div></section>}
   {open.tracking&&trackState==='on'&&open.trackPending&&open.stage<4&&<p className="trackNote">מספר המעקב נרשם אצל חברת השילוח. העדכונים שלה יופיעו כאן בדקות הקרובות.</p>}
   <section className="box"><h3>מסלול</h3>{[...timeline(open.events)].reverse().map((e,i)=><div key={e.id} className={'ev '+(!i?'l':'')}><span className="dot"/><div><strong dir="auto">{e.src?cleanLabel(e.label):shortLabel(cleanLabel(e.label))}</strong>{e.src?<span className="src">מ־{e.src}</span>:/^(?:manual|bd|sms|t|trk):/.test(e.id)?null:<a href={'https://mail.google.com/mail/u/?authuser='+encodeURIComponent(user?.email||'')+'#all/'+encodeURIComponent(e.id)} target="_blank" rel="noopener noreferrer">המייל המקורי <ExternalLink size={13}/></a>}</div><time dateTime={e.time}>{when(e.time)}</time></div>)}{upcoming(open).length>0&&<div className="ahead" aria-label={'השלבים הבאים: '+upcoming(open).join(', ')}>{upcoming(open).map((l,i)=><div key={l} className={'ev f'+(!i?' n':'')}><span className="dot"/><div><strong>{!i?'הבא: '+l:l}</strong></div></div>)}</div>}</section>
   {(open.tracking||open.order||open.url)&&<section className="box">
