@@ -216,3 +216,6 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .card .st{flex-wrap:wrap;row-gap:6px}.card .st .pill{flex:0 0 auto;overflow:visible;text-overflow:clip}
 .card .meta{flex-wrap:wrap;white-space:normal}.card .meta span{overflow:visible;text-overflow:clip;white-space:nowrap}
 .foldList{margin-top:12px}.foldList .list{margin-top:6px}
+.hero.multi{grid-auto-rows:minmax(0,1fr);padding:6px}.hero.multi img{min-height:0;height:100%}
+.hero.multi.n2,.hero.multi.n3{grid-template-rows:minmax(0,1fr)}.hero.multi.n3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hero.multi.n4{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
