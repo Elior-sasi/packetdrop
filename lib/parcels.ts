@@ -7,7 +7,7 @@ type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:st
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
 
 const shops:[RegExp,string][]=[[/aliexpress|עלי ?אקספרס/i,'AliExpress'],[/amazon\./i,'Amazon'],[/temu/i,'Temu'],[/shein/i,'SHEIN'],[/ebay/i,'eBay'],[/iherb/i,'iHerb'],[/asos/i,'ASOS'],[/zara\./i,'Zara'],[/next\.(?:co\.il|com)/i,'NEXT'],[/ksp\.co\.il/i,'KSP'],[/ivory\.co\.il/i,'Ivory'],[/shufersal/i,'שופרסל'],[/terminalx/i,'Terminal X'],[/urbanica|אורבניקה/i,'Urbanica'],[/apple\.com/i,'Apple']];
-const carriers:[RegExp,string][]=[[/israelpost|דואר ישראל/i,'דואר ישראל'],[/\bups\b|ups\.com/i,'UPS'],[/\bdhl\b/i,'DHL'],[/fedex/i,'FedEx'],[/cainiao/i,'Cainiao'],[/yunexpress/i,'YunExpress'],[/\b4px\b/i,'4PX'],[/\bhfd\b|אחד עד אחד|epost/i,'HFD'],[/cheetah|chita-il|צ['׳]יטה/i,"צ'יטה"],[/tapuz|תפוז שליחויות|תפוז משלוחים/i,'תפוז'],[/flying ?cargo|פליינג קרגו/i,'Flying Cargo'],[/getpackage|גט ?פאקג/i,'GetPackage'],[/boxit|בוקסיט/i,'Boxit'],[/yango/i,'Yango']];
+const carriers:[RegExp,string][]=[[/israelpost|postil\.co\.il|דואר ישראל/i,'דואר ישראל'],[/\bups\b|ups\.com/i,'UPS'],[/\bdhl\b/i,'DHL'],[/fedex/i,'FedEx'],[/cainiao/i,'Cainiao'],[/yunexpress/i,'YunExpress'],[/\b4px\b/i,'4PX'],[/\bhfd\b|אחד עד אחד|epost/i,'HFD'],[/cheetah|chita-il|צ['׳]יטה/i,"צ'יטה"],[/tapuz|תפוז שליחויות|תפוז משלוחים/i,'תפוז'],[/flying ?cargo|פליינג קרגו/i,'Flying Cargo'],[/getpackage|גט ?פאקג/i,'GetPackage'],[/boxit|בוקסיט/i,'Boxit'],[/yango/i,'Yango']];
 export const brandDomains:Record<string,string>={AliExpress:'aliexpress.com',Amazon:'amazon.com',Temu:'temu.com',SHEIN:'shein.com',eBay:'ebay.com',iHerb:'iherb.com',ASOS:'asos.com',Zara:'zara.com',NEXT:'next.co.il',KSP:'ksp.co.il',Ivory:'ivory.co.il','שופרסל':'shufersal.co.il','Terminal X':'terminalx.com',Urbanica:'urbanica-wh.com','תפוז':'tapuzdelivery.co.il','Flying Cargo':'flyingcargo.co.il',GetPackage:'getpackage.com',Apple:'apple.com','דואר ישראל':'israelpost.co.il',UPS:'ups.com',DHL:'dhl.com',FedEx:'fedex.com',Cainiao:'cainiao.com',YunExpress:'yunexpress.com','4PX':'4px.com',HFD:'hfd.co.il',"צ'יטה":'chita-il.com',Boxit:'boxit.co.il',Yango:'yango.com',Wolt:'wolt.com'};
 
 // Store platforms send mail for many shops; the shop itself is the sender's display name ("Shop Name <x@konimbo.co.il>").
@@ -15,8 +15,8 @@ const PLATFORM=/shopify|konimbo|wix|myshopify|bigcommerce|woocommerce|cashcow|pa
 function senderName(from:string){const m=from.match(/^\s*"?([^"<]+?)"?\s*</);if(!m)return '';const n=m[1].replace(/\s*(?:via|דרך)\s+.*$/i,'').replace(/\s*[|·–-]\s*(?:orders?|הזמנות|shop|store|חנות).*$/i,'').trim();
  return n.length>=2&&n.length<=40&&!/^(?:no-?reply|noreply|orders?|info|support|shop|store|notifications?|הזמנות|שירות לקוחות|customer service)$/i.test(n)&&!/@/.test(n)?n:'';}
 function shopFrom(from:string,text:string){for(const [r,n] of shops)if(r.test(from))return n;const dom=from.match(/@([a-z0-9.-]+)/i)?.[1]?.toLowerCase()||'';
- if(dom&&!/israelpost|ups\.|dhl|fedex|cainiao|hfd|cheetah|chita-il|tapuz/.test(dom)){const name=senderName(from);if(name&&(PLATFORM.test(dom)||!/\./.test(name)))return name;if(PLATFORM.test(dom)){for(const [r,n] of shops)if(r.test(text.slice(0,4000)))return n;}return dom.replace(/^(mail|email|e|info|noreply|news|orders?|shipping|notice|transaction|t)\./,'');}
- for(const [r,n] of shops)if(r.test(text.slice(0,4000)))return n;return /israelpost/i.test(from)?'דואר ישראל':'הזמנה מהדוא״ל';}
+ if(dom&&!/israelpost|postil|ups\.|dhl|fedex|cainiao|hfd|cheetah|chita-il|tapuz/.test(dom)){const name=senderName(from);if(name&&(PLATFORM.test(dom)||!/\./.test(name)))return name;if(PLATFORM.test(dom)){for(const [r,n] of shops)if(r.test(text.slice(0,4000)))return n;}return dom.replace(/^(mail|email|e|info|noreply|news|orders?|shipping|notice|transaction|t)\./,'');}
+ for(const [r,n] of shops)if(r.test(text.slice(0,4000)))return n;return /israelpost|postil/i.test(from)?'דואר ישראל':'הזמנה מהדוא״ל';}
 function carrierFrom(t:string,shop:string){for(const [r,n] of carriers)if(r.test(t)&&n!==shop)return n;return '';}
 export function secureUrl(value:string){try{const u=new URL(value);return u.protocol==='https:'?u.href:''}catch{return ''}}
 function body(p?:Part):string{if(!p)return '';const here=p.body?.data?Buffer.from(p.body.data,'base64url').toString('utf8'):'';return [here,...(p.parts||[]).map(body)].join('\n');}
@@ -30,7 +30,7 @@ const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נק
 const STAGE_RULES:[number,RegExp][]=[
  [4,/איך הלך|לכתוב ביקורת|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
  [3,/מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|טרם נאסף|יצאה למסירה|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
- [2,/במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|במרכז המיון|in transit|customs|arrived at/i],
+ [2,/במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
  [1,/נשלחה|נשלח|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
  [0,/אושרה|מאושרת|התקבלה|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
 const CANCEL=/is closed|בוטלה|בוטל|ביטול ה?הזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי/i;
@@ -77,8 +77,8 @@ export function parseMessage(m:Message):Parcel|null{
  // Summary mails about several packages at once would glue unrelated parcels together.
  if(orders.size>1&&/\d+\s*(?:ה?חבילות|packages|parcels)/i.test(subject))return null;
  const tracking=((subject+' '+text).match(/(?:tracking(?:\s+(?:number|no\.?|id|code))?|מספר\s*(?:ה?מעקב|ה?משלוח)|קוד\s*מעקב)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{7,34})/i)?.[1]
-  ||(subject+' '+text).match(/(?:ל?חבילה|החבילה שלכם|החבילה שלך|package|parcel)\s*(?:מס['׳]|מספר|שמספרה|no\.?|#)?\s*:?\s*([A-Z]{1,4}\d{6,}[A-Z0-9]*)/i)?.[1]
-  ||text.match(/\b([A-Z]{2}\d{9}[A-Z]{2}|1Z[0-9A-Z]{16})\b/)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
+  ||(subject+' '+text).match(/(?:ל?חבילה|החבילה שלכם|החבילה שלך|משלוח|דבר דואר|פריט דואר|package|parcel|shipment)\s*(?:מס['׳]|מספר|שמספרה|no\.?|#)?\s*:?\s*([A-Z]{1,4}\d{6,}[A-Z0-9]*)/i)?.[1]
+  ||(subject+' '+text).match(/\b([A-Z]{2}\d{9}[A-Z]{2}|1Z[0-9A-Z]{16}|RS\d{9,12}Y|AP\d{12,16}|LP\d{10,16})\b/)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
  const order=[...orders][0]||'';
  // Israeli last-mile mails (HFD/Epost) list several numbers for one parcel: AP…, Hfd…, and an 8-digit Epost id.
  const extra=new Set<string>();

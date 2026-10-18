@@ -195,3 +195,8 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .erow{display:flex;justify-content:space-between;gap:10px;font-size:calc(15px*var(--fs));padding:8px 0;border-top:1px solid var(--line)}.erow b{font-weight:700;white-space:nowrap}
 .journey{padding:8px}.journey svg{display:block}
 .sheetActions a.ghost{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;margin:0}
+.fold summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;min-height:44px;font-size:calc(16px*var(--fs));color:var(--mut)}
+.fold summary::-webkit-details-marker{display:none}.fold summary b{color:var(--ink);font-weight:600}
+.fold summary::after{content:'';width:9px;height:9px;border-left:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(-45deg);margin-inline-start:6px;transition:transform .2s}
+.fold[open] summary::after{transform:rotate(135deg)}.fold[open] summary{margin-bottom:8px}
+.journey.fold{padding:14px 16px}.journey.fold svg{margin-top:4px}
