@@ -14,8 +14,8 @@ test('shop of a package stays the store when Israel Post writes later',()=>{
  const b={...base,id:'tracking:RS1',keys:['tracking:RS1'],name:'חבילה',shop:'דואר ישראל',carrier:'דואר ישראל',tracking:'RS1',order:'',stage:2,events:[{id:'b',label:'בדרך',time:'2026-10-16T00:00:00Z'}]};
  const m=mergeParcels([a,b] as never);assert.equal(m.length,1);assert.equal(m[0].shop,'AliExpress');assert.equal(m[0].carrier,'דואר ישראל');});
 test('Urbanica confirmation with "#number" and quantity',()=>{
- const p=parseMessage(msg('u1','info@urbanica-wh.com','אישור ההזמנה שלך URBANICA','<p>אנו שמחים להודיע שהזמנתך אושרה. אנחנו מכינים לך את החבילה</p><p><strong>הנה המספר שלה: </strong><span>#302834565</span></p><img src="https://www.urbanica-wh.com/pub/media/catalog/product/a.jpg" alt="מארז 4 כוסות מאג זכוכית 246 מ”ל"/><td>מארז 4 כוסות מאג זכוכית 246 מ”ל<br/>כמות: 2<br/> ארץ ייצור: הולנד</td> <td><span class="price">40 ₪</span></td>','2026-09-22T18:25:27Z'))!;
- assert.ok(p);assert.equal(p.order,'302834565');assert.equal(p.shop,'Urbanica');assert.ok(p.name.includes('כוסות'));assert.equal(p.qty,2);});
+ const p=parseMessage(msg('u1','info@urbanica-wh.com','אישור ההזמנה שלך URBANICA','<p>אנו שמחים להודיע שהזמנתך אושרה. אנחנו מכינים לך את החבילה</p><a href="https://crm.tapuzdelivery.co.il/Baldar/deliverystatus.aspx">סטטוס משלוח</a><p><strong>הנה המספר שלה: </strong><span>#302834565</span></p><img src="https://www.urbanica-wh.com/pub/media/catalog/product/a.jpg" alt="מארז 4 כוסות מאג זכוכית 246 מ”ל"/><td>מארז 4 כוסות מאג זכוכית 246 מ”ל<br/>כמות: 2<br/> ארץ ייצור: הולנד</td> <td><span class="price">40 ₪</span></td>','2026-09-22T18:25:27Z'))!;
+ assert.ok(p);assert.equal(p.order,'302834565');assert.equal(p.shop,'Urbanica');assert.ok(p.name.includes('כוסות'));assert.equal(p.qty,2);assert.deepEqual(p.via,['crm.tapuzdelivery.co.il']);});
 test('Israel Post notice without an icon is a generic parcel',()=>{
  const p=parseMessage(msg('p2','noReply@postil.co.il','הודעה על משלוח שמספרו RU0140292467Z','<div>משלוח RU0140292467Z מחו"ל בדרכו לארץ.</div>','2026-09-03T08:25:15Z'))!;
  assert.equal(p.name,'חבילה');});

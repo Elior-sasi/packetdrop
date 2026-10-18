@@ -91,7 +91,7 @@ export function combine(a?:TrackInfo,b?:TrackInfo):TrackInfo|undefined{if(!a||a.
  const lead=b.stage>a.stage?b:a;return {...lead,carrier:a.carrier||b.carrier,eta:a.eta||b.eta,events,pending:false};}
 export async function trackSources(all:string[],key?:string){let ok17=!!key;
  // "TZ:<order>" = an Israeli store order looked up at Tapuz; everything else goes to 17TRACK / Cainiao.
- const tz=all.filter(n=>n.startsWith('TZ:')).slice(0,10);const numbers=all.filter(n=>!n.startsWith('TZ:'));
+ const tz=all.filter(n=>n.startsWith('TZ:')).slice(0,8);const numbers=all.filter(n=>!n.startsWith('TZ:'));
  const tzRes=await Promise.all(tz.map(n=>tapuz(n.slice(3)).catch(()=>null)));
  const [t17,c]=await Promise.all([key&&numbers.length?track(numbers,key).catch(()=>{ok17=false;return {} as Record<string,TrackInfo>;}):Promise.resolve({} as Record<string,TrackInfo>),numbers.length?cainiao(numbers):Promise.resolve({tracks:{} as Record<string,TrackInfo>,status:'idle'})]);const cn=c.tracks;
  const out:Record<string,TrackInfo>={};for(const n of new Set([...Object.keys(t17),...Object.keys(cn)])){const x=combine(t17[n],cn[n]);if(x)out[n]=x;}

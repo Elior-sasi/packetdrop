@@ -1,7 +1,8 @@
+import {baldarHost} from '@/lib/tapuz';
 import * as cheerio from 'cheerio';
 export type Event={id:string;label:string;time:string};
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
-export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;images?:string[];customs?:{amount:string;url:string;at:string}};
+export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];customs?:{amount:string;url:string;at:string}};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
@@ -71,6 +72,8 @@ export function parseMessage(m:Message):Parcel|null{
  const closing=/הזמנתך זוכתה|הודעה על זיכוי|order (?:has been )?(?:cancel+ed|refunded)|ההזמנה בוטלה/i.test(subject+' '+text.slice(0,400));
  if(NOT_PARCEL.test(from+' '+subject)||(!knownSender&&!closing&&(NOT_PARCEL.test(text.slice(0,1500))||!SHIPPING.test(text))))return null;
  const hrefs=$('a').toArray().map(a=>$(a).attr('href')||'');
+ // Israeli stores link to their courier's Baldar status page; remember which, so the order can be looked up there.
+ const via=[...new Set(hrefs.map(baldarHost).filter(Boolean))];
  // Order IDs from text and from order links (AliExpress package mails only carry them as o_ids=...).
  const orders=new Set<string>();
  const orderText=(subject+' '+text).match(/(?:order(?:\s*(?:number|no\.?|id|#))?|מספר\s*הזמנה|הזמנ(?:ה|תכם|תך)(?:\s*(?:מס['׳]?|מספר))?)\s*[:#.]?\s*#?\s*(\d[\d-]{5,34})/i)?.[1];
@@ -130,7 +133,7 @@ export function parseMessage(m:Message):Parcel|null{
  const pm=text.match(/(?:סך הכל(?:\s*הזמנה)?|סה"?כ(?:\s*לתשלום)?|order total|total)\s*[:|]?\s*(₪\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?₪|(?:US\s?)?\$\s?[\d,]+(?:\.\d{1,2})?)/i);const price=pm?pm[1].replace(/\s+/g,''):undefined;
  // Quantity: AliExpress writes "x2" after each item; only a single item line counts (several lines = several products).
  const qm=[...text.matchAll(/\s[x×]\s?(\d{1,2})(?=\s|$)/g)].map(x=>+x[1]);const qh=[...text.matchAll(/כמות:\s*(\d{1,2})(?!\d)/g)].map(x=>+x[1]);const qa=qm.length?qm:qh;const qty=qa.length===1&&qa[0]>1?qa[0]:undefined;
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta,stage,cancelled,pickup,price,qty,via:via.length?via:undefined,customs,events:[{id:m.id,label:label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
@@ -166,7 +169,7 @@ export function mergeParcels(rows:Parcel[]){
   const shop=sorted.find(p=>p.order&&!isCarrier(p.shop))?.shop||sorted.find(p=>!isCarrier(p.shop))?.shop||latest.shop;
   out.push({...latest,shop,id:keys[0],keys,name:title,image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
-   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,price:sorted.find(p=>p.price)?.price,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
+   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?images.slice(0,4):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }
  return out.sort((a,b)=>b.events.at(-1)!.time.localeCompare(a.events.at(-1)!.time));
 }
