@@ -285,7 +285,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Safety net: if nothing has started 6 seconds after opening (a stuck request), start reading anyway; after 15 seconds offer a retry.
  const [slow,setSlow]=useState(false);
  // iOS still pinch-zooms the whole screen despite the viewport setting; stop it everywhere except the photo viewer.
- useEffect(()=>{const stop=(e:Event)=>{if(!(e.target as Element)?.closest?.('.zoomArea'))e.preventDefault();};document.addEventListener('gesturestart',stop,{passive:false});document.addEventListener('gesturechange',stop,{passive:false});return()=>{document.removeEventListener('gesturestart',stop);document.removeEventListener('gesturechange',stop);};},[]);
+ useEffect(()=>{const stop=(e:globalThis.Event)=>{if(!(e.target as Element)?.closest?.('.zoomArea'))e.preventDefault();};document.addEventListener('gesturestart',stop,{passive:false});document.addEventListener('gesturechange',stop,{passive:false});return()=>{document.removeEventListener('gesturestart',stop);document.removeEventListener('gesturechange',stop);};},[]);
  useEffect(()=>{if(!user)return;const a=setTimeout(()=>{if(!controller.current&&!lastSync.current)void syncRef.current();},6000),b=setTimeout(()=>setSlow(true),15000);return()=>{clearTimeout(a);clearTimeout(b);};},[user?.id]);
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
