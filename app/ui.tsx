@@ -379,7 +379,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const avg=durs.length?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):0;
   return {label:ref.toLocaleDateString('he-IL',{month:'long',year:'numeric'}),ordered:ordered.length,delivered:delivered.length,shops,avg,fast:durs.length?Math.round(Math.min(...durs)):0,slow:durs.length?Math.round(Math.max(...durs)):0,n:durs.length};},[parcels,month]);
 // The animation replaces the list on first load and while new mail is read; a quick check on return keeps the list.
- const waiting=(!data&&!error)||(busy&&(reading||!data));
+ // The loader only covers an empty screen; parcels already known stay visible while new mail is read.
+ const waiting=(!data&&!error)||(busy&&!data?.parcels.length);
  const hiddenCount=Object.values(marks).filter(v=>v==='hide').length;
 
  return <main className={['app','app large','app xlarge'][size]+(view==='account'||open?' nonav':'')}>
