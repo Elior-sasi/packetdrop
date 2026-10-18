@@ -14,6 +14,9 @@ const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
 const step=(p:Parcel)=>p.stale?(p.real??p.stage):p.stage;
 const tone=(p:Parcel)=>p.stale?'unk':p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3&&(isPickup(p)||outToday(p))?'warn':'';
 // Waiting at a pickup point (as opposed to a courier bringing it to the door).
+// Search by meaning, not only by spelling: stores name the same thing differently ("חולצה" / "בגדי אנימה" / "T-shirt").
+const SYN:string[][]=[['חולצ','shirt','טישרט','טי-שירט','טי שירט','בגדי'],['מכנס','pants','trousers','קארגו','ג\'ינס','jeans','shorts'],['אוזני','airpods','earbuds','headphone','earphone','buds'],['שעון','watch'],['נעל','shoe','sneaker','סניקרס','סנדל'],['תיק','bag','backpack','ארנק','wallet'],['כבל','cable','usb'],['מטען','charger'],['כיסוי','case','cover','מגן'],['שקע','plug','socket','מתאם','adapter'],['טלפון','phone','iphone','סמארטפון'],['מקלדת','keyboard'],['עכבר','mouse'],['שלט','remote','controller','בקר','gamepad'],['מנורה','lamp','light','תאורה']];
+function searchTerms(q:string){if(!q)return [];const g=SYN.find(list=>list.some(t=>q.startsWith(t)||t.startsWith(q)&&q.length>=3));return g?[...new Set([q,...g])]:[q];}
 // The day a calendar entry is for: today for a parcel waiting at a pickup point, else the first day of the expected window ("25.10-29.10").
 function calDay(p:Parcel):{date:string;title:string}|null{if(p.cancelled||p.got||p.stage>=4)return null;const iso=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
  if(isPickup(p))return {date:iso(new Date()),title:'לאסוף חבילה: '+p.name};
@@ -228,7 +231,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    // One-time: refunds, Israeli store confirmations and Israel Post notices that older rules skipped are read again.
    // The parcels being re-read stay on screen until their fresh copy arrives, so the list never empties out.
    let held:MailParcel[]=[],reread:string[]=[];const gotIds=new Set<string>();
-   if(fix7&&Array.isArray(d.recheck)&&d.recheck.length){const re=new Set(d.recheck as string[]);const hit=saved.current.filter(p=>p.events.some(e=>re.has(e.id)));for(const p of hit)for(const e of p.events)if(!e.id.startsWith('t:')&&!e.id.startsWith('sms:')&&!e.id.startsWith('manual:'))re.add(e.id);held=hit;reread=[...re];saved.current=saved.current.filter(p=>!hit.includes(p));seen.current=new Set([...seen.current].filter(id=>!re.has(id)));}
+   if(fix7&&Array.isArray(d.recheck)&&d.recheck.length){
+    // Only parcels still on the way are read again (and mail never read before); delivered history is left alone, so a repair takes seconds, not minutes.
+    const old=new Map<string,MailParcel>();for(const p of saved.current)for(const e of p.events)old.set(e.id,p);
+    const re=new Set((d.recheck as string[]).filter(id=>{const p=old.get(id);return !p||p.stage<4&&!p.cancelled;}));d.recheck=[...re];const hit=saved.current.filter(p=>p.events.some(e=>re.has(e.id)));for(const p of hit)for(const e of p.events)if(!e.id.startsWith('t:')&&!e.id.startsWith('sms:')&&!e.id.startsWith('manual:'))re.add(e.id);held=hit;reread=[...re];saved.current=saved.current.filter(p=>!hit.includes(p));seen.current=new Set([...seen.current].filter(id=>!re.has(id)));}
    const waiting=()=>held.filter(p=>!p.events.some(e=>gotIds.has(e.id)));const shown=(ps:MailParcel[])=>held.length?mergeParcels([...ps,...waiting()]):ps;
    if(fixQty){const inWindow=new Set(d.ids as string[]);const need=saved.current.filter(p=>(p.stage<4&&!p.cancelled&&!!p.order||/נגישות/.test(p.name))&&p.events.every(e=>inWindow.has(e.id)));if(need.length){const ids=new Set(need.flatMap(p=>p.events.map(e=>e.id)));saved.current=saved.current.filter(p=>!need.includes(p));seen.current=new Set([...seen.current].filter(id=>!ids.has(id)));}}
    // Mail the background check already read (notifications server) is taken from there instead of reading it again.
@@ -310,8 +316,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const etaAt=(p:Parcel)=>{const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(m){const y=new Date().getFullYear();let t=new Date(y,+m[2]-1,+m[1]).getTime();if(t<Date.now()-60*864e5)t=new Date(y+1,+m[2]-1,+m[1]).getTime();return t;}const e=est(p);return e&&!e.late?e.from:e?.late?Date.now():Infinity;};
  const byEta=(list:Parcel[])=>[...list].sort((a,b)=>{const u=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return u(a)-u(b)||etaAt(a)-etaAt(b)||(b as {last?:number}).last!-(a as {last?:number}).last!;});
  const nextP=(()=>{const l=byEta(active).filter(p=>isPickup(p)||outToday(p)||!!p.eta||(est(p)&&!est(p)!.late));const p=l[0];if(!p)return null;const t=isPickup(p)||outToday(p)?Date.now():etaAt(p);return Number.isFinite(t)?{p,t}:null;})();
- const q=search.trim().toLowerCase();// A search looks through everything, delivered parcels included.
- const shownAll=(q?[...byEta(active),...done]:view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order,...(p.items||[]),...p.keys].join(' ').toLowerCase().includes(q));
+ const q=search.trim().toLowerCase();const qs=searchTerms(q);// A search looks through everything, delivered parcels included.
+ const shownAll=(q?[...byEta(active),...done]:view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>{if(!q)return true;const hay=[p.name,p.shop,p.carrier,p.tracking,p.order,...(p.items||[]),...p.keys].join(' ').toLowerCase();return qs.some(t=>hay.includes(t));});
  // Delivered courier notices with no product (HFD etc.) fold into one row at the bottom of "נמסרו".
  const nameless=(p:Parcel)=>!p.image&&!p.images&&/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(p.name)&&!!p.carrier&&!titles[p.id];
  const heroId=showNext&&view==='active'&&filter==='all'&&!q&&nextP?nextP.p.id:'';
