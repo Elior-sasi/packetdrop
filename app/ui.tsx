@@ -285,6 +285,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const viewSent=useRef('');
  useEffect(()=>{if(push!=='on'||busy||!data)return;const v=JSON.stringify(active.map(p=>({keys:p.keys.slice(0,30),name:p.name.slice(0,200)})));if(v===viewSent.current)return;
   const id=setTimeout(()=>{void pushPost({view:{at:new Date().toISOString(),active:JSON.parse(v)}}).then(()=>{viewSent.current=v;}).catch(()=>{});},1500);return ()=>clearTimeout(id);},[push,busy,data,active]);
+ // Slide a finger along the tab bar to move between tabs, like the iOS tab bars.
+ const [navDrag,setNavDrag]=useState<number|null>(null);
+ function navSlide(e:React.TouchEvent<HTMLElement>,moving:boolean){const r=e.currentTarget.getBoundingClientRect();const x=e.touches[0]?.clientX;if(x===undefined)return;
+  const pos=Math.min(2,Math.max(0,(r.right-x)/(r.width/3)-0.5));if(!moving){setNavDrag(null);return;}setNavDrag(pos);
+  const key=(['list','today','stats'] as const)[Math.round(pos)];if(key!==section){setSection(key);setOpenId(null);}}
  async function pushPost(b:object){const r=await fetch('/api/push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'הפעולה נכשלה');return d;}
  async function enablePush(){setPushMsg('');const perm=await Notification.requestPermission();if(perm!=='granted'){setPush(perm==='denied'?'denied':'off');return;}setPush('busy');
   try{const reg=await navigator.serviceWorker.ready;const key=Uint8Array.from(atob(pushKey.current.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
@@ -494,6 +499,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <label htmlFor="addName">שם (לא חובה)</label><input id="addName" value={addName} onChange={e=>setAddName(e.target.value)} placeholder="למשל: אוזניות"/>
   {addErr&&<p className="error" role="alert">{addErr}</p>}
   <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button></>}<button type="button" className="menuCancel" onClick={()=>setAdding(false)}>ביטול</button></form></div>}
- {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" style={{'--tab':['list','today','stats'].indexOf(section)} as React.CSSProperties}>{([['list','חבילות',Package,0],['today','איסוף',MapPin,today.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
+ {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" className={navDrag!==null?'dragging':''} style={{'--tab':navDrag??['list','today','stats'].indexOf(section)} as React.CSSProperties}
+  onTouchStart={e=>navSlide(e,false)} onTouchMove={e=>navSlide(e,true)} onTouchEnd={()=>setNavDrag(null)} onTouchCancel={()=>setNavDrag(null)}>{([['list','חבילות',Package,0],['today','איסוף',MapPin,today.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
  </main>;
 }
