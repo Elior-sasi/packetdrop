@@ -162,15 +162,16 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
  const pick=isPickup(p),today=outToday(p);const days=Math.max(0,Math.round((when-Date.now())/864e5));
  const has=(r:RegExp)=>p.events.some(e=>r.test(e.label));
  const T=pick||today||p.stage>=3?1:has(ROUTE[7][1])?.85:has(ROUTE[6][1])?.75:has(ROUTE[5][1])?.65:has(ROUTE[4][1])?.42:p.stage>=1?.15:.05;
- const k=pick?'מחכה לך לאיסוף':today?'מגיעה היום':'החבילה הבאה';
+ const k=pick?'מחכה לך לאיסוף':today?'מגיעה היום':'החבילה הבאה שמגיעה';
  const big=pick?(p.pickup?.code||'✓'):today||days<=0?'היום':days===1?'מחר':String(days);
  const unit=pick?(p.pickup?.code?'קוד':''):today||days<=0||days===1?'':'ימים';
  const label='החבילה הבאה: '+p.name+'. '+(pick?'מחכה לאיסוף'+(p.pickup?.code?' קוד '+p.pickup.code:'')+(p.pickup?.place?' ב'+p.pickup.place:''):big+' '+unit+(today?'':' צפי '+dd(when)));
  if(!pick){const C=2*Math.PI*40;return <button className="nextCard nc-ring" onClick={onOpen} aria-label={label}>
+  <div className="nc-k nc-top">{k}</div>
   <div className="nc-row"><svg className="ring" viewBox="0 0 92 92" aria-hidden="true"><defs><linearGradient id="ncg"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs>
    <circle cx="46" cy="46" r="40" fill="none" stroke="#ffffff18" strokeWidth="8"/><circle cx="46" cy="46" r="40" fill="none" stroke="url(#ncg)" strokeWidth="8" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-T)} transform="rotate(-90 46 46)"/>
    <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?20:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
-   <div className="nc-info"><div className="nc-k">{today?'מגיעה היום':'החבילה הבאה'}</div></div><Thumb p={p}/></div>
+   <div className="nc-info"/><Thumb p={p}/></div>
   <div className="nc-nm nc-full">{bidi(p.name)}</div>
   <div className="nc-chips" aria-hidden="true"><span>{statusText(p)}</span>{!today&&<span>{'צפי '+dd(when)}</span>}</div></button>;}
  const x=348-T*338;
