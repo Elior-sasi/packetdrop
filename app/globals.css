@@ -200,7 +200,7 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .fold summary::after{content:'';width:9px;height:9px;border-left:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(-45deg);margin-inline-start:6px;transition:transform .2s}
 .fold[open] summary::after{transform:rotate(135deg)}.fold[open] summary{margin-bottom:8px}
 .journey.fold{padding:14px 16px}.journey.fold svg{margin-top:4px}
-.multi{display:grid!important;gap:2px;background:#fff;padding:0;border:0!important}.multi img{width:100%;height:100%;object-fit:cover;display:block}
+.multi{display:grid!important;gap:2px;background:var(--card);padding:0;border:0!important}.multi img{width:100%;height:100%;object-fit:cover;display:block}
 .multi.n2{grid-template-columns:1fr 1fr}.multi.n3{grid-template-columns:1fr 1fr 1fr}.multi.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .hero.multi img{object-fit:contain;background:#fff}
 .card .st{flex-wrap:nowrap;justify-content:flex-start;gap:8px}.card .st .pill{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:calc(13px*var(--fs));padding:3px 9px}
