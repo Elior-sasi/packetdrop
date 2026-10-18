@@ -5,8 +5,9 @@ import {QUERY,gmailClient,pdfInfo} from '@/lib/gmail';
 import {parseMessage,mergeParcels,type Parcel,type Message} from '@/lib/parcels';
 import {trackAll} from '@/lib/track';
 import {baldarByPhone} from '@/lib/tapuz';
-import {diff,withTrack,reminders,weekly,type State} from '@/lib/notify';
+import {diff,withTrack,reminders,weekly,nameOf,type State} from '@/lib/notify';
 import {open,send,db,type Sub} from '@/lib/push';
+import {prettyNames} from '@/lib/names';
 export type Row={user_id:string;refresh:string;subs:Sub[];state:State;seen:string[];checked_at:string|null};
 export async function access(refresh:string){
  const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:GOOGLE_CLIENT_ID,client_secret:process.env.AUTH_GOOGLE_SECRET!,grant_type:'refresh_token',refresh_token:open(refresh)}),signal:AbortSignal.timeout(15000)});
@@ -26,6 +27,9 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  // With no baseline yet, the first check only records the current state.
  const {notes,stuck}=state.parcels.length?diff(state,parcels):{notes:[],stuck:state.stuck};
  const rem=reminders({...state,parcels});const wk=weekly({...state,parcels});const allNotes=[...notes,...rem.notes,...(wk.note?[wk.note]:[])];
+ // Notifications use the same short Hebrew names the app shows, not the store's long title.
+ if(allNotes.length){const ps=parcels.filter(p=>allNotes.some(n=>n.id===p.id));const pretty=await prettyNames(ps,sql).catch(()=>new Map<string,string>());
+  for(const n of allNotes){const p=ps.find(x=>x.id===n.id);const v=p&&pretty.get(p.id);if(!p||!v)continue;const old=nameOf(p);if(old&&old!==v){n.body=n.body.split(old).join(v);n.title=n.title.split(old).join(v);}}}
  let subs=u.subs;let sent=0;
  const batch=allNotes.length>4?[{title:'Unbox',body:allNotes.length+' עדכונים חדשים בחבילות',tag:'many',url:'/'}]:allNotes.map(n=>({title:n.title,body:n.body,tag:n.tag,url:'/?p='+encodeURIComponent(n.id)}));
  for(const n of batch){const alive:Sub[]=[];for(const s of subs){const ok=await send(s,n).catch(()=>true);if(ok)alive.push(s);}subs=alive;sent++;}
