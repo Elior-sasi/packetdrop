@@ -129,8 +129,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
  // A photo for each product in a package notice, so the detail page can show them all.
  const listedImgs=[...new Set($('.EDM-SYSTEM-TEXT-productName').toArray().map(el=>{let box=$(el);for(let k=0;k<6&&!box.find('img').length;k++)box=box.parent();return box.find('img').toArray().map(productImg).find(Boolean)||'';}).filter(Boolean))].slice(0,12);
- // Some AliExpress order mails put the product photos on table cells (src on a non-img tag), not in <img>.
- if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|orderdetail/i.test(href))return;$(el).find('[src]').each((_,e)=>{if(!image&&/alicdn|aliexpress-media/.test($(e).attr('src')||''))image=productImg(e);});});
+ // Some AliExpress order mails put the product photos on table cells (a background attribute), not in <img>.
+ if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|orderdetail/i.test(href))return;$(el).find('[background]').each((_,e)=>{const u=secureUrl($(e).attr('background')||'');if(!image&&/alicdn|aliexpress-media/.test(u)&&!/\/\d{1,2}x\d{1,2}\./.test(u))image=u;});});
  if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;$(el).find('img').each((_,im)=>{if(!image)image=productImg(im);});});
  // Shopify stores: the item title cell ("כסא ארגונומי … × 1").
  if(!name){const t=$('.order-list__item-title').first().text().replace(/\s+/g,' ').trim();if(t.length>3)name=tidyName(t.replace(/\s*[x×]\s*\d{1,3}\s*$/,''));const img=$('.order-list__product-image').first().attr('src');if(name&&img&&!image)image=secureUrl(img);}
