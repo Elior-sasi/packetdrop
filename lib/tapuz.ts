@@ -36,9 +36,9 @@ export async function baldarByPhone(phone:string){const p=phone.replace(/\D/g,''
 export async function kexpress(ship:string,phone:string):Promise<TrackInfo|null>{const p=phone.replace(/\D/g,'');if(!/^[A-Z0-9-]{5,20}$/i.test(ship)||!/^0\d{8,9}$/.test(p))return null;
  const base='https://run10.kexpress.co.il/RunCom.Server/Request.aspx?';
  const a=await fetch(base+'APPNAME=RUN&PRGNAME=ship_locate_num_and_phone&ARGUMENTS=-N'+encodeURIComponent(ship)+',-A'+p,{signal:AbortSignal.timeout(12000),cache:'no-store'});if(!a.ok)return null;
- const xml=new TextDecoder('windows-1255').decode(await a.arrayBuffer());const rand=xml.match(/<ship_rand_num>\s*([^<\s]+)/i)?.[1];if(!rand)return null;
+ const dec=(r:Response,b:ArrayBuffer)=>new TextDecoder(/utf-?8/i.test(r.headers.get('content-type')||'')?'utf-8':'windows-1255').decode(b);const xml=dec(a,await a.arrayBuffer());const rand=xml.match(/<ship_rand_num>\s*([^<\s]+)/i)?.[1];if(!rand)return null;
  const b=await fetch(base+'APPNAME=run&PRGNAME=ship_locate_random&ARGUMENTS=-A'+encodeURIComponent(rand),{signal:AbortSignal.timeout(12000),cache:'no-store'});if(!b.ok)return null;
- return parseKexpress(new TextDecoder('windows-1255').decode(await b.arrayBuffer()),ship);}
+ return parseKexpress(dec(b,await b.arrayBuffer()),ship);}
 export function parseKexpress(html:string,ship:string,now=new Date()):TrackInfo|null{
  const text=html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' | ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ');
  const lines=text.split('|').map(x=>x.trim()).filter(x=>x.length>2&&x.length<120);
