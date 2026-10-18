@@ -368,6 +368,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const id=setTimeout(()=>{void pushPost({view:{at:new Date().toISOString(),active:JSON.parse(v)}}).then(()=>{viewSent.current=v;}).catch(()=>{});},1500);return ()=>clearTimeout(id);},[push,busy,data,active]);
  // Slide a finger along the tab bar to move between tabs, like the iOS tab bars.
  const [navDrag,setNavDrag]=useState<number|null>(null);
+ // Slide a finger along a row of options (like the bottom bar): the option under the finger is picked. Right-to-left order.
+ const slideX=useRef<number|null>(null);
+ function rowSlide(e:React.TouchEvent<HTMLElement>,count:number,pick:(i:number)=>void,moving:boolean){const x=e.touches[0]?.clientX;if(x===undefined)return;
+  if(!moving){slideX.current=x;return;}if(slideX.current!==null&&Math.abs(x-slideX.current)<12)return;slideX.current=null;
+  const r=e.currentTarget.getBoundingClientRect();pick(Math.min(count-1,Math.max(0,Math.floor((r.right-x)/(r.width/count)))));}
  function navSlide(e:React.TouchEvent<HTMLElement>,moving:boolean){const r=e.currentTarget.getBoundingClientRect();const x=e.touches[0]?.clientX;if(x===undefined)return;
   const pos=Math.min(2,Math.max(0,(r.right-x)/(r.width/3)-0.5));if(!moving){setNavDrag(null);return;}setNavDrag(pos);
   const key=(['list','today','stats'] as const)[Math.round(pos)];if(key!==section){setSection(key);setOpenId(null);}}
@@ -443,7 +448,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {user&&view!=='account'&&progress&&waiting&&<div className="progress"><div className="pbar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.pct} aria-label="התקדמות הסריקה"><i style={{width:progress.pct+'%'}}/></div><div className="plabel" aria-live="polite"><span>{progress.label}</span><b>{progress.pct}%</b></div></div>}
   {user&&view!=='account'&&!(progress&&waiting)&&<p className="sub" role="status">{busy?'בודק את Gmail…':error?(!gmail||errorCode==='NO_GMAIL'?'קריאת Gmail לא אושרה':'הסריקה לא הושלמה'):data?ago(data.updated):'ממתין לסריקה'}</p>}
  </header>
- {user&&view!=='account'&&section==='list'&&data&&!waiting&&<div className="tiles" role="tablist" aria-label="סינון חבילות">{([['active','all','בדרך',active.length],['active','pickup','לאיסוף',pickup],['done','all','נמסרו',done.length]] as const).map(([key,f,label,n])=>{const on=view===key&&(key==='done'||filter===f);return <button key={label} role="tab" aria-selected={on} className={'tile'+(on?' on':'')+(f==='pickup'?' p':'')} onClick={()=>{setFilter(f);go(key);}}><b>{data?n:'–'}</b><span>{label}</span></button>;})}</div>}
+ {user&&view!=='account'&&section==='list'&&data&&!waiting&&<div className="tiles" role="tablist" aria-label="סינון חבילות" onTouchStart={e=>rowSlide(e,3,()=>{},false)} onTouchMove={e=>rowSlide(e,3,i=>{const [k,f]=([['active','all'],['active','pickup'],['done','all']] as const)[i];if(!(view===k&&(k==='done'||filter===f))){setFilter(f);go(k);}},true)}>{([['active','all','בדרך',active.length],['active','pickup','לאיסוף',pickup],['done','all','נמסרו',done.length]] as const).map(([key,f,label,n])=>{const on=view===key&&(key==='done'||filter===f);return <button key={label} role="tab" aria-selected={on} className={'tile'+(on?' on':'')+(f==='pickup'?' p':'')} onClick={()=>{setFilter(f);go(key);}}><b>{data?n:'–'}</b><span>{label}</span></button>;})}</div>}
 
  {view==='account'?<div className="settings">
   <section className="set"><h3>תצוגה</h3>
@@ -524,7 +529,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
      {isPickup(p)&&p.pickup?.place&&<p className="todayWhere">איסוף ב<b>{p.pickup.place}</b></p>}{isPickup(p)&&p.pickup?.code&&<p className="todayCode">קוד <b dir="ltr">{p.pickup.code}</b></p>}</div></div></button>)}</>
     :<section className="panel empty"><MapPin size={40}/><h2>אין חבילות לאיסוף</h2><p>כשחבילה תגיע לנקודת איסוף, תופיע כאן עם מפה, קוד וניווט.</p></section>}</div>}
    {!(waiting)&&section==='stats'&&<div className="statsWrap">
-    <div className="seg" role="radiogroup" aria-label="חודש">{['החודש','החודש שעבר'].map((l,i)=><button key={i} role="radio" aria-checked={month===i} className={month===i?'on':''} onClick={()=>setMonth(i)}>{l}</button>)}</div>
+    <div className="seg" role="radiogroup" aria-label="חודש" onTouchStart={e=>rowSlide(e,2,setMonth,false)} onTouchMove={e=>rowSlide(e,2,i=>{if(i!==month)setMonth(i);},true)}>{['החודש','החודש שעבר'].map((l,i)=><button key={i} role="radio" aria-checked={month===i} className={month===i?'on':''} onClick={()=>setMonth(i)}>{l}</button>)}</div>
     <div className="statGrid"><div className="stat"><b>{stats.ordered}</b><span>הזמנות</span></div><div className="stat"><b>{stats.delivered}</b><span>הגיעו</span></div><div className="stat" aria-label={stats.avg?'בממוצע '+stats.avg+' ימים להגעה':'אין עדיין ממוצע'}><b>{stats.avg||'–'}{stats.avg?<small> ימים</small>:null}</b><span>בממוצע</span></div></div>
     {stats.shops.length>0&&<section className="box"><h3>חנויות ב{stats.label}</h3>{stats.shops.map(([shop,n])=><div key={shop} className="shopRow"><span dir="auto">{shop}</span><i style={{width:Math.max(8,100*n/stats.shops[0][1])+'%'}}/><b>{n}</b></div>)}</section>}
     {stats.n>0&&<section className="box"><h3>זמן הגעה</h3><p className="setNote">מההזמנה ועד שהחבילה אצלך: בממוצע {stats.avg} ימים. הכי מהירה {stats.fast}, הכי איטית {stats.slow}. לפי {stats.n} חבילות שהגיעו.</p></section>}
