@@ -7,7 +7,7 @@ import {heEvent,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean};
 type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
-const STATUS=['ההזמנה התקבלה','נשלחה','בדרך ליעד','מוכנה לאיסוף / במסירה','נמסרה'];
+const STATUS=['ההזמנה התקבלה','נשלחה','בדרך','מוכנה לאיסוף / במסירה','נמסרה'];
 const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
 const tone=(p:Parcel)=>p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3&&(isPickup(p)||outToday(p))?'warn':'';
 // Waiting at a pickup point (as opposed to a courier bringing it to the door).
