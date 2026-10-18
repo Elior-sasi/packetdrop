@@ -76,6 +76,19 @@ function Route({p}:{p:Parcel}){if(p.cancelled)return null;const evs=[...p.events
  const hit=ROUTE.map(([,r],i)=>i===0?evs[0]:i===9&&p.stage>=4?(evs.find(e=>r.test(e.label))||evs.at(-1)):i===8&&p.stage>=3?(evs.find(e=>r.test(e.label))||null):evs.find(e=>r.test(e.label))||null);
  let last=-1;hit.forEach((h,i)=>{if(h)last=i;});if(p.stage>=4)last=9;
  return <section className="box"><h3>מסלול</h3><ol className="route">{ROUTE.map(([label],i)=>{const done=i<=last;const h=hit[i];return <li key={label} className={(done?'d ':'')+(i===last?'c':'')}><span className="rdot"/><b>{label}</b>{done&&h&&<time>{new Date(h.time).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})}</time>}</li>;})}</ol></section>;}
+// Courier mails (HFD, Cheetah...) often lack the product: pair each with a different AliExpress order that was on its way just before
+// (closest first, one order per courier parcel) and show the two as one parcel.
+function pairCouriers<T extends Parcel&{stale?:boolean}>(P:T[],titles:Record<string,string>):T[]{
+ const generic=(x:T)=>/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(x.name);
+ const need=(x:T)=>!x.image&&generic(x)&&/AliExpress/i.test(x.shop)&&!!x.carrier&&!/AliExpress|Cainiao/i.test(x.carrier);
+ const t0=(x:T)=>new Date(x.events[0]?.time||0).getTime();
+ const pairs:[number,number,number][]=[];
+ P.forEach((c,ci)=>{if(!need(c))return;P.forEach((o,oi)=>{if(oi===ci||need(o)||generic(o)||!/AliExpress/i.test(o.shop)||o.pickup||!o.events.length)return;
+  const gap=t0(c)-t0(o);if(gap<=0||gap>45*864e5)return;pairs.push([gap+(o.stage>=4&&!o.stale?30*864e5:0),ci,oi]);});});
+ pairs.sort((x,y)=>x[0]-y[0]);const usedC=new Set<number>(),usedO=new Set<number>(),map=new Map<number,number>();
+ for(const [,ci,oi] of pairs){if(usedC.has(ci)||usedO.has(oi))continue;usedC.add(ci);usedO.add(oi);map.set(ci,oi);}
+ return P.flatMap((x,i)=>{if(usedO.has(i))return [];const oi=map.get(i);if(oi===undefined)return [x];const o=P[oi];
+  return [{...x,name:titles[x.id]||o.name,image:o.image,order:x.order||o.order,events:[...o.events,...x.events].sort((a,b)=>a.time.localeCompare(b.time))}];});}
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
 
 export default function Dashboard({user,gmail,drive,configured,login}:{user:User|null;gmail:boolean;drive?:boolean;configured:boolean;login:()=>Promise<void>}){
@@ -141,19 +154,13 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function loadTracks(list:MailParcel[]){const numbers=list.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,40);if(!numbers.length)return;
   try{const r=await fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({numbers}),cache:'no-store'});const d=await r.json();if(d.sources)setSources(d.sources);if(!d.enabled){setTrackState('off');return;}if(!r.ok)throw Error();setTracks(old=>({...old,...d.tracks}));setTrackState('on');}catch{setTrackState('error');}}
  async function copy(v:string){try{await navigator.clipboard.writeText(v);setCopied(v);setTimeout(()=>setCopied(''),1500);}catch{}}
- const parcels=useMemo(()=>(manual.length?mergeParcels([...(data?.parcels||[]),...manual]):(data?.parcels||[])).filter(m=>!/eventbuzz|smarticket|tickchak/i.test(m.shop)&&!/^\s*(?:re|fwd?)\s*:|^ביטול ה?הזמנה/i.test(m.name)&&!/בוטל|ביטול ה?הזמנה|cancel/i.test(m.events.at(-1)?.label||'')).filter(m=>!(marks[m.id]==='hide'||m.keys.some(k=>marks[k]==='hide'))).map(m=>{const got=marks[m.id]==='got'||m.keys.some(k=>marks[k]==='got');const p={...withCarrier(m,tracks[m.tracking])};const last=new Date(p.events.at(-1)?.time||0).getTime();
+ const parcels=useMemo(()=>pairCouriers((manual.length?mergeParcels([...(data?.parcels||[]),...manual]):(data?.parcels||[])).filter(m=>!/eventbuzz|smarticket|tickchak/i.test(m.shop)&&!/^\s*(?:re|fwd?)\s*:|^ביטול ה?הזמנה/i.test(m.name)&&!/בוטל|ביטול ה?הזמנה|cancel/i.test(m.events.at(-1)?.label||'')).filter(m=>!(marks[m.id]==='hide'||m.keys.some(k=>marks[k]==='hide'))).map(m=>{const got=marks[m.id]==='got'||m.keys.some(k=>marks[k]==='got');const p={...withCarrier(m,tracks[m.tracking])};const last=new Date(p.events.at(-1)?.time||0).getTime();
   // Pickup points return parcels after ~2 weeks and shops stop writing once it arrives: after 21 days of silence treat it as received.
   // Step 4 (pickup / delivery) only when an update actually says so; otherwise it is still on its way.
   if(p.stage===3&&!p.carrierStatus?.match(/OutForDelivery|AvailableForPickup/)&&!p.pickup&&!p.events.some(e=>OUT_RE.test(e.label)||PICK_RE.test(e.label)))p.stage=2;
   const stale=p.stage<4&&!p.cancelled&&Date.now()-last>(p.stage===3?14:30)*864e5;
-  return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};})
+  return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
-  // Courier mails (HFD, Cheetah...) often lack the product: suggest the AliExpress order that was on its way just before, marked as a guess.
-  .map((p,_,all)=>{if(p.image||!isGenericName(p)||!/AliExpress/i.test(p.shop)||!p.carrier||/AliExpress|Cainiao/i.test(p.carrier))return p;
-   const at=new Date(p.events[0]?.time||0).getTime();
-   const cands=all.filter(o=>o!==p&&/AliExpress/i.test(o.shop)&&!isGenericName(o)&&o.events.length&&!o.pickup&&new Date(o.events[0].time).getTime()<at&&at-new Date(o.events[0].time).getTime()<45*864e5&&o.stage>=1);
-   if(!cands.length)return p;const best=cands.sort((x,y)=>Math.abs(x.last-at)-Math.abs(y.last-at))[0];
-   return {...p,name:titles[p.id]||'כנראה: '+best.name,image:best.image};})
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual]);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled);
  const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(isPickup):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
