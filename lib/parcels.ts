@@ -33,10 +33,11 @@ const STAGE_RULES:[number,RegExp][]=[
  [4,/איך הלך|לכתוב ביקורת|חוויתכם חשובה|שלחו את דעתכם|דרגו את החוויה|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
  [3,/מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|ממתין ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|ממתינה ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|טרם נאסף|בדרכו לכתובת|בדרכה לכתובת|השליח יצור קשר|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
  [2,/נקלט במחסני|נקלטה במחסני|במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
- [1,/נשלחה|נשלח|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
- [0,/אושרה|מאושרת|התקבלה|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
+ [1,/נשלחה(?! לאימות)|נשלח(?! SMS| לאימות| קוד| אליך קוד)|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
+ [0,/אושרה|מאושרת|התקבלה|תטופל בהקדם|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
 const CANCEL=/is closed|בוטלה|בוטל|ביטול ה?הזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי|הודעה על זיכוי|הזמנתך זוכתה|has been refunded/i;
-function stageOf(s:string){for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
+// "Packed and waiting for the courier to collect it" is the store's side, not a parcel waiting for the user.
+function stageOf(s:string){if(/(?:ממתינה|ממתין)\s+לאיסוף\s+(?:על ידי|ע["״']י)\s+ה?שליח/.test(s))return 1;for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
 
 // Final touch on any title: no dangling connector word, no lone fragment after the last comma.
 export function polishName(n:string){let t=n.trim();
