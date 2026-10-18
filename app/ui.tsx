@@ -135,7 +135,7 @@ function Journey({p}:{p:Parcel}){if(p.cancelled||!/AliExpress|Temu|SHEIN|Amazon|
 const widgetScript=(url:string)=>`// Unbox widget
 const r=await new Request(${JSON.stringify(url)}).loadJSON().catch(()=>null)
 const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');w.url='https://packetdrop.vercel.app'
-const t=w.addText('Unbox');t.font=Font.boldSystemFont(15);t.textColor=new Color('#4aa8ff');w.addSpacer(6)
+const h=w.addStack();h.centerAlignContent();const img=await new Request('https://packetdrop.vercel.app/mark.png').loadImage().catch(()=>null);if(img){const i=h.addImage(img);i.imageSize=new Size(14,17)}const t=h.addText('nbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white();w.addSpacer(6)
 if(!r||!r.ok){const e=w.addText('אין נתונים כרגע');e.textColor=Color.gray()}else{
  const a=w.addText(r.transit+' בדרך');a.font=Font.boldSystemFont(20);a.textColor=Color.white()
  const b=w.addText(r.pickup.length+' לאיסוף');b.font=Font.boldSystemFont(20);b.textColor=new Color('#2ed3c6')
