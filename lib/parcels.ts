@@ -24,7 +24,7 @@ function body(p?:Part):string{if(!p)return '';const here=p.body?.data?Buffer.fro
 // Marketing mail: Israeli law requires the "פרסומת" prefix; promo senders and Gmail's Promotions tab are the other tells.
 export function isAd(subject:string,from:string,labels:string[]=[]){return /(?:^|[\s(|])פרסומת(?:[\s)|]|$)/.test(subject)||/^\s*(?:advertisement|ad\s*[:|])/i.test(subject)||/promotion@|promo@|marketing@|newsletter|ae-brief|deals@/i.test(from)||labels.includes('CATEGORY_PROMOTIONS');}
 
-const NOT_PARCEL=/cinema|yesplanet|רב[- ]?חן|lev\.co\.il|eventim|leaan|לאן כרטיסים|tixwise|kartisim|כרטיס(?:ים)? (?:לסרט|להופעה|להצגה|לאירוע)|הקרנה|אולם \d|מושב|wolt\.com|10bis|tenbis|cibus|uber|gett|yango ?ride|booking\.com|airbnb|elal|אל על|טיסה|flight|מלון|hotel|netflix|spotify|disney|youtube premium|google play|app store|חשבון חודשי|תשלום חשבון/i;
+const NOT_PARCEL=/eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesplanet|רב[- ]?חן|lev\.co\.il|eventim|leaan|לאן כרטיסים|tixwise|kartisim|כרטיס(?:ים)? (?:לסרט|להופעה|להצגה|לאירוע)|הקרנה|אולם \d|מושב|wolt\.com|10bis|tenbis|cibus|uber|gett|yango ?ride|booking\.com|airbnb|elal|אל על|טיסה|flight|מלון|hotel|netflix|spotify|disney|youtube premium|google play|app store|חשבון חודשי|תשלום חשבון/i;
 // Physical shipping words; unknown senders must mention one of these to count as a parcel.
 const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נקודת (?:ה)?חלוקה|כתובת למשלוח|shipping|shipped|shipment|delivery|tracking|מעקב|parcel|package/i;
 const STAGE_RULES:[number,RegExp][]=[
@@ -33,7 +33,7 @@ const STAGE_RULES:[number,RegExp][]=[
  [2,/במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|במרכז המיון|in transit|customs|arrived at/i],
  [1,/נשלחה|נשלח|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
  [0,/אושרה|מאושרת|התקבלה|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
-const CANCEL=/is closed|בוטלה|ביטול ההזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי/i;
+const CANCEL=/is closed|בוטלה|בוטל|ביטול ה?הזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי/i;
 function stageOf(s:string){for(const [n,r] of STAGE_RULES)if(r.test(s))return n;return -1;}
 
 // Final touch on any title: no dangling connector word, no lone fragment after the last comma.
@@ -65,6 +65,8 @@ export function parseMessage(m:Message):Parcel|null{
  const text=[subject,$.text(),m.snippet].join(' ').replace(/\s+/g,' ').slice(0,100000);
  const shop=shopFrom(from,text);const carrier=carrierFrom(from+' '+text,shop);
  const knownSender=shops.some(([r])=>r.test(from))||carriers.some(([r])=>r.test(from));
+ // Replies and forwards are the user's own correspondence, not shipping updates.
+ if(!knownSender&&/^\s*(?:re|fw|fwd|השב|הועבר)\s*:/i.test(subject))return null;
  if(NOT_PARCEL.test(from+' '+subject)||(!knownSender&&(NOT_PARCEL.test(text.slice(0,1500))||!SHIPPING.test(text))))return null;
  const hrefs=$('a').toArray().map(a=>$(a).attr('href')||'');
  // Order IDs from text and from order links (AliExpress package mails only carry them as o_ids=...).
