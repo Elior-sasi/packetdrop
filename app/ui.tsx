@@ -28,7 +28,7 @@ const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא
 // Bump when mail parsing changes: mail from the last 180 days is then read again with the new rules.
 const PARSER=4;
 const keepOld=(list:MailParcel[])=>list.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()>175*864e5);
-const NOISE=/איך הלך|בהמתנה לאישור|ביקורת|review|rate your|תסומן בקרוב|how was/i;
+const NOISE=/(?:^|\s)יש עדכון\s*$|has an update|^עדכון$|איך הלך|בהמתנה לאישור|ביקורת|review|rate your|תסומן בקרוב|how was/i;
 const timeline=(evs:Event[])=>{const out:Event[]=[];for(const e of evs){if(NOISE.test(e.label))continue;const l=cleanLabel(e.label);if(out.length&&cleanLabel(out[out.length-1].label)===l)continue;out.push(e);}return out.length?out:evs.slice(-1);};
 const when=(iso:string)=>{const d=new Date(iso);return d.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})+' · '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
 const ago=(iso:string)=>{const m=Math.floor((Date.now()-new Date(iso).getTime())/60000);return m<1?'עודכן עכשיו':m<60?'עודכן לפני '+m+' דק׳':'עודכן ב־'+new Date(iso).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
