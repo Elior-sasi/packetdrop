@@ -33,3 +33,7 @@ test('a package lists every order in it',()=>{const ev=(id:string,t:string)=>[{i
  const b={...base,id:'order:2',keys:['order:2','tracking:AP1'],name:'חולצת BLEACH',order:'2',tracking:'AP1',events:ev('b','2026-10-01T00:00:01Z')};
  const c={...base,id:'order:3',keys:['order:3','tracking:AP1'],name:'הזמנה מ־AliExpress',order:'3',tracking:'AP1',events:ev('c','2026-10-01T00:00:02Z')};
  const [m]=mergeParcels([a,b,c] as never);assert.deepEqual(m.items,['שלט','חולצת BLEACH','הזמנה …3']);});
+test('same product cut shorter in another mail is listed once',()=>{const base={shop:'AliExpress',carrier:'',image:'',url:'',eta:'',stage:1,cancelled:false,pickup:null};
+ const a={...base,id:'order:1',keys:['order:1','tracking:AP9'],name:'כיסוי',order:'1',tracking:'AP9',items:['כיסוי','מכנסי קארגו לגברים'],events:[{id:'a',label:'x',time:'2026-10-01T00:00:00Z'}]};
+ const b={...base,id:'order:2',keys:['order:2','tracking:AP9'],name:'כיסוי',order:'2',tracking:'AP9',items:['כיסוי','מכנסי קארגו לגברים כותנה'],events:[{id:'b',label:'x',time:'2026-10-02T00:00:00Z'}]};
+ const [m]=mergeParcels([a,b] as never);assert.deepEqual(m.items,['כיסוי','מכנסי קארגו לגברים כותנה']);});

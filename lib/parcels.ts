@@ -111,7 +111,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
   const bits=a.find('*').addBack().contents().toArray().filter(n=>n.type==='text').map(n=>$(n).text().replace(/\s+/g,' ').trim()).filter(t=>t.length>6&&!/^[₪$€]|\d+[.,]\d{2}\s*$|^x\d+$|משלוח אל|סך הכל|לפרטי|פרטי ה(?:חבילה|הזמנה|משלוח)|order details|package details/i.test(t));
   if(bits[0]){name=tidyName(bits[0]);}});
  // Package notices list every product in the box (AliExpress "פרטי החבילה"); keep them all, not just the first.
- const listed=[...new Set($('.EDM-SYSTEM-TEXT-productName').toArray().map(el=>tidyName($(el).text().replace(/\s+/g,' ').trim())).filter(t=>t.length>3))].slice(0,12);
+ const listed=[...new Set($('.EDM-SYSTEM-TEXT-productName, .order-list__item-title').toArray().map(el=>tidyName($(el).text().replace(/\s+/g,' ').trim().replace(/\s*[x×]\s*\d{1,3}$/,''))).filter(t=>t.length>3))].slice(0,12);
  // The photo often sits in its own anchor next to the title anchor; take the first real product photo from those links (skip tiny badge icons).
  const productImg=(el:any)=>{const src=$(el).attr('src')||$(el).attr('data-src')||'';const u=secureUrl(src.startsWith('//')?'https:'+src:src.replace(/^http:\/\/(?=[^/]*(?:alicdn|aliexpress-media|media-amazon|ssl-images-amazon|temu|shein|ebayimg))/i,'https://'));const w=Number($(el).attr('width')||0);
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
@@ -123,7 +123,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  if(!name)$('table').each((_,t)=>{if(name)return;const rows=$(t).children('tbody').children('tr').toArray().concat($(t).children('tr').toArray());
   const cellsOf=(r:any)=>$(r).children('td,th').toArray().map(c=>$(c).text().replace(/\s+/g,' ').trim());let col=-1;
   for(const r of rows){const c=cellsOf(r);if(col<0){col=c.findIndex(x=>/^(?:תיאור(?: פריט| מוצר)?|שם (?:ה)?מוצר|מוצר|פריט)$/.test(x));continue;}
-   const d=c[col]||'';if(d.length>4&&!/GIFTPACK|קמפיין|דואר שליחים|משלוח|הובלה|תשלומים|הטבה|סה['"]?כ/i.test(d+' '+c.join(' '))&&c.some(x=>/^\d{4,9}$/.test(x))){name=tidyName(d);return;}}});
+   const d=c[col]||'';if(d.length>4&&!/GIFTPACK|קמפיין|דואר שליחים|משלוח|הובלה|תשלומים|הטבה|סה['"]?כ/i.test(d+' '+c.join(' '))&&c.some(x=>/^\d{4,9}$/.test(x))){const t=tidyName(d);if(!name)name=t;if(!listed.includes(t))listed.push(t);}}if(name)return;});
+ if(pdf&&pdf.items.length>1)for(const t of pdf.items)if(!listed.includes(t))listed.push(t);
  if(!name&&pdf?.items.length)name=pdf.items.slice(0,2).join(' + ')+(pdf.items.length>2?' ועוד '+(pdf.items.length-2):'');
  if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
@@ -136,8 +137,10 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const keys=[...new Set([...[...orders].map(o=>'order:'+o),...(tracking?['tracking:'+tracking]:[]),...[...extra].map(x=>'tracking:'+x)])];
  const shownTracking=tracking||[...extra].find(x=>/^(AP|RS)/.test(x))||[...extra].find(x=>/^HFD/.test(x))||[...extra][0]||'';
  // Carrier mails often have a generic subject ("הודעה מחברת המשלוחים"); describe the event instead.
- const genericSubject=/^הודעה (?:מ|ב)|notification/i.test(subject)&&!/\d{6,}/.test(subject);
- const label=!genericSubject?subject:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
+ const genericSubject=(/^הודעה (?:מ|ב)|notification/i.test(subject)&&!/\d{6,}/.test(subject))||/^הודעה על (?:ה?משלוח|דבר דואר|ה?חבילה)/.test(subject);
+ // A notice whose subject says only "הודעה על משלוח …": the news is the sentence after the number in the body ("הגיע לארץ ובדרכו אליך").
+ const said=genericSubject?(text.slice(subject.length).match(/\b[A-Z]{2}\d{8,}[A-Z]{0,2}\b\s*(?:מחו["״]ל\s*)?([\u0590-\u05FF][^.\n]{3,70})/)?.[1]||'').replace(/\s+/g,' ').trim():'';
+ const label=!genericSubject?subject:said?said:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
  // Customs / VAT to pay before release. Only official payment links are kept (customs-payment scams are common).
  const due=/(?:תשלום|לתשלום|חיוב|לשלם)\s+(?:ה?מסים|ה?מיסים|ה?מכס|מע"?מ|דמי (?:ה)?מכס|דמי טיפול ומסים)|(?:customs|import) (?:duty|duties|tax|fees?|charges?)|duties (?:and|&) taxes|pay (?:the )?(?:customs|duty|vat)/i.test(subject+' '+text.slice(0,3000))&&(knownSender||/postil|israelpost|gov\.il|dhl|ups|fedex|hfd/i.test(from));
  const OFFICIAL=/^https:\/\/(?:[a-z0-9-]+\.)*(?:israelpost\.co\.il|gov\.il|dhl\.co\.il|dhl\.com|ups\.com|fedex\.com|hfd\.co\.il)\//i;
@@ -166,7 +169,8 @@ export function mergeParcels(rows:Parcel[]){
   // Several orders shipped in one package: name the package after all of them ("שחמט + אזעקה").
   const generic=(n:string)=>/^(?:הזמנה|חבילה|לחבילה|your order|הודעה מ)/i.test(n);
   const perOrder=new Map<string,string>();for(const p of sorted)if(p.order&&!generic(p.name)&&!perOrder.has(p.order))perOrder.set(p.order,p.name);
-  const items=[...new Set([...[...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')),...list.flatMap(p=>p.items||[])])];
+  const items=[...new Set([...[...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')),...list.flatMap(p=>p.items||[])])].filter((a,_,all)=>{const n=(t:string)=>t.replace(/[.…\s]+$/,'').trim();return !all.some(b=>b!==a&&n(b).length>n(a).length&&n(b).startsWith(n(a)));});
+  // The same product named by two mails, one cut shorter ("מכנסי קארגו לגברים" / "… כותנה"), is listed once.
   // One picture per order in the package.
   const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set([...list.flatMap(p=>p.images||[]),...perImg.values()])];
   // Orders in the package whose mails carry no product name still count ("… ועוד 2").
