@@ -13,3 +13,4 @@ const cases:[string,string][]=[
  ['7 יחידות / מערכת חיתוך עוגיות + כבל טעינה לעכבר Type-C','מערכת חיתוך עוגיות + כבל טעינה לעכבר Type-C'],
 ];
 test('hebrew names',()=>{for(const [a,b] of cases)assert.equal(heName(a),b,a);});
+test('trailing catalog number after Hebrew is dropped',()=>{assert.equal(heName('מארז 4 כוסות מאג זכוכית 246'),'מארז 4 כוסות מאג זכוכית');assert.equal(heName('iPhone 15 Pro 256'),'iPhone 15 Pro 256');});

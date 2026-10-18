@@ -33,5 +33,6 @@ function part(raw:string){let s=raw.replace(/[|]/g,' ').replace(/\s+/g,' ').trim
  if(aud&&out&&!out.includes(aud)&&out.split(' ').length<=4)out+=' '+aud;
  return out;}
 export function heName(n:string){const src=n.trim();if(!src)return src;
- const out=src.split(/\s+\+\s+/).map(part).filter(Boolean).join(' + ');
+ // A bare catalog number after a Hebrew word ("מאג זכוכית 246") is a SKU, not part of the name.
+ const out=src.split(/\s+\+\s+/).map(part).filter(Boolean).join(' + ').replace(/([\u0590-\u05FF][\u0590-\u05FF"'׳״]*)\s+\d{3,6}$/,'$1');
  return out.length>=3?out:src;}

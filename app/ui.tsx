@@ -5,11 +5,13 @@ import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,type TrackInfo} from '@/lib/track';
-type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean};
+type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean;ask?:boolean;real?:number};
 type Geo=Record<string,{lat:number;lon:number}|null>;
 type User={id:string;name:string;email:string};type Scan={parcels:MailParcel[];nextCursor?:string;scanned:number;failed?:number;updated:string};
 const STATUS=['ההזמנה התקבלה','נשלחה','בדרך','מוכנה לאיסוף / במסירה','נמסרה'];
 const STEP=['התקבלה','נשלחה','בדרך','לאיסוף','נמסרה'];
+// A parcel that went quiet is not delivered; its steps stay where the last real update left them.
+const step=(p:Parcel)=>p.stale?(p.real??p.stage):p.stage;
 const tone=(p:Parcel)=>p.stale?'unk':p.cancelled||(p.stage<4&&/Exception|DeliveryFailure/.test(p.carrierStatus||''))?'bad':p.stage===4?'ok':p.stage===3&&(isPickup(p)||outToday(p))?'warn':'';
 // Waiting at a pickup point (as opposed to a courier bringing it to the door).
 const isPickup=(p:Parcel)=>p.stage===3&&!p.cancelled&&(p.carrierStatus==='AvailableForPickup'||p.carrierStatus!=='OutForDelivery'&&(!!p.pickup?.place||p.events.some(e=>/איסוף|pickup|collection/i.test(e.label))));
@@ -186,7 +188,7 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
   <svg className="nc-trk" viewBox="0 0 358 40" aria-hidden="true"><line x1="10" y1="16" x2="348" y2="16" stroke="#2a4a66" strokeWidth="3" strokeDasharray="6 6"/><line x1="348" y1="16" x2={x} y2="16" stroke="#2ed3c6" strokeWidth="4" strokeLinecap="round"/>
    <circle cx="348" cy="16" r="6" fill="#4aa8ff"/><circle cx="10" cy="16" r="6" fill={T>=1?'#3fd49a':'#33414f'}/><circle cx={x} cy="16" r="9" fill="#2ed3c6"><animate attributeName="r" values="7;10;7" dur="1.8s" repeatCount="indefinite"/></circle>
    <text x="348" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">{abroad(p)?'חו"ל':'החנות'}</text><text x="12" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">אתה</text></svg></button>;}
-function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
+function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=step(p)?'on':''}/>)}</div>;}
 
 // Bottom sheet chrome: a grab bar you can pull down to close, and a close button.
 function swipeClose(close:()=>void){let y0=0,dy=0;return {
@@ -282,7 +284,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const em=[...p.eta.matchAll(/(\d{1,2})\.(\d{1,2})/g)].at(-1);let due=last+9*864e5;if(em){const y=new Date(last).getFullYear();let t=new Date(y,+em[2]-1,+em[1]).getTime();if(t<last-60*864e5)t=new Date(y+1,+em[2]-1,+em[1]).getTime();due=t+864e5;}
   const ask=local&&!got&&!p.cancelled&&Date.now()>due&&age<30*864e5&&!((snooze[p.id]||0)>Date.now());
   const stale=p.stage<4&&!p.cancelled&&age>(p.stage===3?14:abroad(p)?30:local?30:p.stage>=1?10:21)*864e5;
-  return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,ask,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};}),titles)
+  return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,ask,last,stage:stale||got?4:p.stage,real:p.stage,name:titles[p.id]||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual,snooze,phoneParcels]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
@@ -488,7 +490,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <Thumb p={open} big/>
   <div className="dt"><h2>{bidi(open.name)}</h2><Meta p={open}/></div>
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled?<span className="eta">הגעה <b>{open.eta}</b></span>:showEst&&(()=>{const e=est(open);return e&&<span className="eta" title={'לפי '+e.n+' חבילות קודמות שלך, '+e.stage}>{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>
-   {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':open.stage/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<open.stage?'d':i===open.stage?'c':'')}><span/>{i===3&&open.stage>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
+   {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':step(open)/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<step(open)?'d':i===step(open)?'c':'')}><span/>{i===3&&step(open)>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
   {(()=>{const c=customsDue(open);if(!c)return null;return <section className="box guardBox customsBox"><h3><ShieldAlert size={18}/> לתשלום מכס ומסים</h3>
    <p className="setNote">החבילה מחכה לתשלום לפני שחרור{c.amount?': '+c.amount:''}. בלי תשלום היא לא תמשיך ועלולה לחזור לשולח.</p>
    <a className="primary" href={c.url||'https://doar.israelpost.co.il/'} target="_blank" rel="noopener noreferrer">{c.url?'לתשלום באתר הרשמי':'לאתר דואר ישראל'}</a>
