@@ -29,7 +29,7 @@ const SHORT:[RegExp,string][]=[[/בוטל|cancel/i,'ההזמנה בוטלה'],[/
  [/נשלח|shipped|dispatched/i,'נשלחה'],[/נאספ|נארז|packed/i,'נארזה ויצאה'],[/אושר|מאושרת|התקבל|confirmed|received/i,'ההזמנה התקבלה']];
 const shortLabel=(s:string)=>{if(s.length<=22&&!/\d{5,}/.test(s))return s;for(const [r,t] of SHORT)if(r.test(s))return t;return s;};
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
-const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|הזמנתך|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^(?:תודה|אישור (?:ה)?הזמנה|order confirm|thank you for your order|thanks for your order)/i.test(name)||/^\S*\d{8,}/.test(name);
+const isGeneric=(name:string)=>/^(?:ל?חבילה|הזמנה|הזמנתך|your order|order|הודעה (?:מ|ב))(?=[\s:'׳]|$)/i.test(name)||/^(?:תודה|אישור (?:ה)?הזמנה|order confirm|thank you for your order|thanks for your order)/i.test(name)||/^\S*\d{8,}/.test(name)||/^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(name.trim());
 const isGenericName=(p:{name:string})=>/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(p.name);
 const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא|^דואר ישראל$/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):heName(polishName(p.name))+(p.qty&&p.qty>1?' ×'+p.qty:'');
 // Bump when mail parsing changes: mail from the last 180 days is then read again with the new rules.
@@ -204,7 +204,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Opening screen: shown on launch, then fades out.
  useEffect(()=>{const a=setTimeout(()=>setSplash('out'),1400),b=setTimeout(()=>setSplash('off'),1800);return()=>{clearTimeout(a);clearTimeout(b);};},[]);
  async function sync(){if(!user||controller.current)return;void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
-  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v9')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
+  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v10')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
   try{let r=await fetch(listUrl,{signal:c.signal,cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch(listUrl,{signal:c.signal,cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
    // One-time repair: parcels whose shop was saved as a web address are read again to pick up the shop's real name.
@@ -237,7 +237,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    await Promise.all([worker(),worker()]);
    // Mail Google refused to hand over (usually a short rate limit) gets one slower second try.
    if(retry.length&&!c.signal.aborted){second=true;setProgress({pct:92,label:'משלים '+retry.length+' מיילים שלא נקראו…'});await new Promise(res=>setTimeout(res,1500));for(let i=0;i<retry.length;i+=10)chunks.push(retry.slice(i,i+10));await worker();}acc={...acc,updated:new Date().toISOString()};setData(acc);
-   if(!c.signal.aborted){try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v9','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
+   if(!c.signal.aborted){try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v10','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
   }catch(e){setError(e instanceof Error&&e.name!=='AbortError'?e.message:'הסריקה נעצרה. אפשר לנסות שוב.');}finally{clearTimeout(timeout);controller.current=null;setBusy(false);setReading(false);setTimeout(()=>setProgress(null),700);}}
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles);setStorage(d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
