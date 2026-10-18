@@ -32,3 +32,9 @@ t2('package with two orders is named after both, and stays stable when merged ag
  const b={...base,id:'order:1123351833046914',keys:['order:1123351833046914'],order:'1123351833046914',name:'אזעקה',stage:1,events:[{id:'b',label:"הזמנה מס' 2: נשלחה",time:'2026-10-09T00:44:24.000Z'}]};
  const once=mp2([a,b]);assert2.equal(once.length,1);assert2.match(once[0].name,/שחמט \+ אזעקה|אזעקה \+ שחמט/);
  const twice=mp2([...once,a,b]);assert2.equal(twice[0].name.split(' + ').length,2);});
+t2('package images survive merging an already-merged package again',()=>{
+ const base={shop:'AliExpress',carrier:'',url:'',eta:'',cancelled:false,pickup:null,tracking:''};
+ const a={...base,id:'order:1123351833026914',keys:['order:1123351833026914'],order:'1123351833026914',name:'שחמט',image:'https://x/a.jpg',stage:1,events:[{id:'a',label:"הזמנה: נשלחה",time:'2026-10-09T00:44:24.000Z'}]};
+ const b={...base,id:'order:1123351833046914',keys:['order:1123351833046914'],order:'1123351833046914',name:'אזעקה',image:'https://x/b.jpg',stage:1,events:[{id:'b',label:"הזמנה: נשלחה",time:'2026-10-09T00:44:24.000Z'}]};
+ const once=mp2([a,b]);assert2.equal(once[0].images?.length,2);
+ const again=mp2([...once,{...a,events:[{id:'c',label:'נמסרה',time:'2026-10-15T00:00:00.000Z'}],stage:4}]);assert2.equal(again[0].images?.length,2);});

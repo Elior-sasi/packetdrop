@@ -141,7 +141,7 @@ export function mergeParcels(rows:Parcel[]){
   const perOrder=new Map<string,string>();for(const p of sorted)if(p.order&&!generic(p.name)&&!perOrder.has(p.order))perOrder.set(p.order,p.name);
   const items=[...new Set([...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')))];
   // One picture per order in the package.
-  const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set(perImg.values())];
+  const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set([...list.flatMap(p=>p.images||[]),...perImg.values()])];
   const title=items.length>1?items.slice(0,2).join(' + ')+(items.length>2?' ועוד '+(items.length-2):''):named.name;
   const stage=Math.max(0,...list.map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
