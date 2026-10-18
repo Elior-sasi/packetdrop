@@ -1,0 +1,5 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {parseMessage} from '../lib/parcels';
+const m=(from:string,html:string)=>({id:'c1',internalDate:String(Date.parse('2026-10-16T08:00:00Z')),payload:{mimeType:'text/html',headers:[{name:'Subject',value:'משלוח RS1344385286Y ממתין לתשלום מסים'},{name:'From',value:from}],body:{data:Buffer.from(html).toString('base64url')}}});
+test('customs due from Israel Post with official link',()=>{const p=parseMessage(m('noReply@postil.co.il','<p>משלוח RS1344385286Y ממתין לתשלום מסים בסך 63.40 ש"ח. <a href="https://doar.israelpost.co.il/taxes?x=1">לתשלום</a> <a href="https://evil.example/pay">here</a></p>') as any)!;
+ assert.equal(p.customs?.amount,'63.40₪');assert.match(p.customs!.url,/israelpost/);});
+test('unofficial link is never used',()=>{const p=parseMessage(m('noReply@postil.co.il','<p>משלוח RS1344385286Y ממתין לתשלום מכס. <a href="https://israelpost-pay.top/x">לתשלום</a></p>') as any)!;assert.equal(p.customs?.url,'');});

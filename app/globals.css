@@ -206,3 +206,5 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .card .st{flex-wrap:nowrap;justify-content:flex-start;gap:8px}.card .st .pill{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:calc(13px*var(--fs));padding:3px 9px}
 .card .st .eta{flex:0 0 auto;white-space:nowrap;font-size:calc(13px*var(--fs))}.card .st .eta b{font-size:calc(14px*var(--fs))}
 .card .meta{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}.card .meta span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.customsTag{background:#3a1420;border-color:#ff8fa3;color:#ffc2cd}.customsBox{border-color:#ff8fa3}.customsBox h3{color:#ffc2cd}
+.customsBox a.primary{display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:10px}

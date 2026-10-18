@@ -1,7 +1,7 @@
 // Decides which phone notifications a change in parcels deserves. Pure, so it can be tested without Gmail.
 import type {Parcel} from '@/lib/parcels';
 import type {TrackInfo} from '@/lib/track';
-export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck'|'guard';title:string;body:string;tag:string};
+export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck'|'guard'|'customs';title:string;body:string;tag:string};
 export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>;reminded?:Record<string,number[]>;weekly?:string};
 const DAY=864e5;
 export const GUARD=/בהמתנה לאישור|תסומן בקרוב כהזמנה שהושלמה|will be marked as completed|confirm receipt/i;
@@ -30,6 +30,7 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
    else if(p.stage===3)notes.push(pickupOrOut(p,name));
    else notes.push({id:p.id,kind:'new',title:'הזמנה חדשה',body:name+(p.shop&&!name.includes(p.shop)?' · '+p.shop:''),tag:'n:'+p.id});
    continue;}
+  if(p.customs&&p.stage<3&&(!o.customs||o.customs.at!==p.customs.at)&&now-new Date(p.customs.at).getTime()<3*DAY)notes.push({id:p.id,kind:'customs',title:'לתשלום מכס'+(p.customs.amount?' '+p.customs.amount:''),body:name+' · החבילה לא תשוחרר בלי תשלום',tag:'c:'+p.id});
   // AliExpress is about to close the order while the parcel has not arrived: last chance to open a dispute.
   if(p.stage<4&&p.events.some(e=>GUARD.test(e.label)&&now-new Date(e.time).getTime()<3*DAY&&!o.events.some(x=>x.id===e.id)))notes.push({id:p.id,kind:'guard',title:'ההזמנה תיסגר בקרוב והחבילה לא הגיעה',body:name+' · אפשר עדיין לפתוח מחלוקת ולקבל החזר',tag:'g:'+p.id});
   if(p.stage>o.stage&&recent){

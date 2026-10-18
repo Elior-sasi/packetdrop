@@ -4,7 +4,7 @@ export const QUERY='-in:spam -in:trash -category:promotions -subject:פרסומ�
  'subject:order','subject:shipped','subject:shipment','subject:delivery','subject:delivered','subject:tracking','subject:package','subject:parcel','subject:dispatched',
  'subject:הזמנה','subject:הזמנתך','subject:משלוח','subject:חבילה','subject:איסוף','subject:נשלח','subject:נמסר',
  'from:aliexpress.com','from:amazon.com','from:temu.com','from:shein.com','from:ebay.com','from:iherb.com','from:israelpost.co.il','from:postil.co.il','from:ups.com','from:dhl.com','from:fedex.com','from:cainiao.com','from:hfd.co.il','from:chita-il.com','from:tapuzdelivery.co.il','from:ksp.co.il','from:urbanica-wh.com',
- '"tracking number"','"out for delivery"','"מספר מעקב"','"מוכנה לאיסוף"','"ממתין לאיסוף"','"יצאה למשלוח"','"בדרך אליך"','"נקודת איסוף"'
+ '"tracking number"','"out for delivery"','"מספר מעקב"','"מוכנה לאיסוף"','"ממתין לאיסוף"','"יצאה למשלוח"','"בדרך אליך"','"נקודת איסוף"','subject:מכס','subject:מסים','"תשלום מסים"','"customs duty"'
 ].join(' ')+'}';
 export class GmailError extends Error{}
 export function gmailClient(accessToken:string){
