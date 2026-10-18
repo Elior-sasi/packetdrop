@@ -203,3 +203,6 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .multi{display:grid!important;gap:2px;background:var(--card);padding:0;border:0!important}.multi img{width:100%;height:100%;object-fit:cover;display:block}
 .multi.n2{grid-template-columns:1fr 1fr}.multi.n3{grid-template-columns:1fr 1fr 1fr}.multi.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .hero.multi img{object-fit:contain;background:#fff}
+.card .st{flex-wrap:nowrap;justify-content:flex-start;gap:8px}.card .st .pill{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:calc(13px*var(--fs));padding:3px 9px}
+.card .st .eta{flex:0 0 auto;white-space:nowrap;font-size:calc(13px*var(--fs))}.card .st .eta b{font-size:calc(14px*var(--fs))}
+.card .meta{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}.card .meta span{overflow:hidden;text-overflow:ellipsis;min-width:0}
