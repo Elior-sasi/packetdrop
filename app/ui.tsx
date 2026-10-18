@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {signOut} from 'next-auth/react';
-import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2} from 'lucide-react';
+import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane} from 'lucide-react';
 import {mergeParcels,brandDomains,polishName,parseSms,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,type TrackInfo} from '@/lib/track';
 type Event=MailEvent&{src?:string};type Parcel=Omit<MailParcel,'events'>&{events:Event[];carrierStatus?:string;trackPending?:boolean;stale?:boolean;got?:boolean;manual?:boolean};
@@ -92,10 +92,59 @@ function pairCouriers<T extends Parcel&{stale?:boolean}>(P:T[],titles:Record<str
  for(const [,ci,oi] of pairs){if(usedC.has(ci)||usedO.has(oi))continue;usedC.add(ci);usedO.add(oi);map.set(ci,oi);}
  return P.flatMap((x,i)=>{if(usedO.has(i))return [];const oi=map.get(i);if(oi===undefined)return [x];const o=P[oi];
   return [{...x,name:titles[x.id]||o.name,image:o.image,order:x.order||o.order,events:[...o.events,...x.events].sort((a,b)=>a.time.localeCompare(b.time))}];});}
+// ---- Arrival estimate learned from the user's own delivered parcels (no outside guessing) ----
+const SHIP_RE=/נשלח|יצאה מהמחסן|shipped|dispatched|נאספ/i;
+const shippedAt=(p:Parcel)=>new Date((p.events.find(e=>SHIP_RE.test(e.label))||p.events[0])?.time||0).getTime();
+const routeKey=(p:Parcel)=>p.shop+'|'+(p.carrier&&!/AliExpress|Cainiao/i.test(p.carrier)?p.carrier:'');
+type Est={from:number;to:number;n:number;avg:number;late:boolean;scope:'route'|'shop'};
+function learn(all:Parcel[]){const days:Record<string,number[]>={};
+ for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got)continue;const d=(new Date(p.events.at(-1)!.time).getTime()-shippedAt(p))/864e5;if(!(d>0.5&&d<90))continue;
+  for(const k of [routeKey(p),p.shop+'|*'])(days[k]??=[]).push(d);}
+ return days;}
+const pct=(a:number[],q:number)=>{const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1))))];};
+function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=4||p.cancelled||p.stage<1)return null;
+ let a=days[routeKey(p)],scope:'route'|'shop'='route';if(!a||a.length<3){a=days[p.shop+'|*'];scope='shop';}if(!a||a.length<3)return null;
+ const t0=shippedAt(p);let from=t0+pct(a,.2)*864e5,to=t0+pct(a,.8)*864e5;const now=Date.now();const late=now>to+864e5;
+ if(from<now)from=now+864e5;if(to<from)to=from;return {from,to,n:a.length,avg:Math.round(a.reduce((x,y)=>x+y,0)/a.length),late,scope};}
+const dd=(t:number)=>{const d=new Date(t);return d.getDate()+'.'+(d.getMonth()+1);};
+const estText=(e:Est)=>e.late?'מתעכבת מהרגיל':dd(e.from)===dd(e.to)?dd(e.from):dd(e.from)+'-'+dd(e.to);
+// ---- AliExpress buyer protection: the order is about to be closed but the parcel has not arrived ----
+const GUARD_RE=/בהמתנה לאישור|תסומן בקרוב כהזמנה שהושלמה|will be marked as completed|confirm receipt/i;
+const guardOf=(p:Parcel)=>{if(p.stage>=4||p.cancelled||!/AliExpress/i.test(p.shop))return null;const e=[...p.events].reverse().find(e=>GUARD_RE.test(e.label));if(!e)return null;const age=(Date.now()-new Date(e.time).getTime())/864e5;return age<15?{since:e.time,age}:null;};
+const orderUrl=(p:Parcel)=>p.order&&/AliExpress/i.test(p.shop)?'https://www.aliexpress.com/p/order/detail.html?orderId='+p.order:'';
+const disputeText=(p:Parcel)=>{const last=[...p.events].reverse().find(e=>!GUARD_RE.test(e.label));return 'Hello, I have not received my order '+(p.order||'')+'. '+(p.tracking?'Tracking number '+p.tracking+' shows no delivery':'There has been no delivery')+(last?' (last update '+new Date(last.time).toLocaleDateString('en-GB')+')':'')+'. Please extend the buyer protection or issue a full refund. Thank you.';};
+// ---- Journey: where the parcel is on the way from abroad, from the route milestones ----
+function Journey({p}:{p:Parcel}){if(p.cancelled||!/AliExpress|Temu|SHEIN|Amazon|eBay|iHerb|ASOS|Banggood/i.test(p.shop)&&!/Cainiao|YunExpress|4PX/i.test(p.carrier))return null;
+ const evs=p.events;const has=(r:RegExp)=>evs.some(e=>r.test(e.label));
+ const customs=has(ROUTE[6][1]);const step=p.stage>=4?5:p.stage>=3||has(ROUTE[7][1])?4:customs||has(ROUTE[5][1])?3:has(ROUTE[4][1])?2:has(ROUTE[2][1])||has(ROUTE[3][1])?1:0;
+ const labels=['במחסן המוכר','יצאה מהמחסן','בדרך לישראל',customs?'בישראל, במכס':'הגיעה לישראל','אצל חברת המסירה','אצלך'];
+ const T=[0,.18,.5,.78,.9,1][step];const P0=[318,160],C1=[250,40],C2=[130,30],P1=[56,120];
+ const bz=(t:number,i:number)=>(1-t)**3*P0[i]+3*(1-t)**2*t*C1[i]+3*(1-t)*t*t*C2[i]+t**3*P1[i];const x=bz(T,0),y=bz(T,1);
+ return <section className="box journey"><svg viewBox="0 0 360 200" width="100%" role="img" aria-label={'מיקום החבילה: '+labels[step]}>
+  <defs><linearGradient id="jg" x1="1" x2="0"><stop offset="0" stopColor="#4aa8ff"/><stop offset="1" stopColor="#2ed3c6"/></linearGradient></defs>
+  <rect width="360" height="200" rx="16" fill="#0d141b"/>
+  <path d={`M${P0} C${C1} ${C2} ${P1}`} fill="none" stroke="#2a3a4c" strokeWidth="3" strokeDasharray="6 7"/>
+  <path d={`M${P0} C${C1} ${C2} ${P1}`} fill="none" stroke="url(#jg)" strokeWidth="4" strokeLinecap="round" pathLength={100} strokeDasharray={`${T*100} 100`}/>
+  <circle cx={P0[0]} cy={P0[1]} r="7" fill="#4aa8ff"/><text x={P0[0]} y={P0[1]+24} fill="#b4bdca" fontSize="13" textAnchor="middle">סין</text>
+  <circle cx={P1[0]} cy={P1[1]} r="7" fill={step>=5?'#3fd49a':'#33414f'}/><text x={P1[0]} y={P1[1]+24} fill="#b4bdca" fontSize="13" textAnchor="middle">ישראל</text>
+  {step<5&&<><circle cx={x} cy={y} r="18" fill="#2ed3c6" opacity=".22"><animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite"/></circle><circle cx={x} cy={y} r="9" fill="#2ed3c6"/></>}
+  <text x="180" y="186" fill="#fff" fontSize="15" fontWeight="700" textAnchor="middle">{labels[step]}</text></svg></section>;}
+// Scriptable widget source with the personal link inside.
+const widgetScript=(url:string)=>`// Unbox widget
+const r=await new Request(${JSON.stringify(url)}).loadJSON().catch(()=>null)
+const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');w.url='https://packetdrop.vercel.app'
+const t=w.addText('Unbox');t.font=Font.boldSystemFont(15);t.textColor=new Color('#4aa8ff');w.addSpacer(6)
+if(!r||!r.ok){const e=w.addText('אין נתונים כרגע');e.textColor=Color.gray()}else{
+ const a=w.addText(r.transit+' בדרך');a.font=Font.boldSystemFont(20);a.textColor=Color.white()
+ const b=w.addText(r.pickup.length+' לאיסוף');b.font=Font.boldSystemFont(20);b.textColor=new Color('#2ed3c6')
+ for(const p of r.pickup.slice(0,config.widgetFamily==='small'?1:2)){w.addSpacer(4);const l=w.addText((p.place||p.name)+(p.code?' · '+p.code:''));l.font=Font.mediumSystemFont(13);l.textColor=new Color('#b5fff8');l.lineLimit=1}}
+w.refreshAfterDate=new Date(Date.now()+15*60000)
+if(config.runsInWidget)Script.setWidget(w);else await w.presentSmall()
+Script.complete()`;
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=p.stage?'on':''}/>)}</div>;}
 
 export default function Dashboard({user,gmail,drive,configured,login}:{user:User|null;gmail:boolean;drive?:boolean;configured:boolean;login:()=>Promise<void>}){
- const [view,setView]=useState<'active'|'done'|'account'>('active'),[size,setSize]=useState(0),[auto,setAuto]=useState(true),[splash,setSplash]=useState<'on'|'out'|'off'>('on'),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[filter,setFilter]=useState<'all'|'pickup'>('all'),[backup,setBackup]=useState<{state:'off'|'on'|'error'|'saving';updated?:string;msg?:string}>({state:drive?'on':'off'}),saved=useRef<MailParcel[]>([]),backupOn=useRef(!!drive),seen=useRef<Set<string>>(new Set()),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off'),[sources,setSources]=useState<{t17:boolean;cainiao:string}|null>(null),[section,setSection]=useState<'list'|'today'|'map'|'stats'>('list'),[marks,setMarks]=useState<Record<string,'got'|'hide'>>({}),[manual,setManual]=useState<MailParcel[]>([]),[adding,setAdding]=useState(false),[addNum,setAddNum]=useState(''),[addName,setAddName]=useState(''),[addErr,setAddErr]=useState(''),[menu,setMenu]=useState<Parcel|null>(null),[geo,setGeo]=useState<Geo>({}),[month,setMonth]=useState(0),[reading,setReading]=useState(false),[addSms,setAddSms]=useState(''),[smsLink,setSmsLink]=useState(''),[toast,setToast]=useState(''),[smsLast,setSmsLast]=useState<{at:string;kind:string}|null>(null);
+ const [view,setView]=useState<'active'|'done'|'account'>('active'),[size,setSize]=useState(0),[auto,setAuto]=useState(true),[splash,setSplash]=useState<'on'|'out'|'off'>('on'),[search,setSearch]=useState(''),[data,setData]=useState<Scan|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[errorCode,setErrorCode]=useState(''),[openId,setOpenId]=useState<string|null>(null),[edit,setEdit]=useState<Parcel|null>(null),[draft,setDraft]=useState(''),[titles,setTitles]=useState<Record<string,string>>({}),[storage,setStorage]=useState(false),[saving,setSaving]=useState(false),[editError,setEditError]=useState(''),[copied,setCopied]=useState(''),[progress,setProgress]=useState<{pct:number;label:string}|null>(null),[filter,setFilter]=useState<'all'|'pickup'>('all'),[backup,setBackup]=useState<{state:'off'|'on'|'error'|'saving';updated?:string;msg?:string}>({state:drive?'on':'off'}),saved=useRef<MailParcel[]>([]),backupOn=useRef(!!drive),seen=useRef<Set<string>>(new Set()),[tracks,setTracks]=useState<Record<string,TrackInfo>>({}),[trackState,setTrackState]=useState<'off'|'on'|'error'>('off'),[sources,setSources]=useState<{t17:boolean;cainiao:string}|null>(null),[section,setSection]=useState<'list'|'today'|'map'|'stats'>('list'),[marks,setMarks]=useState<Record<string,'got'|'hide'>>({}),[manual,setManual]=useState<MailParcel[]>([]),[adding,setAdding]=useState(false),[addNum,setAddNum]=useState(''),[addName,setAddName]=useState(''),[addErr,setAddErr]=useState(''),[menu,setMenu]=useState<Parcel|null>(null),[geo,setGeo]=useState<Geo>({}),[month,setMonth]=useState(0),[reading,setReading]=useState(false),[addSms,setAddSms]=useState(''),[smsLink,setSmsLink]=useState(''),[toast,setToast]=useState(''),[smsLast,setSmsLast]=useState<{at:string;kind:string}|null>(null),[widgetUrl,setWidgetUrl]=useState('');
  const marksRef=useRef(marks);marksRef.current=marks;const manualRef=useRef(manual);manualRef.current=manual;
  const controller=useRef<AbortController|null>(null);const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{try{const v=localStorage.getItem('pd_size');setSize(v?Math.min(2,+v||0):localStorage.getItem('pd_large')==='1'?1:0);setAuto(localStorage.getItem('pd_auto')!=='0');setMarks(JSON.parse(localStorage.getItem('pd_marks')||'{}'));setManual(JSON.parse(localStorage.getItem('pd_manual')||'[]'));setGeo(JSON.parse(localStorage.getItem('pd_geo')||'{}'));}catch{}},[]);
@@ -165,6 +214,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   return {...p,got,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got,last,stage:stale||got?4:p.stage,name:titles[p.id]||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}),[data,titles,tracks,marks,manual]);
+ const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled);
  const q=search.trim().toLowerCase();const shown=(view==='done'?done:filter==='pickup'?active.filter(isPickup):active).filter(p=>!q||[p.name,p.shop,p.carrier,p.tracking,p.order].join(' ').toLowerCase().includes(q));
  const pickup=active.filter(isPickup).length;const open=parcels.find(p=>p.id===openId)||null;
@@ -203,7 +253,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    curMarks={...curMarks};for(const m of [...(data?.parcels||[]),...cur])if(m.keys.includes(key))for(const k of [m.id,...m.keys])delete curMarks[k];}
   if(!added)return false;setManual(cur);setMarks(curMarks);persist(curMarks,cur);if(pushOn.current)void pushPost({parcels:[...saved.current,...cur],marks:curMarks}).catch(()=>{});
   if(lastP){void loadTracks([lastP]);setToast(added>1?'נוספו '+added+' עדכונים מ־SMS':'נקלט SMS: '+(lastP.pickup?.code?'קוד '+lastP.pickup.code:lastP.tracking));setTimeout(()=>setToast(''),4000);}return true;}
- async function pullSms(){try{const r=await fetch('/api/sms',{cache:'no-store'});if(!r.ok)return;const d=await r.json();if(d.link)setSmsLink(d.link);setSmsLast(d.last||null);if(d.items?.length)applySms(d.items.map((x:{text:string})=>x.text));}catch{}}
+ async function pullSms(){try{const r=await fetch('/api/sms',{cache:'no-store'});if(!r.ok)return;const d=await r.json();if(d.link)setSmsLink(d.link);if(d.widget)setWidgetUrl(d.widget);setSmsLast(d.last||null);if(d.items?.length)applySms(d.items.map((x:{text:string})=>x.text));}catch{}}
  const smsRef=useRef(pullSms);smsRef.current=pullSms;
  useEffect(()=>{if(!user||!data)return;void smsRef.current();let t='';try{t=new URLSearchParams(location.search).get('sms')||'';}catch{}if(t){applySms([t]);history.replaceState(null,'','/');}},[user?.id,!!data]);
  // Long press on a card opens quick actions.
@@ -273,6 +323,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <button className="ghost" onClick={()=>copy(smsLink)}><Copy size={18}/> {copied===smsLink?'הקישור הועתק ✓':'העתקת הקישור האישי'}</button>
    <p className="setNote" role="status">{smsLast?'הודעה אחרונה הגיעה ב־'+new Date(smsLast.at).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(smsLast.kind==='parcel'?' וזוהתה כחבילה ✓':smsLast.kind==='empty'?', אבל בלי טקסט':', אבל לא נמצא בה מספר מעקב'):'עדיין לא הגיעה אף הודעה מהקיצור.'}</p>
    <p className="setNote">הקישור אישי. אל תשתף אותו.</p></section>}
+  {user&&widgetUrl&&<section className="set"><h3><Smartphone size={20}/> ווידג'ט למסך הבית</h3>
+   <p className="setNote">{push==='on'?'עובד דרך אפליקציית Scriptable, ומתעדכן עם ההתראות.':'עובד דרך Scriptable ומתעדכן מהשרת של ההתראות, אז צריך שההתראות יהיו פעילות.'}</p>
+   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox</b>.</li><li>במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← גודל קטן או בינוני. בהגדרות הווידג'ט בחר את הסקריפט <b>Unbox</b>.</li></ol>
+   <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
   {user&&hiddenCount>0&&<section className="set"><h3>חבילות מוסתרות</h3><p className="setNote">הסתרת {hiddenCount} פריטים שזוהו בטעות כחבילות.</p><button className="ghost" onClick={()=>{const next=Object.fromEntries(Object.entries(marks).filter(([,v])=>v!=='hide')) as Record<string,'got'|'hide'>;setMarks(next);persist(next,manual);}}><Undo2 size={18}/> החזר את כולם</button></section>}
   <section className="set"><h3>חשבון</h3>
    {user?<><div className="setRow"><span>{user.name||'Google'}</span></div><p className="setNote mono" dir="ltr">{user.email}</p>
@@ -305,7 +359,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {!(waiting)&&section==='list'&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>setSearch(e.target.value)}/></label>
    {error&&<div className="error" role="alert"><span>{error}</span>{['NO_GMAIL','RECONNECT','UNAUTHORIZED'].includes(errorCode)?<form action={login}><button className="primary">חידוש הרשאת Google</button></form>:<button className="ghost" onClick={()=>sync()}>נסה שוב</button>}</div>}
    <div className="list">{shown.map(p=><button key={p.id} className={'card '+(isPickup(p)||outToday(p)?'focus':'')} {...longPress(p)} aria-label={p.name+', '+statusText(p)}>
-    <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span>{p.stage===3&&p.pickup?.place&&!p.cancelled?<span className="eta">איסוף ב<b>{p.pickup.place}</b></span>:p.eta&&!p.cancelled&&<span className="eta">הגעה <b>{p.eta}</b></span>}</div></div></div>
+    <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span>{p.stage===3&&p.pickup?.place&&!p.cancelled?<span className="eta">איסוף ב<b>{p.pickup.place}</b></span>:p.eta&&!p.cancelled?<span className="eta">הגעה <b>{p.eta}</b></span>:(()=>{const e=est(p);return e&&<span className="eta">{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>{guardOf(p)&&<div className="guardTag"><ShieldAlert size={16}/> ההזמנה תיסגר בקרוב, החבילה לא הגיעה</div>}</div></div>
     <Bar p={p}/></button>)}</div>
 
    {!shown.length&&!busy&&data&&<section className="panel empty"><Package size={40}/><h2>{q?'לא נמצאו חבילות':view==='done'?'עדיין אין חבילות שנמסרו':filter==='pickup'?'אין חבילות לאיסוף':'אין חבילות בדרך'}</h2><p>{q?'נסה מילה אחרת.':'חבילות חדשות יופיעו כאן אחרי רענון.'}</p></section>}
@@ -319,6 +373,20 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <div className="dt"><h2>{bidi(open.name)}</h2><Meta p={open}/></div>
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled&&<span className="eta">הגעה <b>{open.eta}</b></span>}</div>
    {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':open.stage/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<open.stage?'d':i===open.stage?'c':'')}><span/>{i===3&&open.stage>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
+  {(()=>{const e=est(open);if(!e)return null;const span=Math.max(1,(e.to-shippedAt(open))/864e5),inWay=Math.max(0,Math.round((Date.now()-shippedAt(open))/864e5));
+   return <section className="box estBox"><h3>צפי הגעה</h3><div className="big">{estText(e)}</div>
+    {!e.late&&<div className="mut">{(()=>{const a=Math.max(1,Math.round((e.from-Date.now())/864e5)),b=Math.max(a,Math.round((e.to-Date.now())/864e5));return a===b?'בעוד כ־'+a+' ימים':'בעוד '+a+'-'+b+' ימים';})()}</div>}
+    <div className="estBar"><i style={{width:Math.min(100,100*inWay/span)+'%'}}/></div>
+    <div className="erow"><span>{e.scope==='route'?'חבילות קודמות שלך במסלול הזה':'חבילות קודמות שלך מ־'+open.shop}</span><b>{e.n}</b></div>
+    <div className="erow"><span>בממוצע מהמשלוח עד אליך</span><b>{e.avg} ימים</b></div>
+    <div className="erow"><span>החבילה בדרך כבר</span><b>{inWay} ימים</b></div>
+    <p className="setNote">{e.late?'החבילה בדרך יותר מהרגיל אצלך. אם היא מ־AliExpress, שים לב לזמן הגנת הקונה.':'מחושב רק מחבילות שבאמת הגיעו אליך, ומתעדכן עם כל חבילה שמגיעה.'}</p></section>;})()}
+  {(()=>{const g=guardOf(open);if(!g)return null;return <section className="box guardBox"><h3><ShieldAlert size={18}/> שומר החזר כספי</h3>
+   <p className="setNote">AliExpress הודיעה ב־{new Date(g.since).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})} שההזמנה תסומן בקרוב כהושלמה. אם החבילה לא אצלך, פתח מחלוקת לפני שזה קורה.{open.price?' שילמת '+open.price+'.':''}</p>
+   <div className="msg" dir="ltr">{disputeText(open)}</div>
+   <button className="primary" onClick={()=>{void copy(disputeText(open));const u=orderUrl(open);if(u)window.open(u,'_blank','noopener');}}>{copied===disputeText(open)?'הועתק ✓ ':''}העתק הודעה ופתח את ההזמנה</button>
+   <button className="ghost" onClick={()=>mark(open,'got')}>החבילה הגיעה</button></section>;})()}
+  <Journey p={open}/>
   <Route p={open}/>
   {open.pickup&&open.stage<4&&!open.cancelled&&<section className="box pickup"><h3><MapPin size={18}/> נקודת איסוף</h3>
    {open.pickup.place&&<p className="place">{open.pickup.place}</p>}{open.pickup.address&&<p className="addr">{open.pickup.address}</p>}{open.pickup.hours&&<p className="addr">שעות: {open.pickup.hours}</p>}
@@ -333,6 +401,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {open.url&&<a className="link" href={open.url} target="_blank" rel="noopener noreferrer">מעקב באתר החנות <ExternalLink size={15}/></a>}
   </section>}
   <div className="sheetActions">{open.got?<button className="ghost" onClick={()=>mark(open,null)}><Undo2 size={18}/> בטל "קיבלתי"</button>:open.stage<4&&<button className="primary" onClick={()=>mark(open,'got')}><PackageCheck size={18}/> קיבלתי</button>}
+   {open.stage>=4&&!open.cancelled&&<a className="ghost" href={orderUrl(open)||'https://www.google.com/search?q='+encodeURIComponent((open.shop||'')+' '+open.name)} target="_blank" rel="noopener noreferrer"><RotateCcw size={18}/> הזמן שוב</a>}
    <button className="ghost" onClick={()=>mark(open,'hide')}><EyeOff size={18}/> הסתר, זו לא חבילה</button></div>
  </div>}
 

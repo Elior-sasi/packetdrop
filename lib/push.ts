@@ -23,6 +23,6 @@ export function db(){const sql=neon(DB_URL());
  return {sql,ready};}
 
 // Personal link for the iPhone Shortcut that forwards delivery SMS: user id + signature, nothing stored.
-export function smsToken(userId:string){return b64u(Buffer.from(userId))+'.'+b64u(createHmac('sha256',derive('sms-link')).update(userId).digest()).slice(0,22);}
-export function smsUser(token:string){const [a,sig]=token.split('.');if(!a||!sig)return null;let id='';try{id=Buffer.from(a,'base64url').toString('utf8');}catch{return null;}
- const want=smsToken(id).split('.')[1];return want.length===sig.length&&timingSafeEqual(Buffer.from(want),Buffer.from(sig))?id:null;}
+export function smsToken(userId:string,label='sms-link'){return b64u(Buffer.from(userId))+'.'+b64u(createHmac('sha256',derive(label)).update(userId).digest()).slice(0,22);}
+export function smsUser(token:string,label='sms-link'){const [a,sig]=token.split('.');if(!a||!sig)return null;let id='';try{id=Buffer.from(a,'base64url').toString('utf8');}catch{return null;}
+ const want=smsToken(id,label).split('.')[1];return want.length===sig.length&&timingSafeEqual(Buffer.from(want),Buffer.from(sig))?id:null;}
