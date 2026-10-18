@@ -34,7 +34,9 @@ function part(raw:string){let s=raw.replace(/[|]/g,' ').replace(/\s+/g,' ').trim
  return out;}
 // The same AliExpress fixes as when a title is first read, so names saved before the fix read right too.
 function fixOld(n:string){return n.replace(/(\S) '(\S)/g,"$1'$2").replace(/וואן\s*1?\s*פיס/g,'One Piece').replace(/\s+וואן$/,'').replace(/^\d{5,}\s+/,'').replace(/^פרוק(?=\s|$)/,'פאה').replace(/\s+(?:מותאם|מותאמת|בהתאמה)\s+אישית/g,'').replace(/^(תחפושת|תחפושות|חליפת|חליפה)\s+קוספל\S*\s+(?:של\s+)?/,'$1 ').replace(/^פאה\s+קוספל\S*.*$/,'פאה').replace(/\s+(?:תואם|תואמת|עמיד|עמידה)$/,'').replace(/\s+(?:עם|של|עבור)\s+[\u0590-\u05FF]{1,4}$/,'').trim();}
-export function heName(n:string){const src=fixOld(n.trim());if(!src)return src;
+export function heName(n:string){let src=fixOld(n.trim());if(!src)return src;
+ // Store titles add a second description after a comma ("…לווייתן, גיבור ים"); the part before it is the name.
+ src=src.split(' + ').map(x=>{const m=x.match(/^([^,،]{12,}?)[,،]\s*[\u0590-\u05FF][^,،]*$/);return m?m[1].trim():x;}).join(' + ');
  // A bare catalog number after a Hebrew word ("מאג זכוכית 246") is a SKU, not part of the name.
  const out=src.split(/\s+\+\s+/).map(part).filter(Boolean).join(' + ').replace(/([\u0590-\u05FF][\u0590-\u05FF"'׳״]*)\s+\d{3,6}$/,'$1');
  return out.length>=3?out:src;}
