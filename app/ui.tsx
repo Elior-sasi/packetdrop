@@ -86,8 +86,10 @@ function pairCouriers<T extends Parcel&{stale?:boolean}>(P:T[],titles:Record<str
  const need=(x:T)=>!x.image&&generic(x)&&/AliExpress/i.test(x.shop)&&!!x.carrier&&!/AliExpress|Cainiao/i.test(x.carrier);
  const t0=(x:T)=>new Date(x.events[0]?.time||0).getTime();
  const pairs:[number,number,number][]=[];
- P.forEach((c,ci)=>{if(!need(c))return;P.forEach((o,oi)=>{if(oi===ci||need(o)||generic(o)||!/AliExpress/i.test(o.shop)||o.pickup||!o.events.length)return;
-  const gap=t0(c)-t0(o);if(gap<=0||gap>45*864e5)return;pairs.push([gap+(o.stage>=4&&!o.stale?30*864e5:0),ci,oi]);});});
+ const tLast=(x:T)=>new Date(x.events.at(-1)?.time||0).getTime();
+ // Only orders that are clearly still waiting for a courier: not cancelled, no tracking of their own, no news after the courier's notice.
+ P.forEach((c,ci)=>{if(!need(c))return;P.forEach((o,oi)=>{if(oi===ci||need(o)||generic(o)||!/AliExpress/i.test(o.shop)||o.pickup||!o.events.length||o.cancelled||o.tracking||o.stage>=4&&!o.stale||o.events.some(e=>/בוטל|cancel/i.test(e.label)))return;
+  const gap=t0(c)-t0(o);if(gap<=0||gap>30*864e5||tLast(o)>t0(c)+864e5)return;pairs.push([gap,ci,oi]);});});
  pairs.sort((x,y)=>x[0]-y[0]);const usedC=new Set<number>(),usedO=new Set<number>(),map=new Map<number,number>();
  for(const [,ci,oi] of pairs){if(usedC.has(ci)||usedO.has(oi))continue;usedC.add(ci);usedO.add(oi);map.set(ci,oi);}
  return P.flatMap((x,i)=>{if(usedO.has(i))return [];const oi=map.get(i);if(oi===undefined)return [x];const o=P[oi];
@@ -102,7 +104,7 @@ function learn(all:Parcel[]){const days:Record<string,number[]>={};
   for(const k of [routeKey(p),p.shop+'|*'])(days[k]??=[]).push(d);}
  return days;}
 const pct=(a:number[],q:number)=>{const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1))))];};
-function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=4||p.cancelled||p.stage<1)return null;
+function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=3||p.cancelled||p.stage<1)return null;
  let a=days[routeKey(p)],scope:'route'|'shop'='route';if(!a||a.length<3){a=days[p.shop+'|*'];scope='shop';}if(!a||a.length<3)return null;
  const t0=shippedAt(p);let from=t0+pct(a,.2)*864e5,to=t0+pct(a,.8)*864e5;const now=Date.now();const late=now>to+864e5;
  if(from<now)from=now+864e5;if(to<from)to=from;return {from,to,n:a.length,avg:Math.round(a.reduce((x,y)=>x+y,0)/a.length),late,scope};}
