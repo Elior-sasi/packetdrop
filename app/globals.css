@@ -235,3 +235,5 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .nc-top{margin-bottom:10px;font-size:calc(16px*var(--fs))}
 .nc-ring .thumb{width:72px!important;height:72px!important}
 .listH{margin:10px 4px 0;font-size:calc(17px*var(--fs));color:var(--mut);font-weight:600}
+.card .st .eta,.box .row .eta{display:inline-block;padding:3px 10px;border-radius:999px;background:#ffffff12;border:1px solid #ffffff14;color:#cfe4f7;font-size:calc(13px*var(--fs));font-weight:600;white-space:nowrap}
+.card .st .eta b,.box .row .eta b{color:inherit;font-weight:600}
