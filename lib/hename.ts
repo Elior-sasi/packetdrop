@@ -8,6 +8,8 @@ const isNoun=(w:string)=>NOUNS.includes(w.replace(/[,،]$/,''));
 // "AirPods 5 (2026) /4/Pro 3" -> "AirPods 5"
 const model=(s:string)=>s.replace(/\([^)]*\)/g,' ').replace(/\s*\/.*$/,'').replace(/\s+/g,' ').trim();
 function part(raw:string){let s=raw.replace(/[|]/g,' ').replace(/\s+/g,' ').trim();if(!s)return s;
+ // Leading piece counts ("7 יחידות / …", "2PCS …") are store noise.
+ s=s.replace(/^\d+\s*(?:יחידות|יחידה|יח['׳]?|חלקים|pcs|pieces|pc|sets?)\s*[/\-,:|]?\s*/i,'').replace(/^(?:\d+\s*)?(?:pcs|pieces)\s+/i,'').trim();
  // A title cut with "…": the last word is incomplete, drop it.
  if(/(?:…|\.\.\.)$/.test(s)){s=s.replace(/(?:…|\.\.\.)$/,'').trim();if(s.split(' ').length>2)s=s.replace(/\s+\S+$/,'');}
  // "עבור Logitech F710 USB Nano Dongle" -> "דונגל ל־Logitech F710"

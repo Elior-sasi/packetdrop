@@ -10,5 +10,6 @@ const cases:[string,string][]=[
  ['תחפושת איש כריש לווייתן, גיבור ים','תחפושת איש כריש לווייתן, גיבור ים'],
  ['אוזניות בלוטות\'','אוזניות בלוטות\''],
  ['Smart watch','Smart watch'],
+ ['7 יחידות / מערכת חיתוך עוגיות + כבל טעינה לעכבר Type-C','מערכת חיתוך עוגיות + כבל טעינה לעכבר Type-C'],
 ];
 test('hebrew names',()=>{for(const [a,b] of cases)assert.equal(heName(a),b,a);});
