@@ -123,7 +123,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
   const bits=a.find('*').addBack().contents().toArray().filter(n=>n.type==='text').map(n=>$(n).text().replace(/\s+/g,' ').trim()).filter(t=>t.length>6&&!/^[₪$€]|\d+[.,]\d{2}\s*$|^x\d+$|משלוח אל|סך הכל|לפרטי|פרטי ה(?:חבילה|הזמנה|משלוח)|order details|package details/i.test(t));
   if(bits[0]){name=tidyName(bits[0]);}});
  // Package notices list every product in the box (AliExpress "פרטי החבילה"); keep them all, not just the first.
- const listed=[...new Set($('.EDM-SYSTEM-TEXT-productName, .order-list__item-title').toArray().map(el=>tidyName($(el).text().replace(/\s+/g,' ').trim().replace(/\s*[x×]\s*\d{1,3}$/,''))).filter(t=>t.length>3))].slice(0,12);
+ // Those boxes cut long titles mid-word (sometimes without "…"), so a long one is treated as cut.
+ const listed=[...new Set($('.EDM-SYSTEM-TEXT-productName, .order-list__item-title').toArray().map(el=>{const t=$(el).text().replace(/\s+/g,' ').trim().replace(/\s*[x×]\s*\d{1,3}$/,'');return tidyName(/(\.\.\.|…)$/.test(t)||t.length<28?t:t+'...');}).filter(t=>t.length>3))].slice(0,12);
  // The photo often sits in its own anchor next to the title anchor; take the first real product photo from those links (skip tiny badge icons).
  const productImg=(el:any)=>{const src=$(el).attr('src')||$(el).attr('data-src')||'';const u=secureUrl(src.startsWith('//')?'https:'+src:src.replace(/^http:\/\/(?=[^/]*(?:alicdn|aliexpress-media|media-amazon|ssl-images-amazon|temu|shein|ebayimg))/i,'https://'));const w=Number($(el).attr('width')||0);
   return u&&!/\/\d{1,2}x\d{1,2}\.(?:png|gif|jpe?g)(?:$|\?)|logo|icon|spacer|badge/i.test(u)&&!(w>0&&w<40)?u:'';};
