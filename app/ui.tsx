@@ -76,18 +76,21 @@ function Favicon({name,size=18}:{name:string;size?:number}){const [failed,setFai
 function Mark({cls,anim}:{cls?:string;anim?:'bob'|'open'}){return <svg className={cls} viewBox="100 76 312 386" aria-hidden="true"><defs><linearGradient id="ug" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug)" strokeWidth="58" strokeLinecap="round"/><g className="lid">{anim==="bob"&&<animateTransform attributeName="transform" type="translate" values="0 40;0 -26;0 40" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>}{anim==="open"&&<animateTransform attributeName="transform" type="translate" values="0 56;0 0" dur=".9s" begin=".2s" fill="freeze" calcMode="spline" keySplines=".2 .9 .3 1"/>}<rect x="112" y="112" width="288" height="48" rx="16" fill="#4aa8ff" transform="rotate(-10 112 160)"/></g></svg>;}
 // Full-screen photo: pinch with two fingers to zoom, drag to move, double-tap to zoom in or back, ✕ to close.
 function Zoom({src,alt,onClose}:{src:string;alt:string;onClose:()=>void}){const [t,setT]=useState({s:1,x:0,y:0});const pts=useRef(new Map<number,{x:number;y:number}>());const start=useRef<{d:number;s:number;mx:number;my:number;x:number;y:number}|null>(null);const last=useRef(0);
- const clamp=(v:{s:number;x:number;y:number})=>{const s=Math.min(5,Math.max(1,v.s));return s===1?{s,x:0,y:0}:{s,x:v.x,y:v.y};};
+ const img=useRef<HTMLImageElement>(null);
+ // The photo never slides past its own edge into the black: it can move only as far as its zoomed size overflows the screen.
+ const clamp=(v:{s:number;x:number;y:number})=>{const s=Math.min(5,Math.max(1,v.s));if(s===1)return {s,x:0,y:0};const el=img.current;if(!el)return {s,x:v.x,y:v.y};
+  const mx=Math.max(0,(el.offsetWidth*s-innerWidth)/2),my=Math.max(0,(el.offsetHeight*s-innerHeight)/2);return {s,x:Math.max(-mx,Math.min(mx,v.x)),y:Math.max(-my,Math.min(my,v.y))};};
  const begin=()=>{const a=[...pts.current.values()];if(a.length===2){start.current={d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),s:t.s,mx:(a[0].x+a[1].x)/2,my:(a[0].y+a[1].y)/2,x:t.x,y:t.y};}else if(a.length===1){start.current={d:0,s:t.s,mx:a[0].x,my:a[0].y,x:t.x,y:t.y};}};
  useEffect(()=>{const k=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};addEventListener('keydown',k);return()=>removeEventListener('keydown',k);},[onClose]);
  return <div className="zoom" role="dialog" aria-modal="true" aria-label={alt}>
   <button className="zoomX" aria-label="סגירה" onClick={onClose}><X size={26}/></button>
   <div className="zoomArea" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);pts.current.set(e.pointerId,{x:e.clientX,y:e.clientY});begin();
-    if(pts.current.size===1){const now=Date.now();if(now-last.current<300)setT(v=>v.s>1?{s:1,x:0,y:0}:{s:2.5,x:0,y:0});last.current=now;}}}
+    if(pts.current.size===1){const now=Date.now();if(now-last.current<300)setT(v=>{if(v.s>1)return {s:1,x:0,y:0};const el=img.current;const fill=el?Math.max(innerHeight/el.offsetHeight,innerWidth/el.offsetWidth):2.5;return clamp({s:Math.max(1.5,fill),x:0,y:0});});last.current=now;}}}
    onPointerMove={e=>{if(!pts.current.has(e.pointerId)||!start.current)return;pts.current.set(e.pointerId,{x:e.clientX,y:e.clientY});const a=[...pts.current.values()];const st=start.current;
     if(a.length===2&&st.d){const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);const mx=(a[0].x+a[1].x)/2,my=(a[0].y+a[1].y)/2;setT(clamp({s:st.s*d/st.d,x:st.x+mx-st.mx,y:st.y+my-st.my}));}
     else if(a.length===1&&t.s>1)setT(clamp({s:t.s,x:st.x+a[0].x-st.mx,y:st.y+a[0].y-st.my}));}}
    onPointerUp={e=>{pts.current.delete(e.pointerId);begin();}} onPointerCancel={e=>{pts.current.delete(e.pointerId);begin();}}>
-   <img src={src} alt={alt} referrerPolicy="no-referrer" draggable={false} style={{transform:`translate(${t.x}px,${t.y}px) scale(${t.s})`}}/></div></div>;}
+   <img ref={img} src={src} alt={alt} referrerPolicy="no-referrer" draggable={false} style={{transform:`translate(${t.x}px,${t.y}px) scale(${t.s})`}}/></div></div>;}
 // Several photos: one at a time, swiped sideways, with dots that show where you are.
 function Gallery({imgs}:{imgs:string[]}){const [at,setAt]=useState(0);const [big,setBig]=useState<number|null>(null);
  return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={trimmed(src)} alt={'תמונה '+(i+1)+' מתוך '+imgs.length} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer" role="button" tabIndex={0} onClick={()=>setBig(i)}/>)}</div>{big!==null&&<Zoom src={imgs[big]} alt={'תמונה '+(big+1)+' מתוך '+imgs.length} onClose={()=>setBig(null)}/>}
