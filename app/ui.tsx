@@ -67,7 +67,7 @@ const etaText=(e:TrackInfo['eta'])=>{if(!e)return '';const a=day(e.from),b=day(e
 function withCarrier(p:MailParcel,t?:TrackInfo):Parcel{if(!t||!p.tracking&&!t.number.startsWith('TZ:'))return p;
  const stage=p.cancelled?p.stage:Math.max(p.stage,t.stage);
  const events:Event[]=[...p.events,...t.events.map(e=>({id:'trk:'+e.time+e.text,label:[heEvent(e.text).replace(/\s*[•·]\s*([^•·]*,[^•·]*)$/,(m,pl)=>tidyPlace(pl)?' · '+tidyPlace(pl):''),tidyPlace(e.location||'')].filter(Boolean).filter((x,i,a)=>i===0||!a[0].includes(x)).join(' · '),time:new Date(e.time).toISOString(),src:t.carrier||'חברת השילוח'}))].sort((a,b)=>a.time.localeCompare(b.time));
- return {...p,stage,carrier:p.carrier||t.carrier,eta:stage>=4?'':p.eta||etaText(t.eta),events,carrierStatus:t.status,trackPending:t.pending};}
+ return {...p,stage,carrier:p.carrier||t.carrier,eta:stage>=4?'':etaText(t.eta)||p.eta,events,carrierStatus:t.status,trackPending:t.pending};}
 // Navigation to a pickup point: Google Maps, Waze and Moovit (Moovit needs coordinates, looked up once per address).
 const placeQuery=(pk:{place:string;address:string})=>[pk.place,pk.address].filter(Boolean).join(' ');
 function NavLinks({pk,geo}:{pk:{place:string;address:string};geo?:{lat:number;lon:number}|null}){const q=placeQuery(pk);
