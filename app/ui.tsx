@@ -404,7 +404,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
      <p className="place">{pk.place||pk.address}</p>{pk.place&&pk.address&&<p className="addr">{pk.address}</p>}{pk.hours&&<p className="addr">שעות: {pk.hours}</p>}
      <p className="addr">{bidi(p.name)}</p>{pk.code&&<button className="code" onClick={()=>copy(pk.code)}><KeyRound size={20}/><span>קוד איסוף</span><b dir="ltr">{pk.code}</b>{copied===pk.code?' ✓':<Copy size={17}/>}</button>}
      <NavLinks pk={pk} geo={geo[q]}/></section>;})
-    :<section className="panel empty"><MapIcon size={40}/><h2>אין חבילות שמחכות לאיסוף</h2><p>כשחבילה תגיע לנקודת איסוף, המקום יופיע כאן עם ניווט.</p></section>}</div>}
+    :<section className="panel empty"><MapIcon size={40}/><h2>אין חבילות לאיסוף</h2><p>כשחבילה תגיע לנקודת איסוף, המקום יופיע כאן עם ניווט.</p></section>}</div>}
    {!(waiting)&&section==='stats'&&<div className="statsWrap">
     <div className="seg" role="radiogroup" aria-label="חודש">{['החודש','החודש שעבר'].map((l,i)=><button key={i} role="radio" aria-checked={month===i} className={month===i?'on':''} onClick={()=>setMonth(i)}>{l}</button>)}</div>
     <div className="statGrid"><div className="stat"><b>{stats.ordered}</b><span>הזמנות</span></div><div className="stat"><b>{stats.delivered}</b><span>הגיעו</span></div><div className="stat"><b>{stats.avg||'–'}</b><span>ימים בממוצע</span></div></div>
@@ -419,7 +419,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
     <Bar p={p}/></button>)}</div>
    {folded.length>0&&<details className="box fold foldList"><summary><span>{folded.length} הודעות שליח בלי שם</span><b>הצג</b></summary><div className="list">{folded.map(p=><button key={p.id} className="card" {...longPress(p)} aria-label={p.name+', '+statusText(p)}><div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span></div></div></div></button>)}</div></details>}
 
-   {!shown.length&&!busy&&data&&<section className="panel empty"><Package size={40}/><h2>{q?'לא נמצאו חבילות':view==='done'?'עדיין אין חבילות שנמסרו':filter==='pickup'?'אין חבילות לאיסוף':'אין חבילות בדרך'}</h2><p>{q?'נסה מילה אחרת.':'חבילות חדשות יופיעו כאן אחרי רענון.'}</p></section>}
+   {!shown.length&&!busy&&data&&<section className="panel empty"><Package size={40}/><h2>{q?'לא נמצאו חבילות':view==='done'?'אין חבילות שנמסרו':filter==='pickup'?'אין חבילות לאיסוף':'אין חבילות בדרך'}</h2><p>{q?'נסה מילה אחרת.':'חבילות חדשות יופיעו כאן אחרי רענון.'}</p></section>}
    </>}
   </>}
  </>}
