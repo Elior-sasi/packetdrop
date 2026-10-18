@@ -208,3 +208,4 @@ html,body,.sheet,.menu{scrollbar-width:none;-ms-overflow-style:none}html::-webki
 .card .meta{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}.card .meta span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .customsTag{background:#3a1420;border-color:#ff8fa3;color:#ffc2cd}.customsBox{border-color:#ff8fa3}.customsBox h3{color:#ffc2cd}
 .customsBox a.primary{display:flex;align-items:center;justify-content:center;text-decoration:none;margin-top:10px}
+.list{grid-template-columns:minmax(0,1fr)}.card{min-width:0;max-width:100%;overflow:hidden}html,body{overflow-x:hidden}
