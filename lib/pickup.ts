@@ -22,3 +22,5 @@ export function openNow(hours:string,now=new Date()):{open:boolean;until?:string
  const m=now.getHours()*60+now.getMinutes();for(const [a,b] of today){if(m>=mins(a)&&m<mins(b))return {open:true,until:b};}
  const next=today.find(([a])=>mins(a)>m);return {open:false,...(next?{opens:next[0]}:{today:'סגור להיום'})};}
 export const hoursText=(hours:string,now=new Date())=>{const o=openNow(hours,now);if(!o)return '';return o.open?'פתוח עכשיו · עד '+o.until:o.opens?'סגור · נפתח ב־'+o.opens:o.today||'';};
+// One name per pickup point (place + address), used for the user's on/off choices.
+export const pointKey=(pk:{place?:string;address?:string})=>[pk.place,pk.address].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
