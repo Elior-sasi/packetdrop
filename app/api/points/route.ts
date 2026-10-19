@@ -2,7 +2,7 @@ import {NextRequest} from 'next/server';
 import {identity} from '@/lib/identity';
 import {db,dbOn,smsUser} from '@/lib/push';
 import {mergeParcels,type Parcel} from '@/lib/parcels';
-import {pointKey} from '@/lib/pickup';
+import {pointKey,daysLeft} from '@/lib/pickup';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 // "Near a pickup point" alerts. The phone (Shortcuts) asks with the personal link for parcels waiting at a point,
 // each with the point's coordinates, and turns them into iPhone reminders that fire on arrival.
@@ -16,7 +16,8 @@ async function geocode(s:Awaited<ReturnType<typeof sql>>,k:string):Promise<{lat:
  let hit:{lat:string;lon:string;address?:{city?:string;town?:string;village?:string;suburb?:string}}|undefined;try{const r=await fetch('https://nominatim.openstreetmap.org/search?'+new URLSearchParams({q:k,format:'json',limit:'1',countrycodes:'il','accept-language':'he',addressdetails:'1'}),{headers:{'User-Agent':'Unbox parcel tracker (packetdrop.vercel.app)'},signal:AbortSignal.timeout(8000)});hit=(await r.json())?.[0];}catch{return null;}
  const city=hit?.address?.city||hit?.address?.town||hit?.address?.village||'';
  await s`insert into geo_points(k,lat,lon,city) values(${k},${hit?+hit.lat:null},${hit?+hit.lon:null},${city}) on conflict(k) do update set lat=excluded.lat,lon=excluded.lon,city=excluded.city`;return hit?{lat:+hit.lat,lon:+hit.lon,city}:null;}
-const waiting=(p:Parcel,marks:Record<string,string>)=>p.stage===3&&!p.cancelled&&!!p.pickup&&!!(p.pickup.place||p.pickup.address)&&!marks[p.id]&&!p.keys.some(k=>marks[k]);
+// Still waiting: not marked received, and inside the time the point keeps it (an old one was most likely collected already).
+const waiting=(p:Parcel,marks:Record<string,string>)=>p.stage===3&&!p.cancelled&&!!p.pickup&&!!(p.pickup.place||p.pickup.address)&&!marks[p.id]&&!p.keys.some(k=>marks[k])&&daysLeft(p)>=0;
 export async function GET(req:NextRequest){if(!dbOn())return Response.json({ok:false},{status:503,headers:H});const s=await sql();const q=req.nextUrl.searchParams;
  const t=q.get('t');
  if(t){const user=smsUser(t,'widget');if(!user)return Response.json({ok:false},{status:401,headers:H});
