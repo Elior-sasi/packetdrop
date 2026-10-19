@@ -2,7 +2,7 @@ import {baldarHost} from '@/lib/tapuz';
 import * as cheerio from 'cheerio';
 import {heName} from '@/lib/hename';
 export type Event={id:string;label:string;time:string};
-export type Pickup={place:string;address:string;code:string;url:string;hours?:string};
+export type Pickup={place:string;address:string;code:string;url:string;hours?:string;until?:string};
 export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[];orderItems?:Record<string,string[]>;pkgByOrder?:Record<string,string[]>;link?:string};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
@@ -118,7 +118,9 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const post=/postil\.co\.il|israelpost/i.test(from);
  const postWait=post?text.match(/ממתין ב\s*(.{3,80}?)\s*\.\s*(?:למידע|לתשומת|$)/):null;
  const postShelf=post?text.match(/[A-Z]{2}\d{8,12}[A-Z]{0,2}\s*([\u05D0-\u05EA]\s?\d{1,4})(?=\s|[\u05D0-\u05EA])/)?.[1]||'':'';
- const pickup:Pickup|null=postWait?{place:postWait[1].trim(),address:'',code:postShelf,url:'',hours:''}:place||code?{place,address,code,url:pickupUrl,hours}:null;
+ // The last day to collect, when the notice says it ("ניתן לאסוף עד 25.10", "יוחזר לשולח ב־27/10").
+ const until=text.match(/(?:לאסוף|איסוף|ייאסף|תיאסף|יוחזר|תוחזר|תישמר|יישמר|שמורה|collect)[^.\n\d]{0,30}?(?:עד|לפני|ב־?|by|until)\s*(?:ה?תאריך\s*)?(\d{1,2}[./]\d{1,2})/i)?.[1]||'';
+ const pickup:Pickup|null=postWait?{place:postWait[1].trim(),address:'',code:postShelf,url:'',hours:'',...(until?{until}:{})}:place||code?{place,address,code,url:pickupUrl,hours,...(until?{until}:{})}:null;
  // No order and no parcel number: newsletters, surveys and receipts without shipping. Not a parcel.
  if(!order&&!tracking&&!extra.size)return null;
  let name='',image='';
