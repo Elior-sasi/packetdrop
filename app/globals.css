@@ -303,3 +303,4 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .dispute h3{display:flex;gap:8px;align-items:center;color:#ffcf6b}.dispute .primary{margin-top:10px}.disputeText{text-align:left;font-size:calc(14px*var(--fs));color:#cfe4f7;line-height:1.5}
 .ptCity{color:#9fb4c8;font-weight:400}
 .btnLink{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;color:inherit;margin-top:10px;box-sizing:border-box;width:100%}
+.nc-list button{flex-wrap:wrap;row-gap:2px}.nc-list button em{margin-inline-start:auto}

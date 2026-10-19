@@ -22,7 +22,9 @@ const tone=(p:Parcel)=>p.stale?'unk':p.cancelled||p.returned||(p.stage<4&&/Excep
 // Waiting at a pickup point (as opposed to a courier bringing it to the door).
 // Search by meaning, not only by spelling: stores name the same thing differently ("חולצה" / "בגדי אנימה" / "T-shirt").
 const SYN:string[][]=[['חולצ','shirt','טישרט','טי-שירט','טי שירט','בגדי'],['מכנס','pants','trousers','קארגו','ג\'ינס','jeans','shorts'],['אוזני','airpods','earbuds','headphone','earphone','buds'],['שעון','watch'],['נעל','shoe','sneaker','סניקרס','סנדל'],['תיק','bag','backpack','ארנק','wallet'],['כבל','cable','usb'],['מטען','charger'],['כיסוי','case','cover','מגן'],['שקע','plug','socket','מתאם','adapter'],['טלפון','phone','iphone','סמארטפון'],['מקלדת','keyboard'],['עכבר','mouse'],['שלט','remote','controller','בקר','gamepad'],['מנורה','lamp','light','תאורה']];
-function searchTerms(q:string){if(!q)return [];const g=SYN.find(list=>list.some(t=>q.startsWith(t)||t.startsWith(q)&&q.length>=3));return g?[...new Set([q,...g])]:[q];}
+// Hebrew forms: "מנורה" also finds "מנורת שולחן", "כבלים" finds "כבל" (the stem without a final ה/ת or plural ending).
+const stem=(w:string)=>{const m=w.match(/^(.{3,}?)(?:ים|ות|ה|ת)$/);return m&&/[\u05D0-\u05EA]$/.test(w)?m[1]:'';};
+function searchTerms(q:string){if(!q)return [];const g=SYN.find(list=>list.some(t=>q.startsWith(t)||t.startsWith(q)&&q.length>=3));const base=g?[q,...g]:[q];return [...new Set([...base,...base.map(stem).filter(Boolean)])];}
 // The day a calendar entry is for: today for a parcel waiting at a pickup point, else the first day of the expected window ("25.10-29.10").
 function calDay(p:Parcel):{date:string;title:string}|null{if(p.cancelled||p.got||p.stage>=4)return null;const iso=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
  if(isPickup(p))return {date:iso(new Date()),title:'לאסוף חבילה: '+p.name};
