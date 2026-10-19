@@ -5,7 +5,7 @@ const MODELS=['gemini-flash-latest','gemini-3.8-flash','gemini-2.5-flash'];
 let good='';
 // Free-tier limits: after a 429 everything waits (the retry time Google gives, else a minute) instead of hammering other models.
 let waitUntil=0;
-export async function gemini(body:{contents:unknown[];generationConfig?:Record<string,unknown>},timeout=25000):Promise<{ok:boolean;status:number;text:string;error:string;tried?:string[]}>{
+export async function gemini(body:{contents:unknown[];generationConfig?:Record<string,unknown>;tools?:unknown[]},timeout=25000):Promise<{ok:boolean;status:number;text:string;error:string;tried?:string[]}>{
  const key=process.env.GEMINI_API_KEY;if(!key)return {ok:false,status:0,text:'',error:'no key'};
  let last={ok:false,status:0,text:'',error:''};const tried:string[]=[];
  if(Date.now()<waitUntil)return {ok:false,status:429,text:'',error:'cooling down',tried:['waiting '+Math.ceil((waitUntil-Date.now())/1000)+'s']};
