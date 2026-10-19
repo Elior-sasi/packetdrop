@@ -177,7 +177,7 @@ const disputeText=(p:Parcel)=>{const last=[...p.events].reverse().find(e=>!GUARD
 function Journey({p}:{p:Parcel}){if(p.cancelled||!/AliExpress|Temu|SHEIN|Amazon|eBay|iHerb|ASOS|Banggood/i.test(p.shop)&&!/Cainiao|YunExpress|4PX/i.test(p.carrier))return null;
  const evs=p.events;const has=(r:RegExp)=>evs.some(e=>r.test(e.label));
  const customs=has(ROUTE[6][1]);const step=p.stage>=4?5:p.stage>=3||has(ROUTE[7][1])?4:customs||has(ROUTE[5][1])?3:has(ROUTE[4][1])?2:has(ROUTE[2][1])||has(ROUTE[3][1])?1:0;
- const labels=['במחסן המוכר','יצאה מהמחסן','בדרך לישראל',customs?'בישראל, במכס':'הגיעה לישראל','בדרך למרכז המסירה','אצלך'];
+ const labels=['במחסן המוכר','יצאה מהמחסן','בדרך לישראל',customs?'בישראל, במכס':'הגיעה לישראל',isPickup(p)?'מחכה בנקודת האיסוף':outToday(p)?'יצאה למסירה':'בדרך למרכז המסירה','אצלך'];
  const T=[0,.18,.5,.78,.9,1][step];const P0=[318,160],C1=[250,40],C2=[130,30],P1=[56,120];
  const bz=(t:number,i:number)=>(1-t)**3*P0[i]+3*(1-t)**2*t*C1[i]+3*(1-t)*t*t*C2[i]+t**3*P1[i];const x=bz(T,0),y=bz(T,1);
  return <details className="box journey fold"><summary><span>איפה החבילה</span><b>{labels[step]}</b></summary><svg viewBox="0 0 360 200" width="100%" role="img" aria-label={'מיקום החבילה: '+labels[step]}>
