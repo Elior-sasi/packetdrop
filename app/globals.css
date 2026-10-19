@@ -300,3 +300,4 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .nc-list li{min-width:0}.nc-list button{box-sizing:border-box;width:100%;max-width:100%}.nc-list button span{min-width:0;white-space:nowrap}
 .nc-list button span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.nc-list button{align-items:center}
 .openNow{font-weight:700;color:#ff9b8a;margin:4px 0 0}.openNow.on{color:#3fd49a}.leftTag{font-weight:700;color:#ffcf6b;margin:6px 0 0}
+.dispute h3{display:flex;gap:8px;align-items:center;color:#ffcf6b}.dispute .primary{margin-top:10px}.disputeText{text-align:left;font-size:calc(14px*var(--fs));color:#cfe4f7;line-height:1.5}

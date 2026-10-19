@@ -235,6 +235,17 @@ function NextGroup({ps,came,when,onOpen}:{ps:Parcel[];came:string[];when:number;
    <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?24:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
    <div className="nc-info"/><div className="nc-stack">{show.slice(0,3).map((p,i)=><div key={p.id} style={{zIndex:9-i}}><ThumbOne p={p}/></div>)}</div></div>
   <ul className="nc-list">{show.map(p=>{const c=came.includes(p.id);return <li key={p.id}><button type="button" className={c?'nc-came':''} onClick={()=>onOpen(p.id)}><span>{bidi(p.name)}</span>{how(p)&&<em className={c?'':'nc-pick'}>{how(p)}</em>}</button></li>;})}{rest>0&&<li className="nc-more" aria-hidden="true">{'ועוד '+rest}</li>}</ul></section>;}
+// Dispute helper (AliExpress): English text with the facts AliExpress asks for, ready to paste. Shown only when there is a reason.
+function disputeFor(p:Parcel,close?:number):{why:string;text:string}|null{if(!/AliExpress/i.test(p.shop)||p.cancelled||!p.order)return null;
+ const lastE=[...p.events].sort((a,b)=>a.time.localeCompare(b.time)).at(-1);const lastD=lastE?new Date(lastE.time).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+ const trk=p.tracking?' (tracking number '+p.tracking+')':'';
+ if(p.missing?.length&&p.stage>=3)return {why:'חסרים פריטים בחבילה',text:'Hello, my package for order '+p.order+trk+' arrived, but the following item(s) were not in it: '+p.missing.join('; ')+'. Please refund the missing item(s). Thank you.'};
+ if(p.stage>=4)return null;
+ const closing=close&&close>Date.now()&&close-Date.now()<7*864e5;const guard=guardOf(p);const stale=lastE&&Date.now()-new Date(lastE.time).getTime()>14*864e5;
+ const etaEnd=(()=>{const m=[...p.eta.matchAll(/(\d{1,2})\.(\d{1,2})/g)].at(-1);if(!m)return 0;const y=new Date().getFullYear();return new Date(y,+m[2]-1,+m[1],23).getTime();})();const late=etaEnd&&Date.now()>etaEnd+864e5;
+ if(!closing&&!guard&&!stale&&!late)return null;
+ return {why:closing||guard?'ההזמנה תיסגר בקרוב והחבילה לא הגיעה':late?'הצפי עבר והחבילה לא הגיעה':'אין עדכון כבר שבועיים',
+  text:'Hello, I have not received order '+p.order+trk+'.'+(lastD?' The last tracking update was on '+lastD+' and the package has not been delivered.':'')+(p.eta?' The estimated delivery was '+p.eta+'.':'')+' Please extend the buyer protection or refund the order. Thank you.'};}
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=step(p)?'on':''}/>)}</div>;}
 
 // Bottom sheet chrome: a grab bar you can pull down to close, and a close button.
@@ -670,6 +681,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {open.order&&<div className="kv"><span>מספר הזמנה</span><button className="copy" onClick={()=>copy(open.order)}><b dir="ltr">{open.order}</b>{copied===open.order?' ✓':<Copy size={15}/>}</button></div>}
    {open.url&&<a className="link" href={open.url} target="_blank" rel="noopener noreferrer">מעקב באתר החנות <ExternalLink size={15}/></a>}
   </section>}
+  {(()=>{const d=disputeFor(open,open.order?aeCloses[open.order]:undefined);return d&&<section className="box dispute"><h3><ShieldAlert size={18}/> {d.why}</h3><p className="setNote">אפשר לפתוח מחלוקת בעליאקספרס ולבקש החזר. הכנתי נוסח באנגלית עם הפרטים.</p>
+   <button className="ghost" onClick={async()=>{await copy(d.text);window.open('https://www.aliexpress.com/p/order/detail.html?orderId='+encodeURIComponent(open.order),'_blank');}}><Copy size={18}/> {copied===d.text?'הועתק ✓ עכשיו "Open dispute" והדבק':'העתקת הנוסח ופתיחת ההזמנה'}</button>
+   <details><summary>הנוסח</summary><p dir="ltr" className="disputeText">{d.text}</p></details></section>;})()}
   <div className="sheetActions">{calDay(open)&&<button className="ghost" onClick={()=>addToCalendar(open)}><CalendarCheck size={18}/> הוספה ליומן</button>}{open.got?<button className="ghost" onClick={()=>mark(open,null)}><Undo2 size={18}/> בטל "קיבלתי"</button>:open.stage<4&&<button className="primary" onClick={()=>mark(open,'got')}><PackageCheck size={18}/> קיבלתי</button>}
    {open.stage>=4&&!open.cancelled&&<a className="ghost" href={orderUrl(open)||'https://www.google.com/search?q='+encodeURIComponent((open.shop||'')+' '+open.name)} target="_blank" rel="noopener noreferrer"><RotateCcw size={18}/> הזמן שוב</a>}
    <button className="ghost" onClick={()=>mark(open,'hide')}><EyeOff size={18}/> הסתר, זו לא חבילה</button></div>
