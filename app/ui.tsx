@@ -538,7 +538,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   <section className="set"><h3>תצוגה</h3>
    <div className="setRow"><span>גודל טקסט</span></div>
    <div className="seg" role="radiogroup" aria-label="גודל טקסט" style={{marginBottom:8}}>{['רגיל','גדול','גדול מאוד'].map((l,i)=><button key={i} role="radio" aria-checked={size===i} className={size===i?'on':''} onClick={()=>{setSize(i);setPref('pd_size',String(i));}}>{l}</button>)}</div>
-   <label className="setRow"><span>צפי</span><input type="checkbox" className="sw" checked={showEst} onChange={e=>{setShowEst(e.target.checked);setPref('pd_est',e.target.checked?'1':'0');}}/></label>
+   <label className="setRow"><span>הערכה לפי חבילות קודמות</span><input type="checkbox" className="sw" checked={showEst} onChange={e=>{setShowEst(e.target.checked);setPref('pd_est',e.target.checked?'1':'0');}}/></label>
    <label className="setRow"><span>צליל כשיש עדכון</span><input type="checkbox" className="sw" checked={sound} onChange={e=>{setSound(e.target.checked);setPref('pd_sound',e.target.checked?'1':'0');if(e.target.checked){try{audio.current??=new AudioContext();void audio.current.resume().then(chime);}catch{}}}}/></label>
    <label className="setRow"><span>כרטיס "החבילה הבאה"</span><input type="checkbox" className="sw" checked={showNext} onChange={e=>{setShowNext(e.target.checked);setPref('pd_next',e.target.checked?'1':'0');}}/></label>
    <label className="setRow"><span>לקפל הודעות שליח בלי שם ב"נמסרו"</span><input type="checkbox" className="sw" checked={foldCourier} onChange={e=>{setFoldCourier(e.target.checked);setPref('pd_fold',e.target.checked?'1':'0');}}/></label>
@@ -576,7 +576,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
   {user&&widgetUrl&&(()=>{const sc=aeLoader(widgetUrl.replace('/api/widget','/api/ae'));return <section className="set"><h3><CalendarCheck size={20}/> תאריכי הגעה מעליאקספרס</h3>
    <p className="setNote">Scriptable נכנס לעמוד של כל הזמנה פתוחה ומעתיק את תאריך ההגעה שעליאקספרס נותנת. ההתחברות לעליאקספרס נשמרת רק בטלפון שלך.</p>
-   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox AliExpress</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים ← אוטומציה ← שעה ביום ← הפעל סקריפט ב־Scriptable ← <b>Unbox AliExpress</b>, ובחר "הפעל מיד".</li></ol>
+   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox AliExpress</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים צור קיצור עם הפעולה <b>Run Script</b>, בחר <b>Unbox AliExpress</b> והדלק <b>Run In App</b>. הוסף אירוע <b>שעה</b>, 8:00, כל יום, עם <b>פעולה אוטומטית</b> דלוקה.</li></ol>
    <button className="ghost" onClick={()=>copy(sc)}><Copy size={18}/> {copied===sc?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button>
    <p className="setNote" role="status">{aeChecked?'עדכון אחרון: '+new Date(aeChecked).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+Object.keys(aeEtas).length+' תאריכים':'עדיין לא התקבלו תאריכים.'}</p></section>;})()}
   {user&&<section className="set"><h3>מעקב אצל חברות השליחויות</h3>
