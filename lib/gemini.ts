@@ -20,5 +20,5 @@ export async function gemini(body:{contents:unknown[];generationConfig?:Record<s
     if(r.status===429){const sec=Number(String(j?.error?.details?.find?.((d:{retryDelay?:string})=>d.retryDelay)?.retryDelay||'').replace(/s$/,''))||60;waitUntil=Date.now()+Math.min(600,sec)*1000;return {...last,tried};}
     if(thinking&&r.status===400)continue;   // the thinking setting may be what this model rejects   // try the same model without the thinking setting
     break;                                                        // other errors: next model
-   }catch(e){last={ok:false,status:0,text:'',error:String(e).slice(0,120)};break;}}}
+   }catch(e){last={ok:false,status:0,text:'',error:String(e).slice(0,120)};tried.push(model+(thinking?'+t':'')+': '+last.error.slice(0,90));break;}}}
  return {...last,tried};}
