@@ -16,8 +16,10 @@ export async function POST(req:NextRequest){
  if(t.length!==want.length||!timingSafeEqual(Buffer.from(t),Buffer.from(want)))return new Response(null,{status:403});
  if(!dbOn())return new Response(null,{status:204});
  let email='';try{const b=await req.json();email=String(JSON.parse(Buffer.from(b?.message?.data||'','base64').toString('utf8'))?.emailAddress||'').toLowerCase();}catch{}
- if(!email)return new Response(null,{status:204});
  const {sql,ready}=db();await ready;
+ // Last push seen (for the check page), even before knowing whose mail it was.
+ await sql`insert into push_meta(k,v) values('gpush-any',now()) on conflict(k) do update set v=now()`.catch(()=>{});
+ if(!email)return new Response(null,{status:204});
  const u=(await sql`select user_id,refresh,subs,state,seen,checked_at from push_users where lower(email)=${email} and jsonb_array_length(subs)>0 limit 1`)[0] as Row|undefined;
  if(!u)return new Response(null,{status:204});
  // Several pushes can arrive for one mail; one check per 20 seconds is enough.
