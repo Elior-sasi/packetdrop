@@ -1,0 +1,31 @@
+import {NextRequest} from 'next/server';
+import {identity} from '@/lib/identity';
+import {db,dbOn,smsUser,smsToken} from '@/lib/push';
+import {mergeParcels,type Parcel} from '@/lib/parcels';
+import {aeEta,AE_JS,aeLoader} from '@/lib/ae';
+export const runtime='nodejs';export const dynamic='force-dynamic';
+// AliExpress delivery dates from the order page, read by a Scriptable script on the user's phone (signed in to AliExpress there).
+// ?t=<personal link>: GET lists open AliExpress orders, POST sends one order page's text. Signed in: GET returns the dates and the phone script.
+const H={'Cache-Control':'no-store'};
+async function sql(){const d=db();await d.ready;await d.sql`create table if not exists ae_eta(user_id text not null,order_no text not null,eta text not null,raw text not null default '',at timestamptz not null default now(),primary key(user_id,order_no))`;return d.sql;}
+export async function GET(req:NextRequest){const q=req.nextUrl.searchParams;
+ if(q.get('js'))return new Response(AE_JS,{headers:{'Content-Type':'text/javascript; charset=utf-8',...H}});
+ if(!dbOn())return Response.json({ok:false},{status:503,headers:H});const s=await sql();
+ const t=q.get('t');
+ if(t){const user=smsUser(t,'widget');if(!user)return Response.json({ok:false},{status:401,headers:H});
+  const row=(await s`select state from push_users where user_id=${user}`)[0];const all=mergeParcels(((row?.state as {parcels?:Parcel[]})?.parcels)||[]);
+  const orders=[...new Set(all.filter(p=>/aliexpress/i.test(p.shop)&&p.stage<4&&!p.cancelled&&/^\d{12,20}$/.test(p.order||'')).map(p=>p.order))];
+  return Response.json({ok:true,orders},{headers:H});}
+ let me:{id:string};try{me=await identity(req,false) as {id:string};}catch{return Response.json({ok:false},{status:401,headers:H});}
+ const rows=await s`select order_no,eta,raw,at from ae_eta where user_id=${me.id} and at>now()-interval '60 days'`;
+ const raw=q.get('raw');if(raw){const r=rows.find(x=>x.order_no===raw);return Response.json({order:raw,eta:r?.eta||'',at:r?.at||null,lines:String(r?.raw||'').split('\n').filter(l=>/\d/.test(l)).slice(0,80)},{headers:H});}
+ const link=req.nextUrl.origin+'/api/ae?t='+smsToken(me.id,'widget');
+ return Response.json({ok:true,etas:Object.fromEntries(rows.filter(r=>r.eta).map(r=>[r.order_no,r.eta])),checked:rows.length?rows.map(r=>new Date(r.at).getTime()).sort().at(-1):null,script:aeLoader(link)},{headers:H});}
+export async function POST(req:NextRequest){if(!dbOn())return Response.json({ok:false},{status:503,headers:H});
+ const user=smsUser(req.nextUrl.searchParams.get('t')||'','widget');if(!user)return Response.json({ok:false},{status:401,headers:H});
+ const b=await req.json().catch(()=>({}));const order=String(b.order||'');const text=String(b.text||'').slice(0,30000);
+ if(!/^\d{12,20}$/.test(order)||!text)return Response.json({ok:false},{status:400,headers:H});
+ const eta=aeEta(text);const s=await sql();
+ // A page read without a date keeps the last date found (the page sometimes loads partly).
+ await s`insert into ae_eta(user_id,order_no,eta,raw) values(${user},${order},${eta},${text}) on conflict(user_id,order_no) do update set eta=case when excluded.eta<>'' then excluded.eta else ae_eta.eta end,raw=excluded.raw,at=now()`;
+ return Response.json({ok:true,eta},{headers:H});}
