@@ -6,7 +6,7 @@ const MODELS=['gemini-flash-lite-latest','gemini-flash-latest','gemini-3.8-flash
 let good='';
 // Free-tier limits are per model: after a 429 that model rests (the retry time Google gives, else a minute) and the next one is tried.
 const rest:Record<string,number>={};
-export async function gemini(body:{contents:unknown[];generationConfig?:Record<string,unknown>;tools?:unknown[]},timeout=25000,prefer?:string[]):Promise<{ok:boolean;status:number;text:string;error:string;tried?:string[]}>{
+export async function gemini(body:{contents:unknown[];generationConfig?:Record<string,unknown>;tools?:unknown[];systemInstruction?:unknown},timeout=25000,prefer?:string[]):Promise<{ok:boolean;status:number;text:string;error:string;tried?:string[]}>{
  const key=process.env.GEMINI_API_KEY;if(!key)return {ok:false,status:0,text:'',error:'no key'};
  let last={ok:false,status:0,text:'',error:''};const tried:string[]=[];
  // Recognising a character from a photo needs the full Flash model (Lite guesses); other jobs start with whatever worked last.
