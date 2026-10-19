@@ -297,3 +297,5 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .nc-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.nc-list button{all:unset;cursor:pointer;display:block;font-size:calc(17px*var(--fs));font-weight:700;padding:6px 0;border-bottom:1px solid #ffffff14;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nc-list li:last-child button{border-bottom:0}.nc-more{color:#9fd2ff;font-size:calc(15px*var(--fs))}
 .nc-list button{display:flex!important;justify-content:space-between;gap:10px}.nc-list button span{overflow:hidden;text-overflow:ellipsis}.nc-came span{color:#7f93a6;font-weight:400}.nc-came em{font-style:normal;color:#3fd49a;font-weight:700;flex:none}
 .nc-list em.nc-pick{font-style:normal;color:#2ed3c6;font-weight:700;flex:none}
+.nc-list li{min-width:0}.nc-list button{box-sizing:border-box;width:100%;max-width:100%}.nc-list button span{min-width:0;white-space:nowrap}
+.nc-list button span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.nc-list button{align-items:center}
