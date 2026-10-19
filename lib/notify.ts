@@ -70,7 +70,7 @@ export function reminders(state:State,now=Date.now()):{notes:Note[];reminded:Rec
   const days=Math.floor((now-pickupSince(p))/DAY);const done=reminded[p.id]||[];const where=p.pickup?.place?' ב'+p.pickup.place:'';const code=p.pickup?.code?' · קוד '+p.pickup.code:'';
   // Two days in: a gentle reminder. Then before it goes back to the sender: 3 days left, and the last day.
   const left=daysLeft(p,now);
-  if(Number.isFinite(left)&&left>=0&&left<=1&&!done.includes(-1)){reminded[p.id]=[...done,-1,-3,2];notes.push({id:p.id,kind:'pickup',title:left===0?'היום אחרון לאסוף את החבילה':'מחר אחרון לאסוף את החבילה',body:nameOf(p)+where+code+' · אחרי זה היא חוזרת לשולח',tag:'rd1:'+p.id});}
+  if(Number.isFinite(left)&&left>=0&&left<=1&&!done.includes(-1)){reminded[p.id]=[...done,-1,-3,2];notes.push({id:p.id,kind:'pickup',title:left===0?'היום האחרון לאסוף את החבילה':'מחר היום האחרון לאסוף את החבילה',body:nameOf(p)+where+code+' · אחרי זה היא חוזרת לשולח',tag:'rd1:'+p.id});}
   else if(Number.isFinite(left)&&left>1&&left<=3&&!done.includes(-3)){reminded[p.id]=[...done,-3,2];notes.push({id:p.id,kind:'pickup',title:'נשארו '+left+' ימים לאסוף',body:nameOf(p)+where+code+' · אחרי זה היא חוזרת לשולח',tag:'rd3:'+p.id});}
   else if(days>=2&&days<16&&!done.includes(2)){reminded[p.id]=[...done,2];notes.push({id:p.id,kind:'pickup',title:'מחכה לך'+where+' כבר יומיים',body:nameOf(p)+code,tag:'r2:'+p.id});}}
  for(const id of Object.keys(reminded))if(!state.parcels.some(p=>p.id===id&&waitingAtPickup(p)))delete reminded[id];
