@@ -164,7 +164,10 @@ const noSat=(t:number)=>{const d=new Date(t);return d.getDay()===6?t+864e5:t;};
 function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=3||p.cancelled||p.stage<1)return null;
  for(let k=MILES.length-1;k>=0;k--){const t0=mileAt(p,k);if(!t0)continue;
   let a=days[routeKey(p)+'#'+k],scope:'route'|'shop'='route';if(!a||a.length<3){a=days[p.shop+'|*#'+k];scope='shop';}if(!a||a.length<3)continue;
-  let from=t0+pct(a,.25)*864e5,to=t0+pct(a,.75)*864e5;const now=Date.now();const late=now>t0+pct(a,.9)*864e5+864e5;
+  const now=Date.now();let late=now>t0+pct(a,.9)*864e5+864e5;
+  // Already past the usual time: use only your past parcels that also took at least this long from here (still a real range, not a guess).
+  if(late){const waited=(now-t0)/864e5;const slow=a.filter(d=>d>=waited);if(slow.length>=3){a=slow;late=false;}}
+  let from=t0+pct(a,.25)*864e5,to=t0+pct(a,.75)*864e5;
   if(from<now)from=now+864e5/2;if(to<from)to=from;return {from:noSat(from),to:noSat(to),n:a.length,avg:Math.round(a.reduce((x,y)=>x+y,0)/a.length),late,scope,stage:MILES[k][0]};}
  return null;}
 // The store's delivery window is written when the parcel leaves China and is often far too cautious.
