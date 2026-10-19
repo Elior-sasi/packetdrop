@@ -59,8 +59,8 @@ if(orders.length){
   const res=await (()=>{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({order:o,text:q.t,items:q.items||[]});return x.loadJSON().catch(()=>null)})()
   done++;if(res&&res.eta)sent.push(res.eta)}}
 const msg=orders.length?('נבדקו '+done+' הזמנות'+(sent.length?' · נמצאו תאריכים: '+sent.join(', '):' · לא נמצא תאריך')):'אין הזמנות פתוחות מעליאקספרס'
-// A notification, not a dialog: a morning run from Shortcuts must not wait for a tap.
-{const n=new Notification();n.title='Unbox · עליאקספרס';n.body=msg;await n.schedule()}
+// No daily "all fine" notification: delays and closing orders come as Unbox notifications from the server. Only a run that found nothing says so.
+if(!sent.length&&orders.length){const n=new Notification();n.title='Unbox · עליאקספרס';n.body=msg;await n.schedule()}
 await log('סיום: '+msg)
 Script.setShortcutOutput(msg)
 }catch(e){const m='שגיאה: '+String(e&&e.message||e).slice(0,200);try{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({error:m,ctx:config.runsInApp?'app':config.runsWithSiri?'siri':'shortcut'});await x.loadJSON()}catch(_){}
