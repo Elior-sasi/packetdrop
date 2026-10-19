@@ -598,9 +598,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
   {user&&widgetUrl&&(()=>{const sc=aeLoader(widgetUrl.replace('/api/widget','/api/ae'));return <section className="set"><h3><CalendarCheck size={20}/> תאריכי הגעה מהחנויות</h3>
    <p className="setNote">Scriptable נכנס לעמוד של כל הזמנה פתוחה, בעליאקספרס, באמזון ובחנויות נוספות, ומעתיק את תאריך ההגעה שהחנות נותנת. בפעם הראשונה בכל חנות הוא יבקש להתחבר אליה, וההתחברות נשמרת רק בטלפון שלך.</p>
-   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox AliExpress</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים צור קיצור עם הפעולה <b>Run Script</b>, בחר <b>Unbox AliExpress</b> והדלק <b>Run In App</b>. הוסף אירוע <b>שעה</b>, 8:00, כל יום, עם <b>פעולה אוטומטית</b> דלוקה.</li></ol>
+   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox Shops</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים צור קיצור עם הפעולה <b>Run Script</b>, בחר <b>Unbox Shops</b> והדלק <b>Run In App</b>. הוסף אירוע <b>שעה</b>, 8:00, כל יום, עם <b>פעולה אוטומטית</b> דלוקה.</li></ol>
    <button className="ghost" onClick={()=>copy(sc)}><Copy size={18}/> {copied===sc?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button>
-   <a className="ghost btnLink" href="scriptable:///run/Unbox%20AliExpress"><RefreshCw size={18}/> בדוק עכשיו בחנויות</a>
+   <a className="ghost btnLink" href="scriptable:///run/Unbox%20Shops"><RefreshCw size={18}/> בדוק עכשיו בחנויות</a>
    <p className="setNote" role="status">{aeChecked?'עדכון אחרון: '+new Date(aeChecked).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+(Object.keys(aeEtas).length===1?'תאריך אחד':Object.keys(aeEtas).length+' תאריכים'):'עדיין לא התקבלו תאריכים.'}</p></section>;})()}
   {user&&<section className="set"><h3>מעקב אצל חברות השליחויות</h3>
    {phone&&!phoneEdit?<><div className="setRow"><span>טלפון <b dir="ltr">{phone.replace(/^(\d{3})(\d{3})(\d+)$/,'$1-$2$3')}</b></span><button className="linkBtn" onClick={()=>{setPhoneDraft(phone);setPhoneEdit(true);}}>עריכה</button></div>
@@ -699,7 +699,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {open.order&&<div className="kv"><span>מספר הזמנה</span><button className="copy" onClick={()=>copy(open.order)}><b dir="ltr">{open.order}</b>{copied===open.order?' ✓':<Copy size={15}/>}</button></div>}
    {open.url&&<a className="link" href={open.url} target="_blank" rel="noopener noreferrer">מעקב באתר החנות <ExternalLink size={15}/></a>}
   </section>}
-  {open.stage<4&&!open.cancelled&&open.order&&/aliexpress|amazon|iherb|temu|shein|ebay|asos|next|banggood/i.test(open.shop)&&<a className="ghost btnLink" href="scriptable:///run/Unbox%20AliExpress"><RefreshCw size={18}/> {'בדוק עכשיו ב־'+open.shop}</a>}
+  {open.stage<4&&!open.cancelled&&open.order&&/aliexpress|amazon|iherb|temu|shein|ebay|asos|next|banggood/i.test(open.shop)&&<a className="ghost btnLink" href="scriptable:///run/Unbox%20Shops"><RefreshCw size={18}/> {'בדוק עכשיו ב־'+open.shop}</a>}
   {(()=>{const d=disputeFor(open,open.order?aeCloses[open.order]:undefined);return d&&<section className="box dispute"><h3><ShieldAlert size={18}/> {d.why}</h3><p className="setNote">אפשר לפתוח מחלוקת בעליאקספרס ולבקש החזר. הכנתי נוסח באנגלית עם הפרטים.</p>
    <button className="ghost" onClick={async()=>{await copy(d.text);window.open('https://www.aliexpress.com/p/order/detail.html?orderId='+encodeURIComponent(open.order),'_blank');}}><Copy size={18}/> {copied===d.text?'הועתק ✓ עכשיו "Open dispute" והדבק':'העתקת הנוסח ופתיחת ההזמנה'}</button>
    <details><summary>הנוסח</summary><p dir="ltr" className="disputeText">{d.text}</p></details></section>;})()}
