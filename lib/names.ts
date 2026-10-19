@@ -3,6 +3,7 @@
 import {createHash} from 'node:crypto';
 import {polishName,photoKey,type Parcel} from '@/lib/parcels';
 import {heName} from '@/lib/hename';
+import {gemini} from '@/lib/gemini';
 import type {db} from '@/lib/push';
 type Sql=ReturnType<typeof db>['sql'];
 const PROMPT=`אלה כותרות של מוצרים מחנויות אונליין (לרוב תרגום מכונה גרוע). לכל כותרת כתוב שם קצר וטבעי בעברית, 2 עד 5 מילים, כמו שאדם היה קורא למוצר.
@@ -16,9 +17,8 @@ export async function shortNames(input:string[],sql:Sql|null):Promise<Record<str
   const rows=await sql`select k,name from name_cache where k = any(${titles.map(h)})`;const got=new Map(rows.map(r=>[r.k as string,r.name as string]));for(const t of titles){const n=got.get(h(t));if(n)out[t]=n;}}
  const todo=titles.filter(t=>!out[t]);
  if(todo.length){try{
-  const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',signal:AbortSignal.timeout(25000),headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-   body:JSON.stringify({contents:[{parts:[{text:PROMPT+'\n\n'+JSON.stringify(todo)}]}],generationConfig:{temperature:0.2,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}})});
-  if(r.ok){const j=await r.json();const arr=JSON.parse(String(j?.candidates?.[0]?.content?.parts?.[0]?.text||'[]'));
+  const g=await gemini({contents:[{parts:[{text:PROMPT+'\n\n'+JSON.stringify(todo)}]}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}});
+  if(g.ok){const arr=JSON.parse(g.text.replace(/^```(?:json)?|```$/g,'').trim());
    if(Array.isArray(arr)&&arr.length===todo.length)for(let i=0;i<todo.length;i++){const n=String(arr[i]||'').replace(/\s+/g,' ').trim();if(n&&n.length<=45){out[todo[i]]=n;if(sql)await sql`insert into name_cache(k,title,name) values(${h(todo[i])},${todo[i]},${n}) on conflict(k) do nothing`;}}}
  }catch{}}
  return out;}

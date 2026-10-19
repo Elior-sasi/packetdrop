@@ -168,10 +168,10 @@ function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=3|
   if(from<now)from=now+864e5/2;if(to<from)to=from;return {from:noSat(from),to:noSat(to),n:a.length,avg:Math.round(a.reduce((x,y)=>x+y,0)/a.length),late,scope,stage:MILES[k][0]};}
  return null;}
 // The store's delivery window is written when the parcel leaves China and is often far too cautious.
-// Once the parcel is in Israel, YOUR past parcels from the same point say better: if they say it comes sooner, that wins.
-const ISRAEL_MILES=new Set(['מההגעה לישראל','מהשחרור ממכס','מחברת המסירה']);let learnCache:{all:Parcel[];days:Record<string,number[]>}|null=null;
+// YOUR past parcels from the same point on the way say better: if they say it comes sooner than the store's window ends, that wins.
+let learnCache:{all:Parcel[];days:Record<string,number[]>}|null=null;
 function freshEta(p:Parcel,all:Parcel[]):Parcel{if(!p.eta||p.stage>=3||p.cancelled)return p;const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(!m)return p;
- if(learnCache?.all!==all)learnCache={all,days:learn(all)};const e=estimate({...p,eta:''},learnCache.days);if(!e||e.late||!ISRAEL_MILES.has(e.stage))return p;
+ if(learnCache?.all!==all)learnCache={all,days:learn(all)};const e=estimate({...p,eta:''},learnCache.days);if(!e||e.late)return p;
  const y=new Date().getFullYear();let start=new Date(y,+m[2]-1,+m[1]).getTime();if(start<Date.now()-60*864e5)start=new Date(y+1,+m[2]-1,+m[1]).getTime();
  const em=p.eta.match(/-(\d{1,2})\.(\d{1,2})/);let end=em?new Date(y,+em[2]-1,+em[1]).getTime():start;if(end<start)end=new Date(y+1,+em![2]-1,+em![1]).getTime();
  return e.to<end?{...p,eta:''}:p;}

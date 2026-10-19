@@ -1,6 +1,7 @@
 import {NextRequest} from 'next/server';
 import {identity} from '@/lib/identity';
 import {db,dbOn} from '@/lib/push';
+import {gemini} from '@/lib/gemini';
 export const runtime='nodejs';
 // Names a product from its photo with Gemini (Google AI Studio free tier), only for orders whose mails carry no product name.
 // Each photo is asked once; the answer is kept in the database. A daily cap keeps it inside the free quota.
@@ -21,9 +22,8 @@ export async function POST(req:NextRequest){const H={'Cache-Control':'no-store'}
  if(sql&&todo.length){used=Number((await sql`select count(*)::int as n from photo_names where created_at>now()-interval '1 day'`)[0]?.n||0);}
  for(const u of todo.slice(0,Math.max(0,40-used))){try{
    const img=await fetch(u,{signal:AbortSignal.timeout(8000)});if(!img.ok)continue;const buf=Buffer.from(await img.arrayBuffer());if(buf.length>4_000_000)continue;
-   const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:img.headers.get('content-type')?.split(';')[0]||'image/jpeg',data:buf.toString('base64')}},{text:PROMPT}]}],generationConfig:{temperature:0.2,maxOutputTokens:40,thinkingConfig:{thinkingBudget:0}}})});
-   if(!r.ok)continue;const j=await r.json();const t=String(j?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/["'״׳.\n]/g,' ').replace(/\s+/g,' ').trim();
+   const g=await gemini({contents:[{parts:[{inline_data:{mime_type:img.headers.get('content-type')?.split(';')[0]||'image/jpeg',data:buf.toString('base64')}},{text:PROMPT}]}],generationConfig:{temperature:0.2,maxOutputTokens:1024}},20000);
+   if(!g.ok)continue;const j={candidates:[{content:{parts:[{text:g.text}]}}]};const t=String(j?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/["'״׳.\n]/g,' ').replace(/\s+/g,' ').trim();
    if(!t||t.length>40||!/[֐-׿]/.test(t))continue;const k=key(u);names[k]=t;if(sql)await sql`insert into photo_names(k,name) values(${k},${t}) on conflict(k) do nothing`;
   }catch{}}
  void day;return Response.json({names,enabled:true},{headers:H});}
