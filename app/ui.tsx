@@ -657,6 +657,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {ptPref.enabled&&pts.length>0&&<><p className="setNote">נקודות האיסוף שלי:</p><input className="phoneIn" type="search" placeholder="חיפוש נקודה או עיר" aria-label="חיפוש נקודת איסוף או עיר" value={ptQ} onChange={e=>setPtQ(e.target.value)}/>{pts.map(([k,name,city])=><label key={k} className="setRow"><span>{name}{city&&<small className="ptCity">{' · '+city}</small>}</span><input type="checkbox" className="sw" aria-label={'התראה בנקודה '+name+(city?', '+city:'')} checked={!ptPref.off.includes(k)} onChange={e=>setPt({key:k,off:!e.target.checked})}/></label>)}</>}
    {ptPref.enabled&&!pts.length&&<p className="setNote">עדיין לא היו לך חבילות בנקודות איסוף.</p>}
    {ptPref.enabled&&widgetUrl&&(()=>{const u=widgetUrl.replace('/api/widget','/api/points')+'&new=1&text=1';return <button className="ghost" onClick={()=>copy(u)}><Copy size={18}/> {copied===u?'הקישור הועתק ✓':'העתקת הקישור לקיצור'}</button>;})()}</section>;})()}
+  {user&&widgetUrl&&(()=>{const cal=widgetUrl.replace('/api/widget','/api/calendar');return <section className="set"><h3><CalendarCheck size={20}/> יומן חבילות</h3>
+   <p className="setNote">כל צפי הגעה וכל יום אחרון לאיסוף נכנסים ליומן שלך ומתעדכנים לבד כשמשהו משתנה. ביום האחרון לאיסוף תגיע תזכורת ב־9:00.</p>
+   <a className="primary btnLink" href={cal.replace(/^https:/,'webcal:')}><CalendarCheck size={18}/> הוספה ליומן של iPhone</a>
+   <button className="ghost" onClick={()=>copy(cal)}><Copy size={18}/> {copied===cal?'הקישור הועתק ✓':'העתקת הקישור, ליומן Google'}</button>
+   <p className="setNote">ביומן Google: הגדרות ← הוספת יומן ← מכתובת URL, והדבק. Google מעדכן יומן כזה רק כמה פעמים ביום.</p></section>;})()}
   {user&&widgetUrl&&<section className="set"><h3><Mic size={20}/> לשאול את Siri</h3>
    <p className="setNote">אומרים "היי Siri, איפה החבילות שלי" ושומעים מה מחכה לאיסוף ועם איזה קוד, מה מגיע היום ומה בדרך. {push==='on'?'':'צריך שההתראות יהיו פעילות.'}</p>
    <ol className="steps2"><li>העתק את הקישור האישי.</li><li>באפליקציית קיצורים: <b>+</b> ← הוסף פעולה <b>קבל תוכן של URL</b> והדבק את הקישור.</li><li>הוסף פעולה <b>דבר טקסט</b>.</li><li>שמור את הקיצור בשם <b>איפה החבילות שלי</b>.</li></ol>
