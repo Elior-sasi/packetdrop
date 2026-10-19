@@ -28,7 +28,8 @@ export function aeEta(text:string,now=new Date()):string{const lines=text.split(
   if(!ds.length)continue;const a=ds[0],b=ds[1];if(b&&at(b,now)>at(a,now)&&at(b,now)-at(a,now)<40*864e5)return at(a,now)<now.getTime()-864e5?fmt(b):fmt(a)+'-'+fmt(b);return fmt(a);}
  return '';}
 // Runs inside Scriptable (loaded by the tiny script on the phone). `u` = the personal link.
-export const AE_JS=`const r=await new Request(u).loadJSON().catch(()=>null)
+export const AE_JS=`try{
+const r=await new Request(u).loadJSON().catch(()=>null)
 const orders=(r&&r.orders)||[]
 const wv=new WebView()
 const grab="let n=0;const f=()=>{const t=document.body?document.body.innerText:'';if((t.length>800&&/\\\\d/.test(t))||n++>45)completion(JSON.stringify({u:location.href,t:t.slice(0,30000)}));else setTimeout(f,300)};f()"
@@ -39,11 +40,15 @@ if(orders.length){
  let p=await page('https://www.aliexpress.com/p/order/index.html')
  if(needLogin(p)){
   if(config.runsInApp){const a=new Alert();a.title='התחברות לעליאקספרס';a.message='התחבר פעם אחת. אחרי ההתחברות סגור את החלון (Close) והסקריפט ימשיך.';a.addAction('אישור');await a.present();await wv.loadURL('https://login.aliexpress.com/');await wv.present(true);p=await page('https://www.aliexpress.com/p/order/index.html')}
-  if(needLogin(p)){const n=new Notification();n.title='Unbox';n.body='צריך להתחבר לעליאקספרס: פתח את הסקריפט Unbox AliExpress';if(!config.runsInApp)await n.schedule();else{const a=new Alert();a.title='לא מחובר';a.message='ההתחברות לא הושלמה. נסה שוב.';a.addAction('אישור');await a.present()}Script.complete();return}}
+  if(needLogin(p)){const n=new Notification();n.title='Unbox';n.body='צריך להתחבר לעליאקספרס: פתח את הסקריפט Unbox AliExpress';if(!config.runsInApp)await n.schedule();else{const a=new Alert();a.title='לא מחובר';a.message='ההתחברות לא הושלמה. נסה שוב.';a.addAction('אישור');await a.present()}Script.setShortcutOutput('צריך להתחבר לעליאקספרס');Script.complete();return}}
  for(const o of orders.slice(0,12)){const q=await page('https://www.aliexpress.com/p/order/detail.html?orderId='+o);if(!q.t)continue
   const res=await (()=>{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({order:o,text:q.t});return x.loadJSON().catch(()=>null)})()
   done++;if(res&&res.eta)sent.push(res.eta)}}
-if(config.runsInApp){const a=new Alert();a.title='Unbox';a.message=orders.length?('נבדקו '+done+' הזמנות'+(sent.length?' · נמצאו תאריכים: '+sent.join(', '):' · לא נמצא תאריך')):'אין הזמנות פתוחות מעליאקספרס';a.addAction('סגור');await a.present()}
+const msg=orders.length?('נבדקו '+done+' הזמנות'+(sent.length?' · נמצאו תאריכים: '+sent.join(', '):' · לא נמצא תאריך')):'אין הזמנות פתוחות מעליאקספרס'
+if(config.runsInApp){const a=new Alert();a.title='Unbox';a.message=msg;a.addAction('סגור');await a.present()}
+Script.setShortcutOutput(msg)
+}catch(e){const m='שגיאה: '+String(e&&e.message||e).slice(0,200);try{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({error:m,ctx:config.runsInApp?'app':config.runsWithSiri?'siri':'shortcut'});await x.loadJSON()}catch(_){}
+if(config.runsInApp){const a=new Alert();a.title='Unbox';a.message=m;a.addAction('סגור');await a.present()}Script.setShortcutOutput(m)}
 Script.complete()`;
 export const aeLoader=(url:string)=>`// Unbox · AliExpress delivery dates. Loads its code from Unbox, so updates arrive by themselves.
 const u=${JSON.stringify(url)}
