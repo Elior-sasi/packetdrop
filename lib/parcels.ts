@@ -188,7 +188,10 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
 // Package photos in the same order as its product list, one per product first (so every product shows), extras after.
 function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
- const n=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();const pos=(u:string)=>{const nm=named[photoKey(u)];if(!nm)return 999;const a=n(nm);const i=items.findIndex(it=>{const b=n(it);return a===b||a.startsWith(b)||b.startsWith(a);});return i<0?999:i;};
+ const n=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();// Titles of the same product differ between mails (cut, reworded), so the best word overlap decides, not exact text.
+ const words=(t:string)=>new Set(n(t).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).filter(w=>w.length>1));
+ const score=(a:string,b:string)=>{const A=words(a),B=words(b);if(!A.size||!B.size)return 0;let c=0;for(const w of A)if(B.has(w))c++;return c/Math.min(A.size,B.size);};
+ const pos=(u:string)=>{const nm=named[photoKey(u)];if(!nm)return 999;const a=n(nm);let best=-1,bs=0;items.forEach((it,i)=>{const b=n(it);const sc=a===b||a.startsWith(b)||b.startsWith(a)?2:score(nm,it);if(sc>bs){bs=sc;best=i;}});return bs>=0.5?best:999;};
  const sorted=[...imgs].map((u,k)=>({u,p:pos(u),k})).sort((a,b)=>a.p-b.p||a.k-b.k);const seen=new Set<number>();const first:string[]=[],rest:string[]=[];
  for(const x of sorted){if(x.p<999&&!seen.has(x.p)){seen.add(x.p);first.push(x.u);}else rest.push(x.u);}return [...first,...rest];}
 export function mergeParcels(rows:Parcel[]){

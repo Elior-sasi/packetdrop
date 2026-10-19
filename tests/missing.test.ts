@@ -27,3 +27,8 @@ test('photos follow the product order when each order mail has one photo',()=>{
  const mk=(o:string,name:string,img:string,t:string)=>({...base,id:'order:'+o,keys:['order:'+o,'tracking:LP1'],name,image:'https://ae-pic-a1.aliexpress-media.com/kf/'+img+'.jpg',tracking:'',order:o,stage:2,events:[{id:o,label:'נשלחה',time:t}]});
  const m=mergeParcels([mk('3','פאה של סנג\'י','S3','2026-10-03T00:00:00Z'),mk('2','תחפושת זורו','S2','2026-10-02T00:00:00Z'),mk('1','חולצה של פרנקי','S1','2026-10-01T00:00:00Z')] as never);
  assert.deepEqual(m[0].images!.map(u=>u.match(/kf\/(\w+)/)![1]),m[0].items!.map(n=>n.includes('פרנקי')?'S1':n.includes('זורו')?'S2':'S3'));});
+test('photos match products even when the two mails word the title differently',()=>{
+ const mk=(o:string,name:string,img:string,t:string,extra={})=>({...base,id:'order:'+o,keys:['order:'+o,'tracking:GLS1'],name,image:'https://ae-pic-a1.aliexpress-media.com/kf/'+img+'.jpg',tracking:'',order:o,stage:2,events:[{id:o+t,label:'נשלחה',time:t}],...extra});
+ const pkg={...base,id:'tracking:GLS1',keys:['tracking:GLS1','order:1','order:2','order:3'],name:'One Piece כובע קש רשמי',items:['One Piece כובע קש רשמי','תושבת אחסון פשוטה לאוזניות','מרית מטבח 2 ב-1'],tracking:'GLS1',order:'',stage:3,events:[{id:'p',label:'יצאה',time:'2026-10-05T00:00:00Z'}]};
+ const m=mergeParcels([mk('3','מרית מטבח','S3','2026-10-03T00:00:00Z'),mk('2','מעמד אוזניות - תושבת אחסון פשוטה לאוזניות שולחני','S2','2026-10-02T00:00:00Z'),mk('1','כובע קש One Piece בעיצוב רשמי','S1','2026-10-01T00:00:00Z'),pkg] as never);
+ assert.deepEqual(m[0].images!.map(u=>u.match(/kf\/(\w+)/)![1]),['S1','S2','S3']);});
