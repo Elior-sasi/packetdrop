@@ -5,6 +5,7 @@ import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X,Share2,Wallet,Users} from 'lucide-react';
 import {learn,estimate,freshEta,SHIP_RE,type Est} from '@/lib/estimate';
 import {aeLoader} from '@/lib/ae';
+import {goodPlace} from '@/lib/parcels';
 import {daysLeft,openNow,hoursText,pointKey} from '@/lib/pickup';
 import {mergeParcels,brandDomains,polishName,parseSms,photoKey,type Parcel as MailParcel,type Event as MailEvent} from '@/lib/parcels';
 import {heEvent,tidyPlace,type TrackInfo} from '@/lib/track';
@@ -600,7 +601,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox AliExpress</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים צור קיצור עם הפעולה <b>Run Script</b>, בחר <b>Unbox AliExpress</b> והדלק <b>Run In App</b>. הוסף אירוע <b>שעה</b>, 8:00, כל יום, עם <b>פעולה אוטומטית</b> דלוקה.</li></ol>
    <button className="ghost" onClick={()=>copy(sc)}><Copy size={18}/> {copied===sc?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button>
    <a className="ghost btnLink" href="scriptable:///run/Unbox%20AliExpress"><RefreshCw size={18}/> בדוק עכשיו בעליאקספרס</a>
-   <p className="setNote" role="status">{aeChecked?'עדכון אחרון: '+new Date(aeChecked).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+Object.keys(aeEtas).length+' תאריכים':'עדיין לא התקבלו תאריכים.'}</p></section>;})()}
+   <p className="setNote" role="status">{aeChecked?'עדכון אחרון: '+new Date(aeChecked).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+(Object.keys(aeEtas).length===1?'תאריך אחד':Object.keys(aeEtas).length+' תאריכים'):'עדיין לא התקבלו תאריכים.'}</p></section>;})()}
   {user&&<section className="set"><h3>מעקב אצל חברות השליחויות</h3>
    {phone&&!phoneEdit?<><div className="setRow"><span>טלפון <b dir="ltr">{phone.replace(/^(\d{3})(\d{3})(\d+)$/,'$1-$2$3')}</b></span><button className="linkBtn" onClick={()=>{setPhoneDraft(phone);setPhoneEdit(true);}}>עריכה</button></div>
     <p className="setNote">השרת בודק לפי המספר משלוחים אצל חברות משלוחים בארץ.</p></>
@@ -608,7 +609,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <label className="setRow" htmlFor="phoneIn"><span>מספר טלפון</span></label>
    <input id="phoneIn" className="phoneIn" type="tel" inputMode="tel" dir="ltr" autoComplete="tel" value={phoneDraft} onChange={e=>setPhoneDraft(e.target.value)}/>
    <button className="ghost" onClick={()=>{const v=phoneDraft.replace(/\D/g,'');if(v&&!/^0\d{8,9}$/.test(v)){setToast('מספר לא תקין');return;}setPhoneEdit(false);if(v===phone)return;setPhone(v);phoneRef.current=v;setPref('pd_phone',v);if(!v){setPhoneParcels([]);setPref('pd_phone_parcels','[]');}if(pushOn.current)void pushPost({phone:v}).catch(()=>{});if(v)void loadByPhone();setToast(v?'נשמר ✓':'המספר הוסר');}}>{phone&&!phoneDraft.trim()?'הסרת המספר':'שמירה'}</button></>}</section>}
-  {user&&(()=>{const pts=[...new Map(parcels.filter(p=>p.pickup&&(p.pickup.place||p.pickup.address)&&!/הגיע|\d{3}-\d{3}|^\W/.test(p.pickup.place||p.pickup.address)).map(p=>[pointKey(p.pickup!),p.pickup!.place||p.pickup!.address] as const)).entries()].map(([k,n])=>[k,n,ptCity[k]||''] as const).filter(([,n,c])=>!ptQ.trim()||(n+' '+c).includes(ptQ.trim()));return <section className="set"><h3><MapPin size={20}/> התראה ליד נקודת איסוף</h3>
+  {user&&(()=>{const pts=[...new Map(parcels.filter(p=>p.pickup&&(p.pickup.place||p.pickup.address)&&!!goodPlace(p.pickup.place||p.pickup.address)).map(p=>[pointKey(p.pickup!),p.pickup!.place||p.pickup!.address] as const)).entries()].map(([k,n])=>[k,n,ptCity[k]||''] as const).filter(([,n,c])=>!ptQ.trim()||(n+' '+c).includes(ptQ.trim()));return <section className="set"><h3><MapPin size={20}/> התראה ליד נקודת איסוף</h3>
    <p className="setNote">כשמחכה לך חבילה ואתה מגיע לנקודת האיסוף, הטלפון מזכיר לך מה מחכה שם ואת הקוד. נקודה חדשה נוספת לרשימה לבד, והתראה עליה פעילה עד שתכבה אותה.</p>
    <label className="setRow"><span>התראה ליד נקודת איסוף</span><input type="checkbox" className="sw" checked={ptPref.enabled} onChange={e=>setPt({enabled:e.target.checked})}/></label>
    {ptPref.enabled&&pts.length>0&&<><p className="setNote">נקודות האיסוף שלי:</p><input className="phoneIn" type="search" placeholder="חיפוש נקודה או עיר" aria-label="חיפוש נקודת איסוף או עיר" value={ptQ} onChange={e=>setPtQ(e.target.value)}/>{pts.map(([k,name,city])=><label key={k} className="setRow"><span>{name}{city&&<small className="ptCity">{' · '+city}</small>}</span><input type="checkbox" className="sw" aria-label={'התראה בנקודה '+name+(city?', '+city:'')} checked={!ptPref.off.includes(k)} onChange={e=>setPt({key:k,off:!e.target.checked})}/></label>)}</>}
