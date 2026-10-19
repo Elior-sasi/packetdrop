@@ -29,7 +29,7 @@ export function speak(all:Parcel[],opts:{marks?:Record<string,string>;titles?:Re
  const parts:string[]=[];
  if(!live.length)parts.push('אין חבילות בדרך כרגע.');
  if(pick.length){parts.push(count(pick.length,'חבילה אחת מחכה לך לאיסוף.',' חבילות מחכות לך לאיסוף.').trim());
-  for(const p of pick.slice(0,3)){const d=daysLeft(p,now);parts.push(spokenName(p,titles)+(p.pickup?.place?', ב'+p.pickup.place:'')+(p.pickup?.code?', קוד '+digits(p.pickup.code):'')+(Number.isFinite(d)&&d>=0&&d<=3?(d===0?', היום האחרון לאסוף':d===1?', מחר היום האחרון לאסוף':', נשארו '+d+' ימים לאסוף'):'')+'.');}}
+  for(const p of pick.slice(0,3)){const d=daysLeft(p,now);parts.push(spokenName(p,titles)+(p.pickup?.place?', ב'+p.pickup.place:'')+(p.pickup?.code?', קוד '+digits(p.pickup.code):'')+(Number.isFinite(d)&&d>=0&&d<=3?(d===0?', היום האחרון לאיסוף':d===1?', מחר היום האחרון לאיסוף':', נשארו '+d+' ימים לאיסוף'):'')+'.');}}
  if(out.length)parts.push((out.length===1?'היום מגיעה: ':'היום מגיעות: ')+out.slice(0,3).map(p=>spokenName(p,titles)).join(', ')+'.');
  // Expected today by the store's/AliExpress's date (not yet out for delivery).
  const dueToday=rest.filter(p=>{const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/g);if(!m)return false;const [d,mo]=m.at(-1)!.split('.').map(Number);const t=new Date(now);return t.getDate()===d&&t.getMonth()+1===mo;});
