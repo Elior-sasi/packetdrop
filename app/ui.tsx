@@ -211,7 +211,7 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
    <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?20:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
    <div className="nc-info"/><Thumb p={p}/></div>
   <div className="nc-nm nc-full">{bidi(p.name)}</div>
-  <div className="nc-chips" aria-hidden="true"><span>{statusText(p)}</span>{!today&&<span>{'צפי '+(p.eta&&/-/.test(p.eta)?p.eta:dd(when))}</span>}</div></button>;}
+  <div className="nc-chips" aria-hidden="true"><span>{statusText(p)}</span>{!today&&<span>{(p.eta?'הגעה ':'צפי ')+(p.eta&&/-/.test(p.eta)?p.eta:dd(when))}</span>}</div></button>;}
  const x=348-T*338;
  return <button className="nextCard nc-ring" onClick={onOpen} aria-label={label}>
   <div className="nc-row"><Thumb p={p}/><div className="nc-info"><div className="nc-k">{k}</div><div className="nc-nm">{bidi(p.name)}</div>
