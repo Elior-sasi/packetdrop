@@ -29,7 +29,7 @@ function body(p?:Part):string{if(!p)return '';const here=p.body?.data?Buffer.fro
 export const REFUND=/ההחזר הכספי (?:אושר|בוצע|על ביטול)|זיכוי נשלח לאמצעי התשלום|refund has been issued|refunded bonus|fast refund bonus|הונפק החזר כספי|הזמנתך זוכתה|הודעה על זיכוי/i;
 export function isAd(subject:string,from:string,labels:string[]=[]){if(REFUND.test(subject)&&/aliexpress|temu|shein|amazon|shopify/i.test(from))return false;return /(?:^|[\s(|])פרסומת(?:[\s)|]|$)/.test(subject)||/^\s*(?:advertisement|ad\s*[:|])/i.test(subject)||/promotion@|promo@|marketing@|newsletter|ae-brief|deals@/i.test(from)||labels.includes('CATEGORY_PROMOTIONS');}
 
-const NOT_PARCEL=/eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesplanet|רב[- ]?חן|lev\.co\.il|eventim|leaan|לאן כרטיסים|tixwise|kartisim|כרטיס(?:ים)? (?:לסרט|להופעה|להצגה|לאירוע)|הקרנה|אולם \d|מושב|wolt\.com|10bis|tenbis|cibus|uber|gett|yango ?ride|booking\.com|airbnb|elal|אל על|טיסה|flight|מלון|hotel|netflix|spotify|disney|youtube premium|google play|app store|חשבון חודשי|תשלום חשבון/i;
+const NOT_PARCEL=/17track|eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesplanet|רב[- ]?חן|lev\.co\.il|eventim|leaan|לאן כרטיסים|tixwise|kartisim|כרטיס(?:ים)? (?:לסרט|להופעה|להצגה|לאירוע)|הקרנה|אולם \d|מושב|wolt\.com|10bis|tenbis|cibus|uber|gett|yango ?ride|booking\.com|airbnb|elal|אל על|טיסה|flight|מלון|hotel|netflix|spotify|disney|youtube premium|google play|app store|חשבון חודשי|תשלום חשבון/i;
 // Physical shipping words; unknown senders must mention one of these to count as a parcel.
 const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נקודת (?:ה)?חלוקה|כתובת למשלוח|shipping|shipped|shipment|delivery|tracking|מעקב|parcel|package/i;
 const STAGE_RULES:[number,RegExp][]=[
@@ -188,7 +188,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
 // Package photos in the same order as its product list, one per product first (so every product shows), extras after.
 // Lines that are not products (store campaigns, invoice headers) and slipped into product lists of saved parcels.
-const JUNK_ITEM=/^\s*\[?קמפיין|תודה שבחרתם|^חשבוניות|הזמנה מספר\s*:?$|GIFTPACK|^\s*\[?#\d+\]/i;
+const JUNK_ITEM=/^\s*[\[\]]?קמפיין|תודה שבחרתם|^חשבוניות|הזמנה מספר\s*:?$|GIFTPACK|^\s*\[?#\d+\]/i;
 function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
  const n=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();// Titles of the same product differ between mails (cut, reworded), so the best word overlap decides, not exact text.
  const words=(t:string)=>new Set(n(t).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).filter(w=>w.length>1));
@@ -198,7 +198,7 @@ function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
  for(const x of sorted){if(x.p<999&&!seen.has(x.p)){seen.add(x.p);first.push(x.u);}else rest.push(x.u);}return [...first,...rest];}
 export function mergeParcels(rows:Parcel[]){
  // Old saves from before the Israel Post fix: the mail's accessibility icon was taken for the product.
- rows=rows.map(p=>/תפריט נגישות|accessibility/i.test(p.name)||/inforu\.net/i.test(p.image||'')?{...p,name:/תפריט נגישות|accessibility/i.test(p.name)?'חבילה':p.name,image:/inforu\.net/i.test(p.image||'')?'':p.image}:p);
+ rows=rows.filter(p=>!/17track/i.test(p.shop||'')).map(p=>/תפריט נגישות|accessibility/i.test(p.name)||/inforu\.net/i.test(p.image||'')?{...p,name:/תפריט נגישות|accessibility/i.test(p.name)?'חבילה':p.name,image:/inforu\.net/i.test(p.image||'')?'':p.image}:p);
  const parent=new Map<string,string>();const find=(k:string):string=>{const p=parent.get(k)??k;if(p===k)return k;const r=find(p);parent.set(k,r);return r;};
  for(const p of rows){const keys=p.keys?.length?p.keys:[p.id];for(const k of keys)if(!parent.has(k))parent.set(k,k);for(const k of keys.slice(1))parent.set(find(k),find(keys[0]));}
  // AliExpress ships several orders from one checkout in a single package, but its package mails name only one of them.
@@ -225,7 +225,7 @@ export function mergeParcels(rows:Parcel[]){
   const more=Math.max(0,items.length-4)+unnamed;
   // Every order in the package, so each one can be found and listed (unnamed ones by their order number).
   const contents=orderCount>1||items.length>1?[...items,...keys.filter(k=>k.startsWith('order:')).map(k=>k.slice(6)).filter(o=>!perOrder.has(o)).slice(0,unnamed).map(o=>'הזמנה …'+o.slice(-6))]:[];
-  const title=items.length>1||unnamed?items.slice(0,4).join(' + ')+(more?' ועוד '+more:''):named.name;
+  const title=items.length>1||unnamed?items.slice(0,4).join(' + ')+(more?' ועוד '+more:''):(JUNK_ITEM.test(named.name)?(items[0]||'הזמנה'):named.name);
   const stage=Math.max(0,...list.map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
   const cancelled=latest.cancelled||(list.some(p=>p.cancelled)&&stage<1);

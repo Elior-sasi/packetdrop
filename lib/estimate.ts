@@ -15,7 +15,9 @@ export function learn(all:Parcel[]){const days:Record<string,number[]>={};
 export const pct=(a:number[],q:number)=>{const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1))))];};
 // Israel Post and couriers do not deliver on Saturday.
 const noSat=(t:number)=>{const d=new Date(t);return d.getDay()===6?t+864e5:t;};
-export function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=3||p.cancelled||p.stage<1)return null;
+export function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.stage>=4||p.cancelled||p.stage<1)return null;
+ // At stage 3 only while the local courier still has it (not waiting at a pickup point or out for delivery today).
+ if(p.stage===3&&(p.pickup||/לאיסוף|איסוף|יצאה למסירה|בדרך למסירה|השליח בדרך|out for delivery/i.test(p.events.at(-1)?.label||'')))return null;
  for(let k=MILES.length-1;k>=0;k--){const t0=mileAt(p,k);if(!t0)continue;
   let a=days[routeKey(p)+'#'+k],scope:'route'|'shop'='route';if(!a||a.length<3){a=days[p.shop+'|*#'+k];scope='shop';}if(!a||a.length<3)continue;
   const now=Date.now();let late=now>t0+pct(a,.9)*864e5+864e5;
@@ -27,7 +29,7 @@ export function estimate(p:Parcel,days:Record<string,number[]>):Est|null{if(p.st
 // The store's delivery window is written when the parcel leaves China and is often far too cautious.
 // YOUR past parcels from the same point on the way say better: if they say it comes sooner than the store's window ends, that wins.
 let learnCache:{all:unknown[];days:Record<string,number[]>}|null=null;
-export function freshEta<T extends Parcel>(p:T,all:T[]):T{if(!p.eta||p.stage>=3||p.cancelled)return p;const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(!m)return p;
+export function freshEta<T extends Parcel>(p:T,all:T[]):T{if(!p.eta||p.stage>=4||p.cancelled)return p;const m=p.eta.match(/(\d{1,2})\.(\d{1,2})/);if(!m)return p;
  if(learnCache?.all!==all)learnCache={all,days:learn(all)};const e=estimate({...p,eta:''},learnCache.days);if(!e||e.late)return p;
  const y=new Date().getFullYear();let start=new Date(y,+m[2]-1,+m[1]).getTime();if(start<Date.now()-60*864e5)start=new Date(y+1,+m[2]-1,+m[1]).getTime();
  const em=p.eta.match(/-(\d{1,2})\.(\d{1,2})/);let end=em?new Date(y,+em[2]-1,+em[1]).getTime():start;if(end<start)end=new Date(y+1,+em![2]-1,+em![1]).getTime();
