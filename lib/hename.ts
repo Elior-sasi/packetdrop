@@ -43,4 +43,4 @@ export function heName(n:string){let src=fixOld(n.trim()).replace(/One Piece/g,'
  return (out.length>=3?out:src).replace(/OnePieceX/g,'One Piece');}
 
 // Machine-translation slips in series names, also inside names Gemini wrote ("מאן פיס" = One Piece).
-export const fixSeries=(n:string)=>n.replace(/(^|\s)מאן[\s-]*פיס(?=\s|$)/g,'$1מוואן פיס').replace(/(^|\s)ואן[\s-]*פיס(?=\s|$)/g,'$1וואן פיס');
+export const fixSeries=(n:string)=>n.replace(/(^|\s)מאן[\s-]*פיס(?=\s|$)/g,'$1מ־One Piece').replace(/(^|\s)ו?ואן[\s-]*1?\s*פיס(?=\s|$)/g,'$1One Piece');

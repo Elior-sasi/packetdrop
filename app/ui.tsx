@@ -417,7 +417,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const it=p.order?aeItems[p.order]:undefined;if(!it?.length)return p;let r=p;
   if(!p.image&&!p.images?.length)r={...r,image:it[0].img,...(it.length>1?{images:it.map(x=>x.img)}:{})};
   if(!titles[p.id]&&/^(?:הזמנה|חבילה)/.test(p.name)&&it[0].title)r={...r,name:it[0].title};return r;})
-  .map((p,_,all)=>{const q=titles[p.id]?p:fillUnnamed(p,visionNames);const live=p.stage<4&&!p.cancelled;const cour=live&&p.link?courEtas[p.link]?.eta:'';const ae=live&&p.order?aeEtas[p.order]:'';return cour?{...q,eta:cour}:ae?{...q,eta:ae}:freshEta(q,all);}).map(p=>!p.image&&!p.images?.length&&webPhotos[p.id]?{...p,image:webPhotos[p.id]}:p),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames,webPhotos,aeEtas,courEtas,aeItems]);
+  .map((p,_,all)=>{const q=titles[p.id]?p:fillUnnamed(p,visionNames);const live=p.stage<4&&!p.cancelled;const cour=live&&p.link?courEtas[p.link]?.eta:'';const ae=live&&p.order?aeEtas[p.order]:'';return cour?{...q,eta:cour}:ae?{...q,eta:ae}:freshEta(q,all);}).map(p=>!p.image&&!p.images?.length&&webPhotos[p.id]?{...p,image:webPhotos[p.id]}:p).map(p=>{const n=fixSeries(p.name);return n===p.name?p:{...p,name:n};}),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames,webPhotos,aeEtas,courEtas,aeItems]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled||p.cancelled&&!!p.refund);
  // On the way: what is due first comes first (carrier date, else your own estimate); pickups and today's deliveries stay on top.
