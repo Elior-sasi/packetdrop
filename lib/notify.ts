@@ -24,7 +24,11 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
  const notes:Note[]=[];const stuck=new Set(before.stuck);
  const marked=(p:Parcel)=>p.keys.some(k=>before.marks?.[k])||!!before.marks?.[p.id];
  for(const p of after){
-  if(p.ret)continue;
+  // Returns: picked up by the courier, and arrived back at the store.
+  if(p.ret){const o=find(before.parcels,p);if(o){const nm=p.name;const fresh=(r:RegExp)=>p.events.find(e=>r.test(e.label)&&!o.events.some(x=>r.test(x.label))&&now-new Date(e.time).getTime()<3*DAY);
+    if(p.stage>=4&&o.stage<4)notes.push({id:p.id,kind:'delivered',title:'ההחזרה הגיעה לחנות',body:nm,tag:'rt4:'+p.id});
+    else if(fresh(/נאספ|השליח אסף|picked up|collected/i))notes.push({id:p.id,kind:'new',title:'ההחזרה נאספה מהשליח',body:nm,tag:'rtp:'+p.id});}
+   continue;}
   // Money back for an order (even a cancelled one): once per refund.
   {const o=find(before.parcels,p);if(p.refund&&(!o||o.refund?.at!==p.refund.at)&&now-new Date(p.refund.at).getTime()<3*DAY&&!(before.marks?.[p.id]==='hide'||p.keys.some(k=>before.marks?.[k]==='hide'))&&before.parcels.length)notes.push({id:p.id,kind:'new',title:(p.refund.bonus?'הוחזר כבונוס באתר':'התקבל החזר כספי')+(p.refund.amount?' '+p.refund.amount:''),body:nameOf(p),tag:'f:'+p.id+':'+p.refund.at});}
   if(p.cancelled||marked(p))continue;
@@ -40,6 +44,14 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
   if(p.customs&&p.stage<3&&(!o.customs||o.customs.at!==p.customs.at)&&now-new Date(p.customs.at).getTime()<3*DAY)notes.push({id:p.id,kind:'customs',title:'לתשלום מכס'+(p.customs.amount?' '+p.customs.amount:''),body:name+' · החבילה לא תשוחרר בלי תשלום',tag:'c:'+p.id});
   // AliExpress is about to close the order while the parcel has not arrived: last chance to open a dispute.
   if(p.stage<4&&p.events.some(e=>GUARD.test(e.label)&&now-new Date(e.time).getTime()<3*DAY&&!o.events.some(x=>x.id===e.id)))notes.push({id:p.id,kind:'guard',title:'ההזמנה תיסגר בקרוב והחבילה לא הגיעה',body:name+' · אפשר עדיין לפתוח מחלוקת ולקבל החזר',tag:'g:'+p.id});
+  // Milestones on the way, each once per parcel: left the origin country, released from customs; a failed delivery attempt every time it happens.
+  {const firstNew=(r:RegExp)=>{const e=p.events.find(e=>r.test(e.label));return e&&!o.events.some(x=>r.test(x.label))&&now-new Date(e.time).getTime()<3*DAY?e:null;};
+   const IL0=/הגיע[הו]? לארץ|הגיע(?:ה)? לישראל|במדינה\/באזור שלכם|באזור שלכם|arrived in (?:israel|destination)/i;
+   if(p.stage<3&&!p.events.some(e=>IL0.test(e.label))&&firstNew(/יצאה מארץ המוצא|יצא(?:ה)? מארץ המוצא|יצאה בטיסה|יצאה מאזור המוצא|departed (?:from )?(?:the )?(?:origin|country of origin)|left the origin/i))notes.push({id:p.id,kind:'new',title:'החבילה יצאה מארץ המוצא',body:name,tag:'lo:'+p.id});
+   if(p.stage<4&&firstNew(/שוחרר(?:ה)? (?:בהצלחה )?מ(?:ה)?מכס|released (?:from|by) customs|customs clearance (?:is )?complete/i))notes.push({id:p.id,kind:'new',title:'החבילה שוחררה מהמכס',body:name,tag:'cr:'+p.id});
+   const FAIL=/מסירה נכשל|ניסיון (?:ה)?מסירה|לא נמצא(?:ה)? (?:בכתובת|בבית)|הנמען לא נמצא|לא היה מענה|לא נמסר(?:ה)? - |delivery (?:attempt|failed|unsuccessful)|unable to deliver|attempted delivery/i;
+   const fail=p.events.find(e=>FAIL.test(e.label)&&!o.events.some(x=>x.id===e.id)&&now-new Date(e.time).getTime()<2*DAY);
+   if(p.stage<4&&fail)notes.push({id:p.id,kind:'out',title:'ניסיון המסירה נכשל',body:name+(p.carrier?' · '+p.carrier:'')+' · כדאי לתאם מסירה חדשה',tag:'fd:'+p.id+':'+fail.id});}
   // Arrived in Israel (first time only; AliExpress "במדינה/באזור שלכם" and Israel Post "הגיע לארץ" are the same step).
   {const IL=/הגיע[הו]? לארץ|הגיע לישראל|הגיעה לישראל|במדינה\/באזור שלכם|באזור שלכם|arrived in (?:israel|destination)/i;const e=p.events.find(e=>IL.test(e.label));
    if(e&&p.stage<3&&!o.events.some(x=>IL.test(x.label))&&now-new Date(e.time).getTime()<3*DAY)notes.push({id:p.id,kind:'new',title:'החבילה הגיעה לארץ',body:name+(p.carrier?' · '+p.carrier:''),tag:'il:'+p.id});}

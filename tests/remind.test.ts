@@ -16,3 +16,12 @@ test('arrived in Israel: one notification, not again for the post office mail',a
  const e0=[{id:'a',label:'נשלחה',time:t}];const e1=[...e0,{id:'b',label:'במדינה/באזור שלכם',time:t}];const e2=[...e1,{id:'c',label:'הגיעה לארץ ובדרך אליך',time:t}];
  const r=diff({parcels:[{...base,events:e0}],stuck:[]} as never,[{...base,events:e1}] as never);assert.equal(r.notes.filter(n=>n.title==='החבילה הגיעה לארץ').length,1);
  const r2=diff({parcels:[{...base,events:e1}],stuck:[]} as never,[{...base,events:e2}] as never);assert.equal(r2.notes.filter(n=>n.title==='החבילה הגיעה לארץ').length,0);});
+test('milestone notifications: left origin, customs released, failed delivery, returns',async()=>{const {diff}=await import('../lib/notify');
+ const t=new Date().toISOString();const base={id:'o3',keys:['o3'],name:'שעון',shop:'AliExpress',carrier:'דואר ישראל',image:'',url:'',tracking:'',order:'3',eta:'',cancelled:false,pickup:null,stage:1};
+ const e0=[{id:'a',label:'נשלחה',time:t}];
+ const T=(b:unknown[],a:unknown[],extra={})=>diff({parcels:[{...base,events:b}],stuck:[]} as never,[{...base,...extra,events:a}] as never).notes.map(n=>n.title);
+ assert.deepEqual(T(e0,[...e0,{id:'b',label:'יצאה מארץ המוצא',time:t}]),['החבילה יצאה מארץ המוצא']);
+ assert.ok(T(e0,[...e0,{id:'c',label:'שוחררה מהמכס',time:t}],{stage:2}).includes('החבילה שוחררה מהמכס'));
+ assert.ok(T(e0,[...e0,{id:'d',label:'ניסיון מסירה נכשל',time:t}],{stage:3}).includes('ניסיון המסירה נכשל'));
+ const r={...base,id:'return:1',keys:['return:1'],ret:true,name:'החזרה ל־SHEIN'};
+ assert.deepEqual(diff({parcels:[{...r,events:[{id:'x',label:'השליח יאסוף',time:t}]}],stuck:[]} as never,[{...r,events:[{id:'x',label:'השליח יאסוף',time:t},{id:'y',label:'ההחזרה נאספה',time:t}]}] as never).notes.map(n=>n.title),['ההחזרה נאספה מהשליח']);});
