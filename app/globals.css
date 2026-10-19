@@ -315,3 +315,6 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .primary.btnLink{color:#05182b}
 .app.detailOn>:not(.sheet):not(dialog):not(.toast):not(.menuWrap){display:none}
 .search .micBtn{margin:0;padding:6px}.search input+.micBtn{margin-inline-start:auto}.search .micBtn+.micBtn{margin-inline-start:-8px}
+.mailSheet{z-index:40}.mailSubj{font-size:calc(19px*var(--fs));margin:10px 0 4px}.mailFrame{display:block;width:100%;height:62vh;border:0;border-radius:14px;background:#fff;margin:8px 0}
+.linkBtn.mailLink{display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:0;color:#7cc4ff;font:inherit;font-size:calc(14px*var(--fs))}
+.app.detailOn>.mailSheet{display:block}
