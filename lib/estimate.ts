@@ -9,7 +9,8 @@ export type Est={from:number;to:number;n:number;avg:number;late:boolean;scope:'r
 const MILES:[string,RegExp][]=[['מהמשלוח',SHIP_RE],['מיציאה מארץ המוצא',/יצאה מארץ המוצא|יצאה בטיסה|נמסרה לחברת ההובלה|יצאה מאזור המוצא|בתעבורה/i],['מההגעה לישראל',/הגיעה לארץ|נחתה|הגיעה לחברת ההובלה|במדינה|באזור שלכם|הגיע לארץ/i],['מהשחרור ממכס',/שוחררה מהמכס/i],['מחברת המסירה',/חברת המסירה|חברת המשלוחים המקומית|המקומית/i]];
 const mileAt=(p:Parcel,k:number)=>{if(k===0)return shippedAt(p);const e=p.events.find(e=>MILES[k][1].test(e.label));return e?new Date(e.time).getTime():0;};
 export function learn(all:Parcel[]){const days:Record<string,number[]>={};
- for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got||(p as {returned?:boolean}).returned)continue;const end=new Date(p.events.at(-1)!.time).getTime();
+ for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got||(p as {returned?:boolean}).returned)continue;// "Arrived" = ready for pickup or out for delivery or delivered, whichever came first; time waiting at the pickup point does not count.
+  const done=p.events.find(e=>/לאיסוף|מוכנה לאיסוף|ממתינ[הה]? לאיסוף|יצאה למסירה|בדרך למסירה|השליח בדרך|נמסר|נאספה|delivered|ready for pickup|out for delivery/i.test(e.label));const end=new Date((done||p.events.at(-1)!).time).getTime();
   MILES.forEach((_,k)=>{const t=mileAt(p,k);if(!t)return;const d=(end-t)/864e5;if(!(d>0.1&&d<90))return;for(const key of [routeKey(p),p.shop+'|*'])(days[key+'#'+k]??=[]).push(d);});}
  return days;}
 export const pct=(a:number[],q:number)=>{const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1))))];};
