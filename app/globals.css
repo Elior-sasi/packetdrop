@@ -269,7 +269,7 @@ nav{touch-action:none}nav.dragging:before{transition:none}
 .hero:has(>img.photo.fill){height:auto;aspect-ratio:auto;max-height:none;display:block;background:transparent}
 .hero>img.photo.fill{position:static;width:100%;height:auto;object-fit:initial;display:block}
 .galTrack{height:auto;aspect-ratio:1/1;max-height:none}
-.galTrack img{object-fit:cover}
+.galTrack img{object-fit:contain;background:#fff}
 .zoom{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center}
 .zoomArea{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;touch-action:none;overflow:hidden}
 .zoomArea img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;user-select:none;-webkit-user-select:none}

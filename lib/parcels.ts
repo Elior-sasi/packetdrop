@@ -199,7 +199,8 @@ function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
  const score=(a:string,b:string)=>{const A=words(a),B=words(b);if(!A.size||!B.size)return 0;let c=0;for(const w of A)if(B.has(w))c++;return c/Math.min(A.size,B.size);};
  const pos=(u:string)=>{const nm=named[photoKey(u)];if(!nm)return 999;const a=n(nm);let best=-1,bs=0;items.forEach((it,i)=>{const b=n(it);const sc=a===b||a.startsWith(b)||b.startsWith(a)?2:score(nm,it);if(sc>bs){bs=sc;best=i;}});return bs>=0.5?best:999;};
  const sorted=[...imgs].map((u,k)=>({u,p:pos(u),k})).sort((a,b)=>a.p-b.p||a.k-b.k);const seen=new Set<number>();const first:string[]=[],rest:string[]=[];
- for(const x of sorted){if(x.p<999&&!seen.has(x.p)){seen.add(x.p);first.push(x.u);}else rest.push(x.u);}return [...first,...rest];}
+ // Products in the order of the title; a product's extra photos right after its first one; photos of no known product last.
+ for(const x of sorted){if(x.p<999){seen.add(x.p);first.push(x.u);}else rest.push(x.u);}return [...first,...rest];}
 export function mergeParcels(rows:Parcel[]){
  // Old saves from before the Israel Post fix: the mail's accessibility icon was taken for the product.
  rows=rows.filter(p=>!/17track/i.test(p.shop||'')).map(p=>/תפריט נגישות|accessibility/i.test(p.name)||/inforu\.net/i.test(p.image||'')?{...p,name:/תפריט נגישות|accessibility/i.test(p.name)?'חבילה':p.name,image:/inforu\.net/i.test(p.image||'')?'':p.image}:p);
