@@ -18,6 +18,7 @@ export async function GET(req:NextRequest){const q=req.nextUrl.searchParams;
   return Response.json({ok:true,orders},{headers:H});}
  let me:{id:string};try{me=await identity(req,false) as {id:string};}catch{return Response.json({ok:false},{status:401,headers:H});}
  const rows=await s`select order_no,eta,raw,at from ae_eta where user_id=${me.id} and at>now()-interval '60 days'`;
+ if(q.get('log')){const e=rows.find(x=>x.order_no==='error');return Response.json({log:e?.raw||'',at:e?.at||null},{headers:H});}
  const raw=q.get('raw');if(raw){const r=rows.find(x=>x.order_no===raw);return Response.json({order:raw,eta:r?.eta||'',at:r?.at||null,lines:String(r?.raw||'').split('\n').filter(l=>/\d/.test(l)).slice(0,80)},{headers:H});}
  const link=req.nextUrl.origin+'/api/ae?t='+smsToken(me.id,'widget');
  return Response.json({ok:true,etas:Object.fromEntries(rows.filter(r=>r.eta&&r.order_no!=='error').map(r=>[r.order_no,r.eta])),error:rows.find(r=>r.order_no==='error')?.raw||'',checked:rows.length?rows.filter(r=>r.order_no!=='error').map(r=>new Date(r.at).getTime()).sort().at(-1):null,script:aeLoader(link)},{headers:H});}
@@ -25,7 +26,7 @@ export async function POST(req:NextRequest){if(!dbOn())return Response.json({ok:
  const user=smsUser(req.nextUrl.searchParams.get('t')||'','widget');if(!user)return Response.json({ok:false},{status:401,headers:H});
  const b=await req.json().catch(()=>({}));
  // The phone script reports a failed run (kept for the check page).
- if(b.error){const s=await sql();await s`insert into ae_eta(user_id,order_no,eta,raw) values(${user},'error','',${String(b.error).slice(0,300)+' · '+String(b.ctx||'')}) on conflict(user_id,order_no) do update set raw=excluded.raw,at=now()`;return Response.json({ok:true},{headers:H});}
+ if(b.error){const s=await sql();await s`insert into ae_eta(user_id,order_no,eta,raw) values(${user},'error','',${String(b.error).slice(0,300)+' · '+String(b.ctx||'')}) on conflict(user_id,order_no) do update set raw=case when ae_eta.at>now()-interval '10 minutes' then right(ae_eta.raw||E'\n'||excluded.raw,2000) else excluded.raw end,at=now()`;return Response.json({ok:true},{headers:H});}
  const order=String(b.order||'');const text=String(b.text||'').slice(0,30000);
  if(!/^\d{12,20}$/.test(order)||!text)return Response.json({ok:false},{status:400,headers:H});
  const eta=aeEta(text);const s=await sql();
