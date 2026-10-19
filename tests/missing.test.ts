@@ -37,3 +37,6 @@ test('gallery order survives re-merging an already merged package',()=>{
  const once=mergeParcels([mk('3','מרית','S3','2026-10-03T00:00:00Z'),mk('2','מעמד אוזניות','S2','2026-10-02T00:00:00Z'),mk('1','כובע קש','S1','2026-10-01T00:00:00Z')] as never);
  const twice=mergeParcels(JSON.parse(JSON.stringify(once)));const ids=(p:{images?:string[]})=>p.images!.map(u=>u.match(/kf\/(\w+)/)![1]);
  assert.deepEqual(ids(twice[0]),ids(once[0]));assert.equal(ids(twice[0])[twice[0].items!.findIndex(n=>n.includes('כובע'))],'S1');});
+test('store campaign lines are not products',()=>{
+ const p={...base,id:'order:9545',keys:['order:9545'],name:'הזמנה מ־KSP',shop:'KSP',items:['תודה שבחרתם KSP - הזמנה מספר:','[קמפיין #72583] - מבצעי חג','[קמפיין #73220] - הטבה לרוכשים','חשבוניות מס:'],tracking:'',order:'9545',stage:1,events:[{id:'k',label:'x',time:'2026-10-01T00:00:00Z'}]};
+ const m=mergeParcels([p] as never);assert.equal(m[0].items,undefined);});

@@ -187,6 +187,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
 
 // Mails about the same parcel share an order number or a tracking number; join everything connected.
 // Package photos in the same order as its product list, one per product first (so every product shows), extras after.
+// Lines that are not products (store campaigns, invoice headers) and slipped into product lists of saved parcels.
+const JUNK_ITEM=/^\s*\[?קמפיין|תודה שבחרתם|^חשבוניות|הזמנה מספר\s*:?$|GIFTPACK|^\s*\[?#\d+\]/i;
 function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
  const n=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();// Titles of the same product differ between mails (cut, reworded), so the best word overlap decides, not exact text.
  const words=(t:string)=>new Set(n(t).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).filter(w=>w.length>1));
@@ -213,7 +215,7 @@ export function mergeParcels(rows:Parcel[]){
   // Several orders shipped in one package: name the package after all of them ("שחמט + אזעקה").
   const generic=(n:string)=>/^(?:הזמנה|חבילה|לחבילה|your order|הודעה מ)/i.test(n);
   const perOrder=new Map<string,string>();for(const p of sorted)if(p.order&&!generic(p.name)&&!perOrder.has(p.order))perOrder.set(p.order,p.name);
-  const items=[...new Set([...[...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')),...list.flatMap(p=>p.items||[])])].filter(t=>!/^הזמנה …/.test(t)).filter((a,i,all)=>{const n=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();const na=n(a);return !all.some((b,j)=>{const nb=n(b);return b!==a&&(nb===na?j<i:nb.length>na.length&&(nb.startsWith(na)||nb.startsWith(na.split(' ').slice(0,3).join(' '))&&na.split(' ').length>=3&&nb.split(' ').slice(0,3).join(' ')===na.split(' ').slice(0,3).join(' ')));});});
+  const items=[...new Set([...[...perOrder.values()].flatMap(n=>n.replace(/\s+ועוד \d+$/,'').split(' + ')),...list.flatMap(p=>p.items||[])])].filter(t=>!/^הזמנה …/.test(t)).filter(t=>!JUNK_ITEM.test(t)).filter((a,i,all)=>{const n=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();const na=n(a);return !all.some((b,j)=>{const nb=n(b);return b!==a&&(nb===na?j<i:nb.length>na.length&&(nb.startsWith(na)||nb.startsWith(na.split(' ').slice(0,3).join(' '))&&na.split(' ').length>=3&&nb.split(' ').slice(0,3).join(' ')===na.split(' ').slice(0,3).join(' ')));});});
   // The same product named by two mails, one cut shorter ("מכנסי קארגו לגברים" / "… כותנה"), is listed once.
   // One picture per order in the package.
   const perImg=new Map<string,string>();for(const p of sorted)if(p.order&&p.image&&!perImg.has(p.order))perImg.set(p.order,p.image);const images=[...new Set([...list.flatMap(p=>p.images||[]),...perImg.values()])];
@@ -240,7 +242,7 @@ export function mergeParcels(rows:Parcel[]){
   const orderItems=merge('orderItems'),pkgByOrder=merge('pkgByOrder');const found:string[]=[];
   for(const [o,ordered] of Object.entries(orderItems)){const inPkg=pkgByOrder[o];if(!inPkg?.length||ordered.length<2)continue;const miss=ordered.filter(it=>!inPkg.some(x=>sameItem(it,x)));if(miss.length&&miss.length<ordered.length)found.push(...miss);}
   const missing=[...new Set(found)].filter(it=>!pkgItems.some(x=>sameItem(it,x))).slice(0,5);
-  out.push({...latest,shop,id:keys[0],keys,name:title,...(Object.keys(namedAll).length?{named:namedAll}:{}),...(contents.length>1?{items:contents}:{}),image:named.image||list.find(p=>p.image)?.image||'',
+  out.push({...latest,shop,id:keys[0],keys,name:title,...(Object.keys(namedAll).length?{named:namedAll}:{}),items:contents.length>1?contents:undefined,image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
    url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?orderImgs(images,items,namedAll).slice(0,6):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,refund:[...sorted].reverse().find(p=>p.refund)?.refund,ret:list.some(p=>p.ret)||undefined,...(pkgItems.length?{pkgItems:pkgItems.slice(0,30)}:{}),...(Object.keys(orderItems).length?{orderItems}:{}),...(Object.keys(pkgByOrder).length?{pkgByOrder}:{}),missing:missing.length?missing:undefined,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }

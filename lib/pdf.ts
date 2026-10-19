@@ -26,7 +26,7 @@ export function pdfOrder(text:string){
  const order=text.match(/(?:מס['׳]?\s*הזמנה|הזמנה\s*מספר)[\s¦:-]*(?:מס['׳]?[\s¦]*)?(\d{8,12})/)?.[1]||'';
  const ship=[...new Set([...text.matchAll(/ת\.?\s?משלוח[\s¦:]*(\d{7,12})/g)].map(m=>m[1]))];
  // Product rows: a 5-7 digit item code and a price; the description is the longest Hebrew cell that is not a warehouse/agent/payment column.
- const NOISE=/סוכן|אינטרנט|מחסן|הובל|שילוח|אשראי|בנק|התאמות|ספק|שיווק|החזרה|BTB|מבוטל|תשלומים|הטבת|מקט השלמה|התקנה|אחריות|סה"?כ|מע"?מ|^הערות/;
+ const NOISE=/סוכן|אינטרנט|מחסן|הובל|שילוח|אשראי|בנק|התאמות|ספק|שיווק|החזרה|BTB|מבוטל|תשלומים|הטבת|מקט השלמה|התקנה|אחריות|סה"?כ|מע"?מ|^הערות|קמפיין|מבצע|תודה שבחרתם|חשבוני|הזמנה מספר|קופון|הנחה|GIFTPACK/i;
  const items:string[]=[];
  for(const line of text.split('\n')){const cells=line.split(' ¦ ').map(c=>c.trim()).filter(Boolean);const flat=cells.join(' ');
   if(!/\b\d{5,7}\b/.test(flat)||!/\d+\.\d{2}/.test(flat))continue;
