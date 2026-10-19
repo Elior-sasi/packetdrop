@@ -2,10 +2,19 @@ import {NextRequest} from 'next/server';
 import {identity} from '@/lib/identity';
 import {cainiao,track} from '@/lib/track';
 import {gemini} from '@/lib/gemini';
+import {db,dbOn} from '@/lib/push';
+import {learn,estimate} from '@/lib/estimate';
+import {mergeParcels,type Parcel} from '@/lib/parcels';
 export const runtime='nodejs';
 // Signed-in check that the Gemini key works (opened in the browser); never shows the key.
 export async function GET(req:NextRequest){const H={'Cache-Control':'no-store'};
- try{await identity(req,false);}catch{return Response.json({ok:false,why:'לא מחובר'},{status:401,headers:H});}
+ let me:{id:string};try{me=await identity(req,false) as {id:string};}catch{return Response.json({ok:false,why:'לא מחובר'},{status:401,headers:H});}
+ // ?eta=1: why each parcel on the way shows the date it does (from the notification server's copy of the parcels).
+ if(req.nextUrl.searchParams.get('eta')&&dbOn()){const {sql,ready}=db();await ready;const row=(await sql`select state from push_users where user_id=${me.id}`)[0];
+  const all=mergeParcels(((row?.state as {parcels?:Parcel[]})?.parcels)||[]);const days=learn(all as never);
+  const counts=Object.fromEntries(Object.entries(days).map(([k,v])=>[k,v.length]));
+  const live=all.filter(p=>p.stage<4&&!p.cancelled).slice(0,12).map(p=>{const e=estimate({...p,eta:''} as never,days);return {name:p.name.slice(0,30),shop:p.shop,carrier:p.carrier,stage:p.stage,eta:p.eta,last:p.events.at(-1)?.label?.slice(0,40),est:e?{from:new Date(e.from).toISOString().slice(0,10),to:new Date(e.to).toISOString().slice(0,10),n:e.n,late:e.late,from_point:e.stage}:null};});
+  return Response.json({history:counts,live},{headers:H});}
  // ?track=NUMBER: what Cainiao (AliExpress's carrier system) says about it, including its delivery window.
  const n=(req.nextUrl.searchParams.get('track')||'').trim().toUpperCase();
  if(n){const c=await cainiao([n]).catch(()=>null);const t=c?.tracks[n];const key=process.env.TRACK17_KEY;const s17=key?await track([n],key).catch(e=>({err:String(e)}) as never):null;const t17=s17?(s17 as Record<string,{eta?:unknown;status?:string;pending?:boolean}>)[n]:null;
