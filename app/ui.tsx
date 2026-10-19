@@ -494,9 +494,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   fetch('/api/courier-eta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({links:due})}).then(r=>r.ok?r.json():null).then(d=>{if(!d?.etas)return;const n={...c};for(const l of due)n[l]={eta:d.etas[l]||'',at:Date.now()};setCourEtas(n);try{localStorage.setItem('pd_cour',JSON.stringify(n));}catch{}}).catch(()=>{});},[user,courLinks]);
  // "Near a pickup point" alerts: the user's choices (all on/off, and points turned off).
  useEffect(()=>{if(!user)return;fetch('/api/points',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d?.ok)setPtPref({enabled:d.enabled,off:d.off||[]});}).catch(()=>{});},[user]);
- useEffect(()=>{if(!user)return;let c:Record<string,string>={};try{c=JSON.parse(localStorage.getItem('pd_ptcity')||'{}');}catch{}setPtCity(c);
+ useEffect(()=>{if(!user)return;let c:Record<string,string>={};try{c=JSON.parse(localStorage.getItem('pd_ptcity2')||'{}');}catch{}setPtCity(c);
   const keys=[...new Set(parcels.filter(p=>p.pickup&&(p.pickup.place||p.pickup.address)).map(p=>pointKey(p.pickup!)))].filter(k=>!(k in c)).slice(0,6);if(!keys.length)return;
-  fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cities:keys})}).then(r=>r.ok?r.json():null).then(d=>{if(!d?.cities)return;const n={...c,...d.cities};setPtCity(n);try{localStorage.setItem('pd_ptcity',JSON.stringify(n));}catch{}}).catch(()=>{});
+  fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cities:keys})}).then(r=>r.ok?r.json():null).then(d=>{if(!d?.cities)return;const n={...c,...d.cities};setPtCity(n);try{localStorage.setItem('pd_ptcity2',JSON.stringify(n));}catch{}}).catch(()=>{});
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[user,parcels.length]);
  const setPt=(body:{enabled?:boolean;key?:string;off?:boolean})=>{fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.ok?r.json():null).then(d=>{if(d?.ok)setPtPref({enabled:d.enabled,off:d.off});}).catch(()=>{});};
