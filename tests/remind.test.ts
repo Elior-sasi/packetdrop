@@ -6,3 +6,8 @@ test('pickup reminder after 2 days, once',()=>{const r=reminders({parcels:[P(2.2
  assert.match(reminders({parcels:[P(13.5)],stuck:[],reminded:r3.reminded}).notes[0].title,/האחרון לאיסוף$/);});
 test('weekly only Sunday morning',()=>{const sun=new Date('2026-10-18T06:30:00Z');const w=weekly({parcels:[P(1)],stuck:[]},sun);assert.ok(w.note);assert.match(w.note!.body,/מחכות לאיסוף/);
  assert.equal(weekly({parcels:[P(1)],stuck:[],weekly:w.week},sun).note,null);assert.equal(weekly({parcels:[P(1)],stuck:[]},new Date('2026-10-19T06:30:00Z')).note,null);});
+test('shipped notification once, when the order moves to shipped',async()=>{const {diff}=await import('../lib/notify');
+ const t=new Date().toISOString();const base={id:'o1',keys:['o1'],name:'מנורה',shop:'AliExpress',carrier:'',image:'',url:'',tracking:'',order:'1',eta:'',cancelled:false,pickup:null};
+ const before={parcels:[{...base,stage:0,events:[{id:'a',label:'אושרה',time:t}]}],stuck:[]};
+ const r=diff(before as never,[{...base,stage:1,events:[{id:'a',label:'אושרה',time:t},{id:'b',label:'נשלחה',time:t}]}] as never);
+ assert.equal(r.notes.length,1);assert.equal(r.notes[0].title,'ההזמנה נשלחה');});

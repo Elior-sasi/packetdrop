@@ -42,7 +42,8 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
   if(p.stage<4&&p.events.some(e=>GUARD.test(e.label)&&now-new Date(e.time).getTime()<3*DAY&&!o.events.some(x=>x.id===e.id)))notes.push({id:p.id,kind:'guard',title:'ההזמנה תיסגר בקרוב והחבילה לא הגיעה',body:name+' · אפשר עדיין לפתוח מחלוקת ולקבל החזר',tag:'g:'+p.id});
   if(p.stage>o.stage&&recent){
    if(p.stage===4)notes.push({id:p.id,kind:'delivered',title:'החבילה נמסרה',body:name,tag:'d:'+p.id});
-   else if(p.stage===3)notes.push(pickupOrOut(p,name));}
+   else if(p.stage===3)notes.push(pickupOrOut(p,name));
+   else if(p.stage===1&&o.stage<1)notes.push({id:p.id,kind:'new',title:'ההזמנה נשלחה',body:name+(p.shop&&!name.includes(p.shop)?' · '+p.shop:''),tag:'sh:'+p.id});}
   else if(p.stage===3&&o.stage===3&&!o.pickup?.code&&p.pickup?.code&&recent)notes.push(pickupOrOut(p,name));
  }
  // A parcel with no news for 10 days gets one heads-up; 30+ days counts as received, so it is left alone.
