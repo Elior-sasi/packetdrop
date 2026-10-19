@@ -3,6 +3,7 @@ import {identity} from '@/lib/identity';
 import {db,dbOn,smsUser} from '@/lib/push';
 import {mergeParcels,type Parcel} from '@/lib/parcels';
 import {pointKey,daysLeft} from '@/lib/pickup';
+import {gemini} from '@/lib/gemini';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 // "Near a pickup point" alerts. The phone (Shortcuts) asks with the personal link for parcels waiting at a point,
 // each with the point's coordinates, and turns them into iPhone reminders that fire on arrival.
@@ -17,7 +18,10 @@ async function geocode(s:Awaited<ReturnType<typeof sql>>,k0:string):Promise<{lat
  let hit:{lat:string;lon:string;address?:{city?:string;town?:string;village?:string;suburb?:string}}|undefined;const words=k0.split(' ');
  const tries=[k0,...[1,2,3].map(n=>words.slice(n).join(' ')).filter(x=>x.length>3&&/\d|\s/.test(x))].filter((x,i,a)=>a.indexOf(x)===i).slice(0,3);
  for(const q of tries){try{const r=await fetch('https://nominatim.openstreetmap.org/search?'+new URLSearchParams({q,format:'json',limit:'1',countrycodes:'il','accept-language':'he',addressdetails:'1'}),{headers:{'User-Agent':'Unbox parcel tracker (packetdrop.vercel.app)'},signal:AbortSignal.timeout(8000)});hit=(await r.json())?.[0];}catch{return null;}if(hit)break;}
- const city=hit?.address?.city||hit?.address?.town||hit?.address?.village||'';
+ let city=hit?.address?.city||hit?.address?.town||hit?.address?.village||'';
+ // Not on the map by name: ask Google (through Gemini's Google Search) which town this pickup point is in.
+ if(!city){try{const g=await gemini({contents:[{parts:[{text:`חפש בגוגל: נקודת איסוף חבילות או חנות בישראל בשם "${k0.slice(0,120)}". באיזו עיר או יישוב היא נמצאת? ענה רק בשם העיר בעברית, בלי שום מילה נוספת. אם לא מצאת, ענה: לא ידוע`}]}],tools:[{google_search:{}}],generationConfig:{temperature:0,maxOutputTokens:256}},20000);
+  const a=g.ok?g.text.replace(/[."'\n]/g,' ').trim():'';if(a&&a.length<=25&&!/לא ידוע|unknown/i.test(a)&&/^[\u05D0-\u05EA\s\-־׳]+$/.test(a))city=a;}catch{}}
  await s`insert into geo_points(k,lat,lon,city) values(${k},${hit?+hit.lat:null},${hit?+hit.lon:null},${city}) on conflict(k) do update set lat=excluded.lat,lon=excluded.lon,city=excluded.city`;return hit?{lat:+hit.lat,lon:+hit.lon,city}:null;}
 // Still waiting: not marked received, and inside the time the point keeps it (an old one was most likely collected already).
 const waiting=(p:Parcel,marks:Record<string,string>)=>p.stage===3&&!p.cancelled&&!!p.pickup&&!!(p.pickup.place||p.pickup.address)&&!marks[p.id]&&!p.keys.some(k=>marks[k])&&daysLeft(p)>=0;
