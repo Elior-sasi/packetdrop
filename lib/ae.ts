@@ -6,7 +6,7 @@ const monOf=(s:string)=>{const k=s.toLowerCase().replace(/^ב/,'').slice(0,3);re
 const EN='(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\\.?';
 const HE='ב?(ינו|פבר|מרץ|מרס|אפר|מאי|יונ|יול|אוג|ספט|אוק|נוב|דצמ)[א-ת]*[׳\'"]?';
 // Words around the date that mean "this is when it comes" (not order date, payment date or "ordered on").
-const KEY=/(?:תקופת (?:ה)?אספקה|estimated delivery|delivery by|deliver(?:ed|y)? (?:by|on|before|between)|arriv(?:e|es|al)(?: by| on| between)?|expected (?:delivery|by)|delivery date|delivery:|guaranteed|זמן אספקה|אספקה עד|צפי (?:ה)?הגעה|צפי (?:ה)?אספקה|יגיע(?:ו)? (?:עד|בין|ב)|תגיע (?:עד|בין|ב)|הגעה (?:עד|משוערת|צפויה)|מסירה (?:עד|משוערת|צפויה)|משלוח (?:עד|צפוי)|צפוי(?:ה)? להגיע)/i;
+const KEY=/(?:תקופת (?:ה)?אספקה|arriving|now expected|estimated delivery|delivery by|deliver(?:ed|y)? (?:by|on|before|between)|arriv(?:e|es|al)(?: by| on| between)?|expected (?:delivery|by)|delivery date|delivery:|guaranteed|זמן אספקה|אספקה עד|צפי (?:ה)?הגעה|צפי (?:ה)?אספקה|יגיע(?:ו)? (?:עד|בין|ב)|תגיע (?:עד|בין|ב)|הגעה (?:עד|משוערת|צפויה)|מסירה (?:עד|משוערת|צפויה)|משלוח (?:עד|צפוי)|צפוי(?:ה)? להגיע)/i;
 type D={d:number;m:number};
 function datesIn(s:string):D[]{const out:D[]=[];let m:RegExpExecArray|null;
  const rx=[new RegExp(EN+'\\s*(\\d{1,2})','gi'),new RegExp('(\\d{1,2})\\s*'+EN,'gi'),new RegExp('(\\d{1,2})\\s*'+HE,'g'),new RegExp(HE+'\\s*(\\d{1,2})','g'),/(?<![\d.])(\d{1,2})[./](\d{1,2})(?![\d.]*\d{3})/g];
@@ -26,6 +26,12 @@ export function aeEta(text:string,now=new Date()):string{const lines=text.split(
  for(const key of [STRONG,KEY])for(let i=0;i<lines.length;i++){if(!key.test(lines[i]))continue;
   const near=[lines[i],lines[i+1]||'',lines[i+2]||''].join(' ').slice(0,200);const ds=datesIn(near).filter(x=>{const t=at(x,now);return t>now.getTime()-30*864e5&&t<now.getTime()+120*864e5;});
   if(!ds.length)continue;const a=ds[0],b=ds[1];if(b&&at(b,now)>at(a,now)&&at(b,now)-at(a,now)<40*864e5)return at(a,now)<now.getTime()-864e5?fmt(b):fmt(a)+'-'+fmt(b);return fmt(a);}
+
+ // Amazon style: "Arriving Thursday" / "Arriving tomorrow" (no date written).
+ const DAYS=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'],HED=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+ for(const l of lines){if(!/arriving|expected|יגיע|תגיע|צפוי/i.test(l))continue;const low=l.toLowerCase();let add=-1;
+  if(/\btoday\b|היום/.test(low))add=0;else if(/tomorrow|מחר/.test(low))add=1;else{const i=DAYS.findIndex(d=>low.includes(d));const h=HED.findIndex(d=>new RegExp('(?:יום |ב)'+d+'(?![א-ת])').test(l));const k=i>=0?i:h;if(k>=0)add=(k-now.getDay()+7)%7||7;}
+  if(add>=0){const t=new Date(now.getTime()+add*864e5);return t.getDate()+'.'+(t.getMonth()+1);}}
  return '';}
 // Runs inside the order page: its text, plus each product's photo and title (not the "you may also like" list below).
 const GRAB=String.raw`let n=0;
@@ -42,25 +48,26 @@ export const AE_JS=`const log=async m=>{try{const x=new Request(u);x.method='POS
 await log('התחיל')
 try{
 const r=await new Request(u).loadJSON().catch(()=>null)
-const orders=(r&&r.orders)||[]
-await log('הזמנות: '+orders.length)
+// Each job: one open order page in one store (AliExpress, Amazon, iHerb...). Older servers sent only AliExpress order numbers.
+const jobs=(r&&r.jobs)||((r&&r.orders)||[]).map(o=>({shop:'AliExpress',order:o,url:'https://www.aliexpress.com/p/order/detail.html?orderId='+o}))
+await log('הזמנות: '+jobs.length)
 const wv=new WebView()
 const grab=${JSON.stringify(GRAB)}
 async function page(url){await wv.loadURL(url);try{return JSON.parse(await wv.evaluateJavaScript(grab,true))}catch(e){return {u:'',t:''}}}
-const needLogin=p=>/login|passport|signin/i.test(p.u)
-let done=0,sent=[]
-if(orders.length){
- let p=await page('https://www.aliexpress.com/p/order/index.html')
- await log('דף ההזמנות: '+(p.u||'ריק').slice(0,80)+' · '+p.t.length)
- if(needLogin(p)){
-  if(config.runsInApp){const a=new Alert();a.title='התחברות לעליאקספרס';a.message='התחבר פעם אחת. אחרי ההתחברות סגור את החלון (Close) והסקריפט ימשיך.';a.addAction('אישור');await a.present();await wv.loadURL('https://login.aliexpress.com/');await wv.present(true);p=await page('https://www.aliexpress.com/p/order/index.html')}
-  if(needLogin(p)){const n=new Notification();n.title='Unbox';n.body='צריך להתחבר לעליאקספרס: פתח את הסקריפט Unbox AliExpress';if(!config.runsInApp)await n.schedule();else{const a=new Alert();a.title='לא מחובר';a.message='ההתחברות לא הושלמה. נסה שוב.';a.addAction('אישור');await a.present()}Script.setShortcutOutput('צריך להתחבר לעליאקספרס');Script.complete();return}}
- for(const o of orders.slice(0,12)){const q=await page('https://www.aliexpress.com/p/order/detail.html?orderId='+o);if(!q.t)continue
-  const res=await (()=>{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({order:o,text:q.t,items:q.items||[]});return x.loadJSON().catch(()=>null)})()
-  done++;if(res&&res.eta)sent.push(res.eta)}}
-const msg=orders.length?('נבדקו '+done+' הזמנות'+(sent.length?' · נמצאו תאריכים: '+sent.join(', '):' · לא נמצא תאריך')):'אין הזמנות פתוחות מעליאקספרס'
-// No daily "all fine" notification: delays and closing orders come as Unbox notifications from the server. Only a run that found nothing says so.
-if(!sent.length&&orders.length){const n=new Notification();n.title='Unbox · עליאקספרס';n.body=msg;await n.schedule()}
+const needLogin=p=>/login|passport|signin|sign-in/i.test(p.u)
+let done=0,sent=[],failed=new Set(),asked=new Set()
+for(const j of jobs.slice(0,15)){if(failed.has(j.shop))continue
+ let q=await page(j.url)
+ if(needLogin(q)){
+  // First time for this store: sign in once inside Scriptable (it remembers), then the same page again.
+  if(config.runsInApp&&!asked.has(j.shop)){asked.add(j.shop);const a=new Alert();a.title='התחברות ל־'+j.shop;a.message='התחבר פעם אחת. בסוף ההתחברות סגור את החלון (Close) והסקריפט ימשיך.';a.addAction('אישור');a.addCancelAction('דלג');if(await a.present()===0){await wv.loadURL(j.url);await wv.present(true);q=await page(j.url)}}
+  if(needLogin(q)){failed.add(j.shop);continue}}
+ if(!q.t)continue
+ const res=await (()=>{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({order:j.order,shop:j.shop,text:q.t,items:q.items||[]});return x.loadJSON().catch(()=>null)})()
+ done++;if(res&&res.eta)sent.push(res.eta)}
+const msg=jobs.length?('נבדקו '+done+' הזמנות'+(sent.length?' · נמצאו תאריכים: '+sent.join(', '):' · לא נמצא תאריך')+(failed.size?' · צריך להתחבר ל: '+[...failed].join(', '):'')):'אין הזמנות פתוחות'
+// No daily "all fine" notification: delays and closing orders come as Unbox notifications from the server.
+if((!sent.length&&jobs.length)||failed.size){const n=new Notification();n.title='Unbox';n.body=msg;await n.schedule()}
 await log('סיום: '+msg)
 Script.setShortcutOutput(msg)
 }catch(e){const m='שגיאה: '+String(e&&e.message||e).slice(0,200);try{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({error:m,ctx:config.runsInApp?'app':config.runsWithSiri?'siri':'shortcut'});await x.loadJSON()}catch(_){}

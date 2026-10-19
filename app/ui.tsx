@@ -400,10 +400,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   return {...p,got,returned,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got&&!returned,ask:ask&&!returned,last,stage:stale||got||returned?4:p.stage,real:p.stage,name:titles[p.id]||byPhoto(m)||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
   .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}).map(p=>{// AliExpress order page (read on the phone): product photos, and the product title for an order the mails left unnamed.
-  const it=/aliexpress/i.test(p.shop)&&p.order?aeItems[p.order]:undefined;if(!it?.length)return p;let r=p;
+  const it=p.order?aeItems[p.order]:undefined;if(!it?.length)return p;let r=p;
   if(!p.image&&!p.images?.length)r={...r,image:it[0].img,...(it.length>1?{images:it.map(x=>x.img)}:{})};
   if(!titles[p.id]&&/^(?:הזמנה|חבילה)/.test(p.name)&&it[0].title)r={...r,name:it[0].title};return r;})
-  .map((p,_,all)=>{const q=titles[p.id]?p:fillUnnamed(p,visionNames);const live=p.stage<4&&!p.cancelled;const cour=live&&p.link?courEtas[p.link]?.eta:'';const ae=live&&/aliexpress/i.test(p.shop)&&p.order?aeEtas[p.order]:'';return cour?{...q,eta:cour}:ae?{...q,eta:ae}:freshEta(q,all);}).map(p=>!p.image&&!p.images?.length&&webPhotos[p.id]?{...p,image:webPhotos[p.id]}:p),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames,webPhotos,aeEtas,courEtas,aeItems]);
+  .map((p,_,all)=>{const q=titles[p.id]?p:fillUnnamed(p,visionNames);const live=p.stage<4&&!p.cancelled;const cour=live&&p.link?courEtas[p.link]?.eta:'';const ae=live&&p.order?aeEtas[p.order]:'';return cour?{...q,eta:cour}:ae?{...q,eta:ae}:freshEta(q,all);}).map(p=>!p.image&&!p.images?.length&&webPhotos[p.id]?{...p,image:webPhotos[p.id]}:p),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames,webPhotos,aeEtas,courEtas,aeItems]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled||p.cancelled&&!!p.refund);
  // On the way: what is due first comes first (carrier date, else your own estimate); pickups and today's deliveries stay on top.
@@ -596,11 +596,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <p className="setNote">{push==='on'?'עובד דרך אפליקציית Scriptable, ומתעדכן עם ההתראות.':'עובד דרך Scriptable ומתעדכן מהשרת של ההתראות, אז צריך שההתראות יהיו פעילות.'}</p>
    <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox</b>.</li><li>במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← גודל קטן או בינוני. בהגדרות הווידג'ט בחר את הסקריפט <b>Unbox</b>.</li></ol>
    <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
-  {user&&widgetUrl&&(()=>{const sc=aeLoader(widgetUrl.replace('/api/widget','/api/ae'));return <section className="set"><h3><CalendarCheck size={20}/> תאריכי הגעה מעליאקספרס</h3>
-   <p className="setNote">Scriptable נכנס לעמוד של כל הזמנה פתוחה ומעתיק את תאריך ההגעה שעליאקספרס נותנת. ההתחברות לעליאקספרס נשמרת רק בטלפון שלך.</p>
+  {user&&widgetUrl&&(()=>{const sc=aeLoader(widgetUrl.replace('/api/widget','/api/ae'));return <section className="set"><h3><CalendarCheck size={20}/> תאריכי הגעה מהחנויות</h3>
+   <p className="setNote">Scriptable נכנס לעמוד של כל הזמנה פתוחה, בעליאקספרס, באמזון ובחנויות נוספות, ומעתיק את תאריך ההגעה שהחנות נותנת. בפעם הראשונה בכל חנות הוא יבקש להתחבר אליה, וההתחברות נשמרת רק בטלפון שלך.</p>
    <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox AliExpress</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים צור קיצור עם הפעולה <b>Run Script</b>, בחר <b>Unbox AliExpress</b> והדלק <b>Run In App</b>. הוסף אירוע <b>שעה</b>, 8:00, כל יום, עם <b>פעולה אוטומטית</b> דלוקה.</li></ol>
    <button className="ghost" onClick={()=>copy(sc)}><Copy size={18}/> {copied===sc?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button>
-   <a className="ghost btnLink" href="scriptable:///run/Unbox%20AliExpress"><RefreshCw size={18}/> בדוק עכשיו בעליאקספרס</a>
+   <a className="ghost btnLink" href="scriptable:///run/Unbox%20AliExpress"><RefreshCw size={18}/> בדוק עכשיו בחנויות</a>
    <p className="setNote" role="status">{aeChecked?'עדכון אחרון: '+new Date(aeChecked).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+(Object.keys(aeEtas).length===1?'תאריך אחד':Object.keys(aeEtas).length+' תאריכים'):'עדיין לא התקבלו תאריכים.'}</p></section>;})()}
   {user&&<section className="set"><h3>מעקב אצל חברות השליחויות</h3>
    {phone&&!phoneEdit?<><div className="setRow"><span>טלפון <b dir="ltr">{phone.replace(/^(\d{3})(\d{3})(\d+)$/,'$1-$2$3')}</b></span><button className="linkBtn" onClick={()=>{setPhoneDraft(phone);setPhoneEdit(true);}}>עריכה</button></div>
@@ -699,7 +699,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {open.order&&<div className="kv"><span>מספר הזמנה</span><button className="copy" onClick={()=>copy(open.order)}><b dir="ltr">{open.order}</b>{copied===open.order?' ✓':<Copy size={15}/>}</button></div>}
    {open.url&&<a className="link" href={open.url} target="_blank" rel="noopener noreferrer">מעקב באתר החנות <ExternalLink size={15}/></a>}
   </section>}
-  {/aliexpress/i.test(open.shop)&&open.stage<4&&!open.cancelled&&open.order&&<a className="ghost btnLink" href="scriptable:///run/Unbox%20AliExpress"><RefreshCw size={18}/> בדוק עכשיו בעליאקספרס</a>}
+  {open.stage<4&&!open.cancelled&&open.order&&/aliexpress|amazon|iherb|temu|shein|ebay|asos|next|banggood/i.test(open.shop)&&<a className="ghost btnLink" href="scriptable:///run/Unbox%20AliExpress"><RefreshCw size={18}/> {'בדוק עכשיו ב־'+open.shop}</a>}
   {(()=>{const d=disputeFor(open,open.order?aeCloses[open.order]:undefined);return d&&<section className="box dispute"><h3><ShieldAlert size={18}/> {d.why}</h3><p className="setNote">אפשר לפתוח מחלוקת בעליאקספרס ולבקש החזר. הכנתי נוסח באנגלית עם הפרטים.</p>
    <button className="ghost" onClick={async()=>{await copy(d.text);window.open('https://www.aliexpress.com/p/order/detail.html?orderId='+encodeURIComponent(open.order),'_blank');}}><Copy size={18}/> {copied===d.text?'הועתק ✓ עכשיו "Open dispute" והדבק':'העתקת הנוסח ופתיחת ההזמנה'}</button>
    <details><summary>הנוסח</summary><p dir="ltr" className="disputeText">{d.text}</p></details></section>;})()}

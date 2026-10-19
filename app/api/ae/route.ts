@@ -1,7 +1,7 @@
 import {NextRequest} from 'next/server';
 import {identity} from '@/lib/identity';
 import {db,dbOn,smsUser,smsToken,send,type Sub} from '@/lib/push';
-import {mergeParcels,type Parcel} from '@/lib/parcels';
+import {mergeParcels,brandDomains,type Parcel} from '@/lib/parcels';
 import {aeEta,AE_JS,aeLoader,aeCloseDays,aeWhen} from '@/lib/ae';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 // AliExpress delivery dates from the order page, read by a Scriptable script on the user's phone (signed in to AliExpress there).
@@ -14,8 +14,16 @@ export async function GET(req:NextRequest){const q=req.nextUrl.searchParams;
  const t=q.get('t');
  if(t){const user=smsUser(t,'widget');if(!user)return Response.json({ok:false},{status:401,headers:H});
   const row=(await s`select state from push_users where user_id=${user}`)[0];const all=mergeParcels(((row?.state as {parcels?:Parcel[]})?.parcels)||[]);
-  const orders=[...new Set(all.filter(p=>/aliexpress/i.test(p.shop)&&p.stage<4&&!p.cancelled&&/^\d{12,20}$/.test(p.order||'')).map(p=>p.order))];
-  return Response.json({ok:true,orders},{headers:H});}
+  const open=all.filter(p=>p.stage<4&&!p.cancelled&&p.order&&Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<45*864e5);
+  const orders=[...new Set(open.filter(p=>/aliexpress/i.test(p.shop)&&/^\d{12,20}$/.test(p.order)).map(p=>p.order))];
+  // Every store whose order page can be opened: AliExpress and Amazon by order number, others by the order link in their own mail.
+  const jobs:{shop:string;order:string;url:string}[]=[];const seen=new Set<string>();
+  for(const p of open){if(seen.has(p.order))continue;let url='';
+   if(/aliexpress/i.test(p.shop)&&/^\d{12,20}$/.test(p.order))url='https://www.aliexpress.com/p/order/detail.html?orderId='+p.order;
+   else if(/amazon/i.test(p.shop)&&/^\d{3}-\d{7}-\d{7}$/.test(p.order))url='https://www.amazon.com/gp/your-account/order-details?orderID='+p.order;
+   else{const dom=brandDomains[p.shop];try{const h=new URL(p.url).hostname;if(dom&&(h===dom||h.endsWith('.'+dom)))url=p.url;}catch{}}
+   if(url){seen.add(p.order);jobs.push({shop:p.shop,order:p.order,url});}}
+  return Response.json({ok:true,orders,jobs:jobs.slice(0,15)},{headers:H});}
  let me:{id:string};try{me=await identity(req,false) as {id:string};}catch{return Response.json({ok:false},{status:401,headers:H});}
  const rows=await s`select order_no,eta,raw,at,items,close_at from ae_eta where user_id=${me.id} and at>now()-interval '60 days'`;
  if(q.get('log')){const e=rows.find(x=>x.order_no==='error');return Response.json({log:e?.raw||'',at:e?.at||null},{headers:H});}
@@ -28,7 +36,7 @@ export async function POST(req:NextRequest){if(!dbOn())return Response.json({ok:
  // The phone script reports a failed run (kept for the check page).
  if(b.error){const s=await sql();await s`insert into ae_eta(user_id,order_no,eta,raw) values(${user},'error','',${String(b.error).slice(0,300)+' · '+String(b.ctx||'')}) on conflict(user_id,order_no) do update set raw=case when ae_eta.at>now()-interval '10 minutes' then right(ae_eta.raw||E'\n'||excluded.raw,2000) else excluded.raw end,at=now()`;return Response.json({ok:true},{headers:H});}
  const order=String(b.order||'');const text=String(b.text||'').slice(0,30000);
- if(!/^\d{12,20}$/.test(order)||!text)return Response.json({ok:false},{status:400,headers:H});
+ if(!/^[\w-]{6,40}$/.test(order)||order==='error'||!text)return Response.json({ok:false},{status:400,headers:H});
  const eta=aeEta(text);const s=await sql();
  const items=(Array.isArray(b.items)?b.items:[]).filter((x:{img?:unknown;title?:unknown})=>typeof x?.img==='string'&&/^https:\/\//.test(x.img)).slice(0,8).map((x:{img:string;title?:unknown})=>({img:x.img.slice(0,400),title:String(x.title||'').slice(0,200)}));
  const days=aeCloseDays(text);const closeAt=days?new Date(Date.now()+days*864e5):null;
@@ -38,8 +46,8 @@ export async function POST(req:NextRequest){if(!dbOn())return Response.json({ok:
  const notes:{title:string;body:string;tag:string}[]=[];
  const row=(await s`select state,subs from push_users where user_id=${user}`)[0];const all=mergeParcels(((row?.state as {parcels?:Parcel[]})?.parcels)||[]);
  const p=all.find(x=>x.order===order&&!x.cancelled);const view=(row?.state as {view?:{active?:{keys:string[];name:string}[]}})?.view;
- const name=(p&&view?.active?.find(v=>v.keys.some(k=>p.keys.includes(k)))?.name)||(p&&!/^(?:הזמנה|חבילה)/.test(p.name)?p.name.slice(0,40):'הזמנה מעליאקספרס');
- if(p&&p.stage<4&&eta&&prev?.eta&&prev.eta!==eta){const a=aeWhen(prev.eta),c=aeWhen(eta);if(c-a>864e5)notes.push({title:'הצפי נדחה ל־'+eta.split('-').pop(),body:name+' · עליאקספרס עדכנה את מועד ההגעה',tag:'ad:'+order+':'+eta});}
+ const shopName=p?.shop||String(b.shop||'החנות');const name=(p&&view?.active?.find(v=>v.keys.some(k=>p.keys.includes(k)))?.name)||(p&&!/^(?:הזמנה|חבילה)/.test(p.name)?p.name.slice(0,40):'הזמנה מ־'+shopName);
+ if(p&&p.stage<4&&eta&&prev?.eta&&prev.eta!==eta){const a=aeWhen(prev.eta),c=aeWhen(eta);if(c-a>864e5)notes.push({title:'הצפי נדחה ל־'+eta.split('-').pop(),body:name+' · '+shopName+' עדכנה את מועד ההגעה',tag:'ad:'+order+':'+eta});}
  if(p&&p.stage<3&&days&&days<=5&&!prev?.warned){notes.push({title:'ההזמנה תיסגר בעוד '+days+(days===1?' יום':' ימים'),body:name+' · החבילה עוד לא הגיעה. אפשר לפתוח מחלוקת לפני הסגירה',tag:'ac:'+order});await s`update ae_eta set warned=true where user_id=${user} and order_no=${order}`;}
  const subs=((row?.subs||[]) as Sub[]);for(const n of notes)for(const sub of subs)await send(sub,{...n,url:'/?p='+encodeURIComponent(p?.id||'')}).catch(()=>{});
  return Response.json({ok:true,eta},{headers:H});}

@@ -15,3 +15,7 @@ test('AliExpress order page: auto-close days and the moment to count to',()=>{
  assert.equal(aeCloseDays('Total 69'),0);
  assert.equal(new Date(aeWhen('11.10-22.10',now)).getDate(),22);
  assert.equal(new Date(aeWhen('21.10-28.10',now)).getDate(),21);});
+test('Amazon order page: arriving weekday / tomorrow',()=>{
+ assert.equal(aeEta('Arriving Thursday',now),'22.10');
+ assert.equal(aeEta('Arriving tomorrow by 10 PM',now),'20.10');
+ assert.equal(aeEta('Now expected October 27',now),'27.10');});
