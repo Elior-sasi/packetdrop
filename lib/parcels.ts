@@ -230,7 +230,8 @@ export function mergeParcels(rows:Parcel[]){
   // The shop comes from the order mails, not from a carrier's notice (Israel Post writes as itself).
   const isCarrier=(n:string)=>!n||n==='הזמנה מהדוא״ל'||carriers.some(([,c])=>c===n);
   const shop=sorted.find(p=>p.order&&!isCarrier(p.shop))?.shop||sorted.find(p=>!isCarrier(p.shop))?.shop||latest.shop;
-  const namedAll=Object.assign({},...list.map(p=>p.named||{}));
+  // Photo -> product name, kept in the merged parcel so later merges (of already merged parcels) still know which photo is which.
+  const namedAll=Object.assign({},...[...perImg].filter(([o])=>perOrder.has(o)).map(([o,u])=>({[photoKey(u)]:perOrder.get(o)!})),...list.map(p=>p.named||{}));
   // Per order: products its order mail listed that none of its shipping mails named. Judged only for orders of 2+ products where
   // at least one product did match (so the two mails name things comparably); a single-product order that shipped is never flagged.
   const pkgItems=[...new Set(list.flatMap(p=>p.pkgItems||[]))];const norm=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();const head=(t:string)=>norm(t).split(' ').slice(0,3).join(' ');
@@ -241,7 +242,7 @@ export function mergeParcels(rows:Parcel[]){
   const missing=[...new Set(found)].filter(it=>!pkgItems.some(x=>sameItem(it,x))).slice(0,5);
   out.push({...latest,shop,id:keys[0],keys,name:title,...(Object.keys(namedAll).length?{named:namedAll}:{}),...(contents.length>1?{items:contents}:{}),image:named.image||list.find(p=>p.image)?.image||'',
    carrier:[...sorted].reverse().find(p=>p.carrier)?.carrier||'',tracking:[...sorted].reverse().find(p=>/^(AP|RS|[A-Z]{2}\d{9}[A-Z]{2})/.test(p.tracking))?.tracking||[...sorted].reverse().find(p=>p.tracking)?.tracking||'',pickup:[...sorted].reverse().find(p=>p.pickup?.place)?.pickup||[...sorted].reverse().find(p=>p.pickup)?.pickup||null,order:sorted.find(p=>p.order)?.order||'',
-   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?orderImgs(images,items,{...Object.fromEntries([...perImg].filter(([o])=>perOrder.has(o)).map(([o,u])=>[photoKey(u),perOrder.get(o)!])),...namedAll}).slice(0,6):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,refund:[...sorted].reverse().find(p=>p.refund)?.refund,ret:list.some(p=>p.ret)||undefined,...(pkgItems.length?{pkgItems:pkgItems.slice(0,30)}:{}),...(Object.keys(orderItems).length?{orderItems}:{}),...(Object.keys(pkgByOrder).length?{pkgByOrder}:{}),missing:missing.length?missing:undefined,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
+   url:[...sorted].reverse().find(p=>p.url)?.url||'',images:images.length>1?orderImgs(images,items,namedAll).slice(0,6):undefined,customs:[...sorted].reverse().find(p=>p.customs)?.customs,refund:[...sorted].reverse().find(p=>p.refund)?.refund,ret:list.some(p=>p.ret)||undefined,...(pkgItems.length?{pkgItems:pkgItems.slice(0,30)}:{}),...(Object.keys(orderItems).length?{orderItems}:{}),...(Object.keys(pkgByOrder).length?{pkgByOrder}:{}),missing:missing.length?missing:undefined,price:sorted.find(p=>p.price)?.price,via:[...new Set(list.flatMap(p=>p.via||[]))].length?[...new Set(list.flatMap(p=>p.via||[]))]:undefined,qty:items.length>1||unnamed?undefined:sorted.find(p=>p.qty)?.qty,stage,cancelled,eta:stage===4?'':[...sorted].reverse().find(p=>p.eta)?.eta||'',events});
  }
  return out.sort((a,b)=>b.events.at(-1)!.time.localeCompare(a.events.at(-1)!.time));
 }

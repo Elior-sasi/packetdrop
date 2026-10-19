@@ -32,3 +32,8 @@ test('photos match products even when the two mails word the title differently',
  const pkg={...base,id:'tracking:GLS1',keys:['tracking:GLS1','order:1','order:2','order:3'],name:'One Piece כובע קש רשמי',items:['One Piece כובע קש רשמי','תושבת אחסון פשוטה לאוזניות','מרית מטבח 2 ב-1'],tracking:'GLS1',order:'',stage:3,events:[{id:'p',label:'יצאה',time:'2026-10-05T00:00:00Z'}]};
  const m=mergeParcels([mk('3','מרית מטבח','S3','2026-10-03T00:00:00Z'),mk('2','מעמד אוזניות - תושבת אחסון פשוטה לאוזניות שולחני','S2','2026-10-02T00:00:00Z'),mk('1','כובע קש One Piece בעיצוב רשמי','S1','2026-10-01T00:00:00Z'),pkg] as never);
  assert.deepEqual(m[0].images!.map(u=>u.match(/kf\/(\w+)/)![1]),['S1','S2','S3']);});
+test('gallery order survives re-merging an already merged package',()=>{
+ const mk=(o:string,name:string,img:string,t:string)=>({...base,id:'order:'+o,keys:['order:'+o,'tracking:LP2'],name,image:'https://ae-pic-a1.aliexpress-media.com/kf/'+img+'.jpg',tracking:'',order:o,stage:2,events:[{id:o+'x',label:'נשלחה',time:t}]});
+ const once=mergeParcels([mk('3','מרית','S3','2026-10-03T00:00:00Z'),mk('2','מעמד אוזניות','S2','2026-10-02T00:00:00Z'),mk('1','כובע קש','S1','2026-10-01T00:00:00Z')] as never);
+ const twice=mergeParcels(JSON.parse(JSON.stringify(once)));const ids=(p:{images?:string[]})=>p.images!.map(u=>u.match(/kf\/(\w+)/)![1]);
+ assert.deepEqual(ids(twice[0]),ids(once[0]));assert.equal(ids(twice[0])[twice[0].items!.findIndex(n=>n.includes('כובע'))],'S1');});

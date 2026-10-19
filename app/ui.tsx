@@ -265,7 +265,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function sync(){if(!user||controller.current)return;setSlow(false);void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   // No single request may hang the whole check: each one gets its own time limit.
   const lim=(ms:number)=>typeof AbortSignal!=='undefined'&&'any' in AbortSignal&&'timeout' in AbortSignal?(AbortSignal as unknown as {any:(a:AbortSignal[])=>AbortSignal}).any([c.signal,AbortSignal.timeout(ms)]):c.signal;
-  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v20')!=='1';}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
+  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v20')!=='1';}catch{}
+  // One full re-read so packages saved before per-order photo names were kept get them (gallery order, unnamed orders).
+  try{if(localStorage.getItem('pd_full_v1')!=='1'&&saved.current.length){seen.current=new Set();saved.current=[];localStorage.setItem('pd_full_v1','1');}}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
   try{let r=await fetch(listUrl,{signal:lim(25000),cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch(listUrl,{signal:lim(25000),cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
    // Only mail that was never read before is fetched; everything older comes from the cloud backup.
    // One-time repair: parcels whose shop was saved as a web address are read again to pick up the shop's real name.
