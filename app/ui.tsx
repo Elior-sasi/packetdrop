@@ -218,20 +218,21 @@ function NextCard({p,when,onOpen}:{p:Parcel;when:number;onOpen:()=>void}){
   <svg className="nc-trk" viewBox="0 0 358 40" aria-hidden="true"><line x1="10" y1="16" x2="348" y2="16" stroke="#2a4a66" strokeWidth="3" strokeDasharray="6 6"/><line x1="348" y1="16" x2={x} y2="16" stroke="#2ed3c6" strokeWidth="4" strokeLinecap="round"/>
    <circle cx="348" cy="16" r="6" fill="#4aa8ff"/><circle cx="10" cy="16" r="6" fill={T>=1?'#3fd49a':'#33414f'}/><circle cx={x} cy="16" r="9" fill="#2ed3c6"><animate attributeName="r" values="7;10;7" dur="1.8s" repeatCount="indefinite"/></circle>
    <text x="348" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">{abroad(p)?'חו"ל':'החנות'}</text><text x="12" y="37" fill="#9fb4c8" fontSize="11" textAnchor="middle">אתה</text></svg></button>;}
-// Hero card for several parcels due the same day: one countdown, every photo and name, each name opens its parcel.
-function NextGroup({ps,when,onOpen,onAll}:{ps:Parcel[];when:number;onOpen:(id:string)=>void;onAll:()=>void}){
+// Hero card for several parcels due the same day: a ring split into one part per parcel (green once it came), every photo and name; each name opens its parcel.
+function NextGroup({ps,came,when,onOpen}:{ps:Parcel[];came:string[];when:number;onOpen:(id:string)=>void}){
  const sod=(t:number)=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime();};const days=Math.max(0,Math.round((sod(when)-sod(Date.now()))/864e5));
- const big=days<=0?'היום':days===1?'מחר':String(days);const unit=days>1?'ימים':'';const n=ps.length;
+ const n=ps.length,a=ps.filter(p=>came.includes(p.id)).length;const order=[...ps.filter(p=>!came.includes(p.id)),...ps.filter(p=>came.includes(p.id))];
+ const big=a?a+'/'+n:days<=0?'היום':days===1?'מחר':String(days);const unit=a?'הגיעו':days>1?'ימים':'';
  const k=n+' חבילות מגיעות '+(days<=0?'היום':days===1?'מחר':'בעוד '+days+' ימים');
- const show=ps.slice(0,3),rest=n-show.length;const C=2*Math.PI*40;
- return <section className="nextCard nc-ring nc-group" aria-label={k+': '+ps.map(p=>p.name).join(', ')}>
+ const show=order.slice(0,3),rest=n-show.length;const C=2*Math.PI*40,seg=C/Math.min(n,8),gap=n>1?7:0;
+ const how=(p:Parcel)=>p.stage===4?'✓ הגיעה':'✓ לאיסוף'+(p.pickup?.code?' · קוד '+p.pickup.code:'');
+ return <section className="nextCard nc-ring nc-group" aria-label={k+(a?', '+a+' כבר הגיעו':'')}>
   <div className="nc-k nc-top" aria-hidden="true">{k}</div>
-  <div className="nc-row" aria-hidden="true"><svg className="ring" viewBox="0 0 92 92"><defs><linearGradient id="ncg2"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs>
-   <circle cx="46" cy="46" r="40" fill="none" stroke="#ffffff18" strokeWidth="8"/><circle cx="46" cy="46" r="40" fill="none" stroke="url(#ncg2)" strokeWidth="8" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={0} transform="rotate(-90 46 46)"/>
-   <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
+  <div className="nc-row" aria-hidden="true"><svg className="ring" viewBox="0 0 92 92"><g transform="rotate(-90 46 46)" fill="none" strokeWidth="8" strokeLinecap="round">
+   {Array.from({length:Math.min(n,8)},(_,i)=><circle key={i} cx="46" cy="46" r="40" stroke={i<a?'#3fd49a':'#4aa8ff55'} strokeDasharray={(seg-gap)+' '+(C-seg+gap)} strokeDashoffset={-i*seg}/>)}</g>
+   <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?24:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
    <div className="nc-info"/><div className="nc-stack">{show.map((p,i)=><div key={p.id} style={{zIndex:9-i}}><ThumbOne p={p}/></div>)}</div></div>
-  <ul className="nc-list">{show.map(p=><li key={p.id}><button type="button" onClick={()=>onOpen(p.id)}>{bidi(p.name)}</button></li>)}{rest>0&&<li className="nc-more" aria-hidden="true">{'ועוד '+rest}</li>}</ul>
-  {days<=0&&<button type="button" className="nc-all" onClick={onAll}><PackageCheck size={18}/> {'קיבלתי את כל ה־'+n}</button>}</section>;}
+  <ul className="nc-list">{show.map(p=>{const c=came.includes(p.id);return <li key={p.id}><button type="button" className={c?'nc-came':''} onClick={()=>onOpen(p.id)}><span>{bidi(p.name)}</span>{c&&<em>{how(p)}</em>}</button></li>;})}{rest>0&&<li className="nc-more" aria-hidden="true">{'ועוד '+rest}</li>}</ul></section>;}
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=step(p)?'on':''}/>)}</div>;}
 
 // Bottom sheet chrome: a grab bar you can pull down to close, and a close button.
@@ -392,9 +393,13 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // A delivery window that has already started ("19.10-26.10" on the 19th): count to its end, not "today".
  const etaWhen=(p:Parcel)=>{const t=etaAt(p);const m=p.eta.match(/-(\d{1,2})\.(\d{1,2})/);if(!m||t>Date.now())return t;const y=new Date().getFullYear();let e=new Date(y,+m[2]-1,+m[1],12).getTime();if(e<t)e=new Date(y+1,+m[2]-1,+m[1],12).getTime();return e;};
  const byEta=(list:Parcel[])=>[...list].sort((a,b)=>{const u=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return u(a)-u(b)||etaAt(a)-etaAt(b)||(b as {last?:number}).last!-(a as {last?:number}).last!;});
- const nextP=(()=>{const l=byEta(active).filter(p=>isPickup(p)||outToday(p)||!!p.eta||(est(p)&&!est(p)!.late));const p=l[0];if(!p)return null;const t=isPickup(p)||outToday(p)?Date.now():etaWhen(p);if(!Number.isFinite(t))return null;
+ // Today's parcels as one group: those still due today and those that already came today, so the ring shows how many arrived.
+ const isToday=(t:number)=>Number.isFinite(t)&&new Date(t).toDateString()===new Date().toDateString();
+ const cameAt=(p:Parcel)=>p.cancelled?NaN:p.stage===4?new Date(p.events.at(-1)?.time||0).getTime():isPickup(p)?new Date((p.events.find(e=>/איסוף|pickup|collection/i.test(e.label))||p.events.at(-1))?.time||0).getTime():NaN;
+ const todayGroup=(()=>{const due=byEta(active).filter(p=>!isPickup(p)&&(outToday(p)||(!!p.eta||(est(p)&&!est(p)!.late))&&isToday(etaWhen(p))));const came=parcels.filter(p=>isToday(cameAt(p)));return due.length&&due.length+came.length>1?{due,came}:null;})();
+ const nextP=todayGroup?{p:todayGroup.due[0],t:Date.now(),group:[...todayGroup.due,...todayGroup.came],came:todayGroup.came.map(p=>p.id)}:(()=>{const l=byEta(active).filter(p=>isPickup(p)||outToday(p)||!!p.eta||(est(p)&&!est(p)!.late));const p=l[0];if(!p)return null;const t=isPickup(p)||outToday(p)?Date.now():etaWhen(p);if(!Number.isFinite(t))return null;
   // Several parcels due the same day share the hero card.
-  const day=(x:number)=>new Date(x).toDateString();const group=isPickup(p)?[p]:l.filter(x=>!isPickup(x)&&day(outToday(x)?Date.now():etaWhen(x))===day(t));return {p,t,group:group.length?group:[p]};})();
+  const day=(x:number)=>new Date(x).toDateString();const group=isPickup(p)?[p]:l.filter(x=>!isPickup(x)&&day(outToday(x)?Date.now():etaWhen(x))===day(t));return {p,t,group:group.length?group:[p],came:[] as string[]};})();
  const q=search.trim().toLowerCase();const qs=searchTerms(q);// A search looks through everything, delivered parcels included.
  const shownAll=(q?[...byEta(active),...done]:view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>{if(!q)return true;const hay=[p.name,p.shop,p.carrier,p.tracking,p.order,...(p.items||[]),...p.keys].join(' ').toLowerCase();return qs.some(t=>hay.includes(t));});
  // Delivered courier notices with no product (HFD etc.) fold into one row at the bottom of "נמסרו".
@@ -445,8 +450,6 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   marksRef.current=nextMarks;manualRef.current=nextManual;void saveBackup(saved.current);if(pushOn.current)void pushPost({marks:nextMarks}).catch(()=>{});}
  function mark(p:Parcel,kind:'got'|'hide'|null){const next={...marks};for(const k of [p.id,...p.keys])delete next[k];if(kind)next[p.id]=kind;
   const nextManual=kind==='hide'&&p.manual?manual.filter(m=>!m.keys.some(k=>p.keys.includes(k))):manual;setMarks(next);setManual(nextManual);persist(next,nextManual);setMenu(null);if(kind==='hide')setOpenId(null);}
- // The group hero card's button: every parcel due that day is marked as received at once.
- function markAll(ps:Parcel[]){const next={...marks};for(const p of ps){for(const k of [p.id,...p.keys])delete next[k];next[p.id]='got';}setMarks(next);persist(next,manual);setToast('סימנתי '+ps.length+' חבילות כהגיעו');}
  function addManual(){const num=addNum.trim().toUpperCase().replace(/\s+/g,'');if(!/^[A-Z0-9-]{8,40}$/.test(num)){setAddErr('מספר מעקב צריך להיות 8-40 אותיות באנגלית ומספרים');return;}
   if(parcels.some(p=>p.tracking===num||p.keys.includes('tracking:'+num))){setAddErr('החבילה הזו כבר ברשימה');return;}
   const now=new Date().toISOString();const p:MailParcel={id:'tracking:'+num,keys:['tracking:'+num],name:addName.trim()||'חבילה '+num,shop:'',carrier:'',image:'',url:'',tracking:num,order:'',eta:'',stage:0,cancelled:false,pickup:null,events:[{id:'manual:'+num,label:'נוספה ידנית',time:now}]};
@@ -607,7 +610,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
     {!stats.ordered&&!stats.delivered&&<section className="panel empty"><ChartColumn size={40}/><h2>אין הזמנות ב{stats.label}</h2></section>}</div>}
    {!(waiting)&&section==='list'&&<><label className="search"><Search size={20}/><input aria-label="חיפוש חבילות" placeholder="חיפוש מוצר, חנות או מספר מעקב" value={search} onChange={e=>{setSearch(e.target.value);setHeard('');}}/>{canListen&&<button type="button" className={'micBtn'+(listening?' on':'')} aria-label={listening?'מקשיב, דבר עכשיו':'חיפוש בקול: שאל איפה חבילה'} onClick={listen}><Mic size={20}/></button>}</label>
    {heard&&<p className="voiceAnswer" role="status" aria-live="assertive"><span aria-hidden="true">{heard}</span><span className="sr">{heardSay||heard}</span></p>}
-   {showNext&&view==='active'&&filter==='all'&&!search&&nextP&&(nextP.group.length>1?<NextGroup ps={nextP.group} when={nextP.t} onOpen={setOpenId} onAll={()=>markAll(nextP.group)}/>:<NextCard p={nextP.p} when={nextP.t} onOpen={()=>setOpenId(nextP.p.id)}/>)}
+   {showNext&&view==='active'&&filter==='all'&&!search&&nextP&&(nextP.group.length>1?<NextGroup ps={nextP.group} came={nextP.came} when={nextP.t} onOpen={setOpenId}/>:<NextCard p={nextP.p} when={nextP.t} onOpen={()=>setOpenId(nextP.p.id)}/>)}
    {error&&<div className="error" role="alert"><span>{error}</span>{['NO_GMAIL','RECONNECT','UNAUTHORIZED'].includes(errorCode)?<form action={login}><button className="primary">חידוש הרשאת Google</button></form>:<button className="ghost" onClick={()=>sync()}>נסה שוב</button>}</div>}
    <div className="list">{shown.map(p=><button key={p.id} className={'card '+(isPickup(p)||outToday(p)?'focus':'')} {...longPress(p)} aria-label={p.name+', '+statusText(p)}>
     <div className="c"><Thumb p={p}/><div className="info"><div className="nm">{bidi(p.name)}</div><Meta p={p}/><div className="st"><span className={'pill '+tone(p)}>{statusText(p)}</span>{p.stage===3&&p.pickup?.place&&!p.cancelled?<span className="eta">איסוף ב<b>{p.pickup.place}</b></span>:p.eta&&!p.cancelled?<span className="eta">הגעה <b>{p.eta}</b></span>:showEst&&(()=>{const e=est(p);return e&&<span className="eta">{e.late?<b>{estText(e)}</b>:<>צפי <b>{estText(e)}</b></>}</span>;})()}</div>{customsDue(p)&&<div className="guardTag customsTag"><ShieldAlert size={16}/> לתשלום מכס{p.customs!.amount?' '+p.customs!.amount:''}</div>}{p.refund&&<div className="guardTag refundTag"><Undo2 size={16}/> {refundText(p)}</div>}{p.missing?.length&&p.stage>=2?<div className="guardTag"><ShieldAlert size={16}/> לא בחבילה: {p.missing.map(nice).join(', ')}</div>:null}{isOther(p)&&<div className="otherTag"><Users size={15}/> בשביל מישהו אחר</div>}{guardOf(p)&&<div className="guardTag"><ShieldAlert size={16}/> ההזמנה תיסגר בקרוב, החבילה לא הגיעה</div>}{p.ask&&<div className="askRow" onClick={e=>e.stopPropagation()}><span>הגיעה?</span><span role="button" tabIndex={0} className="askYes" onClick={()=>mark(p,'got')}>כן</span><span role="button" tabIndex={0} className="askNo" onClick={()=>{const n={...snooze,[p.id]:Date.now()+5*864e5};setSnooze(n);setPref('pd_snooze',JSON.stringify(n));}}>עדיין לא</span></div>}</div></div>
