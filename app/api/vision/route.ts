@@ -14,7 +14,7 @@ export async function POST(req:NextRequest){const H={'Cache-Control':'no-store'}
  if(req.headers.get('origin')!==req.nextUrl.origin)return Response.json({error:'forbidden'},{status:403,headers:H});
  const apiKey=process.env.GEMINI_API_KEY;if(!apiKey)return Response.json({names:{},enabled:false},{headers:H});
  let user:{id:string};try{user=await identity(req,false);}catch{return Response.json({error:'auth'},{status:401,headers:H});}
- const body=await req.json().catch(()=>({}));const urls=[...new Set(((body.images||[]) as unknown[]).filter((u):u is string=>typeof u==='string'))].slice(0,6);const hints=(body.hints&&typeof body.hints==='object'?body.hints:{}) as Record<string,string>;const kk=(u:string)=>(typeof hints[u]==='string'?'c:':'')+key(u);
+ const body=await req.json().catch(()=>({}));const urls=[...new Set(((body.images||[]) as unknown[]).filter((u):u is string=>typeof u==='string'))].slice(0,6);const hints=(body.hints&&typeof body.hints==='object'?body.hints:{}) as Record<string,string>;const kk=(u:string)=>(typeof hints[u]==='string'?'c2:':'')+key(u);
  const names:Record<string,string>={};const sql=dbOn()?(await (async()=>{const d=db();await d.ready;await d.sql`create table if not exists photo_names(k text primary key,name text not null,created_at timestamptz not null default now())`;return d.sql;})()):null;
  const todo:string[]=[];
  for(const u of urls){let h:URL;try{h=new URL(u);}catch{continue;}if(h.protocol!=='https:'||!HOSTS.test(h.hostname))continue;const k=kk(u);
