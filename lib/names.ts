@@ -6,10 +6,11 @@ import {heName} from '@/lib/hename';
 import {gemini} from '@/lib/gemini';
 import type {db} from '@/lib/push';
 type Sql=ReturnType<typeof db>['sql'];
-const PROMPT=`אלה כותרות של מוצרים מחנויות אונליין (לרוב תרגום מכונה גרוע). לכל כותרת כתוב שם קצר וטבעי בעברית, 2 עד 5 מילים, כמו שאדם היה קורא למוצר.
-שמור שמות מותגים ודגמים חשובים באנגלית (למשל AirPods, Logitech F710, One Piece). בלי צבע, מידה, כמות, מילות שיווק או פיסוק מיותר.
+const PROMPT=`אלה כותרות של מוצרים מחנויות אונליין (לרוב תרגום מכונה גרוע). לכל כותרת כתוב שם קצר, טבעי ומדויק בעברית, 2 עד 7 מילים.
+חשוב לשמור את הפרטים שמזהים את המוצר: שם הדמות והסדרה בתחפושות ובמוצרי מעריצים (למשל "תחפושת ג'ינבה מוואן פיס"), הדגם המדויק שהמוצר מתאים לו (למשל "כיסוי ל־AirPods 4", "מגן מסך ל־iPhone 15 Pro"), ושמות מותגים ודגמים (Logitech F710).
+אם הכותרת מתארת דמות בלי לכתוב את שמה, זהה אותה מהתיאור אם אתה בטוח. בלי צבע, מידה, כמות, מילות שיווק או פיסוק מיותר.
 החזר JSON בלבד: מערך מחרוזות באותו סדר ובאותו מספר כמו הקלט.`;
-const h=(s:string)=>createHash('sha1').update(s).digest('hex');
+const h=(s:string)=>createHash('sha1').update('v2|'+s).digest('hex');
 export async function shortNames(input:string[],sql:Sql|null):Promise<Record<string,string>>{
  const titles=[...new Set(input.filter(t=>typeof t==='string'&&t.length>3&&t.length<300))].slice(0,25);const out:Record<string,string>={};
  const apiKey=process.env.GEMINI_API_KEY;if(!apiKey||!titles.length)return out;
@@ -19,7 +20,7 @@ export async function shortNames(input:string[],sql:Sql|null):Promise<Record<str
  if(todo.length){try{
   const g=await gemini({contents:[{parts:[{text:PROMPT+'\n\n'+JSON.stringify(todo)}]}],generationConfig:{temperature:0.2,responseMimeType:'application/json'}});
   if(g.ok){const arr=JSON.parse(g.text.replace(/^```(?:json)?|```$/g,'').trim());
-   if(Array.isArray(arr)&&arr.length===todo.length)for(let i=0;i<todo.length;i++){const n=String(arr[i]||'').replace(/\s+/g,' ').trim();if(n&&n.length<=45){out[todo[i]]=n;if(sql)await sql`insert into name_cache(k,title,name) values(${h(todo[i])},${todo[i]},${n}) on conflict(k) do nothing`;}}}
+   if(Array.isArray(arr)&&arr.length===todo.length)for(let i=0;i<todo.length;i++){const n=String(arr[i]||'').replace(/\s+/g,' ').trim();if(n&&n.length<=60){out[todo[i]]=n;if(sql)await sql`insert into name_cache(k,title,name) values(${h(todo[i])},${todo[i]},${n}) on conflict(k) do nothing`;}}}
  }catch{}}
  return out;}
 const generic=(n:string)=>!n||/^(?:חבילה|הזמנה|משלוח|order|package)$/i.test(n.trim());
