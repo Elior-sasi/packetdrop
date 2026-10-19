@@ -604,7 +604,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <p className="setNote">כשמחכה לך חבילה ואתה מגיע לנקודת האיסוף, הטלפון מזכיר לך מה מחכה שם ואת הקוד. נקודה חדשה נוספת לרשימה לבד, והתראה עליה פעילה עד שתכבה אותה.</p>
    <label className="setRow"><span>התראה ליד נקודת איסוף</span><input type="checkbox" className="sw" checked={ptPref.enabled} onChange={e=>setPt({enabled:e.target.checked})}/></label>
    {ptPref.enabled&&pts.length>0&&<><p className="setNote">נקודות האיסוף שלי:</p>{pts.map(([k,name])=><label key={k} className="setRow"><span>{name}</span><input type="checkbox" className="sw" aria-label={'התראה בנקודה '+name} checked={!ptPref.off.includes(k)} onChange={e=>setPt({key:k,off:!e.target.checked})}/></label>)}</>}
-   {ptPref.enabled&&!pts.length&&<p className="setNote">עדיין לא היו לך חבילות בנקודות איסוף.</p>}</section>;})()}
+   {ptPref.enabled&&!pts.length&&<p className="setNote">עדיין לא היו לך חבילות בנקודות איסוף.</p>}
+   {ptPref.enabled&&widgetUrl&&(()=>{const u=widgetUrl.replace('/api/widget','/api/points')+'&new=1&text=1';return <button className="ghost" onClick={()=>copy(u)}><Copy size={18}/> {copied===u?'הקישור הועתק ✓':'העתקת הקישור לקיצור'}</button>;})()}</section>;})()}
   {user&&widgetUrl&&<section className="set"><h3><Mic size={20}/> לשאול את Siri</h3>
    <p className="setNote">אומרים "היי Siri, איפה החבילות שלי" ושומעים מה מחכה לאיסוף ועם איזה קוד, מה מגיע היום ומה בדרך. {push==='on'?'':'צריך שההתראות יהיו פעילות.'}</p>
    <ol className="steps2"><li>העתק את הקישור האישי.</li><li>באפליקציית קיצורים: <b>+</b> ← הוסף פעולה <b>קבל תוכן של URL</b> והדבק את הקישור.</li><li>הוסף פעולה <b>דבר טקסט</b>.</li><li>שמור את הקיצור בשם <b>איפה החבילות שלי</b>.</li></ol>
