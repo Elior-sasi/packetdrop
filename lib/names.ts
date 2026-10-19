@@ -2,7 +2,7 @@
 // Gemini (Google AI Studio free tier) writes each name once; it is kept in the database. Without a key the app's own rules apply.
 import {createHash} from 'node:crypto';
 import {polishName,photoKey,type Parcel} from '@/lib/parcels';
-import {heName} from '@/lib/hename';
+import {heName,fixSeries} from '@/lib/hename';
 import {gemini} from '@/lib/gemini';
 import type {db} from '@/lib/push';
 type Sql=ReturnType<typeof db>['sql'];
@@ -22,6 +22,8 @@ export async function shortNames(input:string[],sql:Sql|null):Promise<Record<str
   if(g.ok){const arr=JSON.parse(g.text.replace(/^```(?:json)?|```$/g,'').trim());
    if(Array.isArray(arr)&&arr.length===todo.length)for(let i=0;i<todo.length;i++){const n=String(arr[i]||'').replace(/\s+/g,' ').trim();if(n&&n.length<=60){out[todo[i]]=n;if(sql)await sql`insert into name_cache(k,title,name) values(${h(todo[i])},${todo[i]},${n}) on conflict(k) do nothing`;}}}
  }catch{}}
+ // Machine-translation slips Gemini sometimes copies ("מאן פיס" for One Piece).
+ for(const k of Object.keys(out))out[k]=fixSeries(out[k]);
  return out;}
 const generic=(n:string)=>!n||/^(?:חבילה|הזמנה|משלוח|order|package)$/i.test(n.trim());
 const parts=(name:string)=>name.split(' + ').map(x=>{const m=x.match(/^(.*?)( ועוד \d+)?$/)!;return {t:m[1],more:m[2]||''};});

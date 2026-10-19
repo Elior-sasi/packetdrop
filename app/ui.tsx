@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {heName} from '@/lib/hename';
+import {heName,fixSeries} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X,Share2,Wallet,Users,Phone,Sparkles,Send,Camera,Image as ImageIcon} from 'lucide-react';
 import {learn,estimate,freshEta,SHIP_RE,type Est} from '@/lib/estimate';
@@ -58,7 +58,7 @@ const isGenericName=(p:{name:string})=>/^(?:הזמנה מ־|חבילה|הזמנ�
 const GEM:Record<string,string>={};
 // Photo descriptions for VoiceOver (from /api/describe), by image URL.
 const DESC:Record<string,string>={};
-const nice=(raw:string)=>CLEAN.has(raw)?raw:raw.split(' + ').map(x=>{const m=x.match(/^(.*?)( ועוד \d+)?$/)!;return (GEM[m[1]]||heName(polishName(m[1])))+(m[2]||'');}).join(' + ');
+const nice=(raw:string)=>CLEAN.has(raw)?fixSeries(raw):raw.split(' + ').map(x=>{const m=x.match(/^(.*?)( ועוד \d+)?$/)!;return (GEM[m[1]]?fixSeries(GEM[m[1]]):heName(polishName(m[1])))+(m[2]||'');}).join(' + ');
 const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא|^דואר ישראל$/.test(p.shop)?'הזמנה מ־'+p.shop:p.order?'הזמנה …'+p.order.slice(-6):'חבילה '+p.tracking):nice(p.name)+(p.qty&&p.qty>1?' ×'+p.qty:'');
 // Bump when mail parsing changes: mail from the last 180 days is then read again with the new rules.
 const PARSER=5;

@@ -33,10 +33,14 @@ function part(raw:string){let s=raw.replace(/[|]/g,' ').replace(/\s+/g,' ').trim
  if(aud&&out&&!out.includes(aud)&&out.split(' ').length<=4)out+=' '+aud;
  return out;}
 // The same AliExpress fixes as when a title is first read, so names saved before the fix read right too.
-function fixOld(n:string){return n.replace(/(\S) '(\S)/g,"$1'$2").replace(/וואן\s*1?\s*פיס/g,'One Piece').replace(/\s+וואן$/,'').replace(/^\d{5,}\s+/,'').replace(/^פרוק(?=\s|$)/,'פאה').replace(/\s+(?:מותאם|מותאמת|בהתאמה)\s+אישית/g,'').replace(/^(תחפושת|תחפושות|חליפת|חליפה)\s+קוספל\S*\s+(?:של\s+)?/,'$1 ').replace(/^פאה\s+קוספל\S*.*$/,'פאה').replace(/\s+(?:תואם|תואמת|עמיד|עמידה)$/,'').replace(/\s+(?:עם|של|עבור)\s+[\u0590-\u05FF]{1,4}$/,'').trim();}
-export function heName(n:string){let src=fixOld(n.trim());if(!src)return src;
+function fixOld(n:string){return n.replace(/(\S) '(\S)/g,"$1'$2").replace(/(^|\s)מאן[\s-]*פיס(?=\s|$)/g,'$1מ־One Piece').replace(/(^|\s)ואן[\s-]*פיס(?=\s|$)/g,'$1וואן פיס').replace(/וואן\s*1?\s*פיס/g,'One Piece').replace(/\s+וואן$/,'').replace(/^\d{5,}\s+/,'').replace(/^פרוק(?=\s|$)/,'פאה').replace(/\s+(?:מותאם|מותאמת|בהתאמה)\s+אישית/g,'').replace(/^(תחפושת|תחפושות|חליפת|חליפה)\s+קוספל\S*\s+(?:של\s+)?/,'$1 ').replace(/^פאה\s+קוספל\S*.*$/,'פאה').replace(/\s+(?:תואם|תואמת|עמיד|עמידה)$/,'').replace(/\s+(?:עם|של|עבור)\s+[\u0590-\u05FF]{1,4}$/,'').trim();}
+export function heName(n:string){let src=fixOld(n.trim()).replace(/One Piece/g,'OnePieceX');if(!src)return src;
  // Store titles add a second description after a comma ("…לווייתן, גיבור ים"); the part before it is the name.
  src=src.split(' + ').map(x=>{const m=x.match(/^([^,،]{12,}?)[,،]\s*[\u0590-\u05FF][^,،]*$/);return m?m[1].trim():x;}).join(' + ');
  // A bare catalog number after a Hebrew word ("מאג זכוכית 246") is a SKU, not part of the name.
  const out=src.split(/\s+\+\s+/).map(part).filter(Boolean).join(' + ').replace(/([\u0590-\u05FF][\u0590-\u05FF"'׳״]*)\s+\d{3,6}$/,'$1');
- return out.length>=3?out:src;}
+ // "One Piece" travels as one word (the 6-word limit must not cut it in half).
+ return (out.length>=3?out:src).replace(/OnePieceX/g,'One Piece');}
+
+// Machine-translation slips in series names, also inside names Gemini wrote ("מאן פיס" = One Piece).
+export const fixSeries=(n:string)=>n.replace(/(^|\s)מאן[\s-]*פיס(?=\s|$)/g,'$1מוואן פיס').replace(/(^|\s)ואן[\s-]*פיס(?=\s|$)/g,'$1וואן פיס');
