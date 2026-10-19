@@ -11,3 +11,8 @@ test('shipped notification once, when the order moves to shipped',async()=>{cons
  const before={parcels:[{...base,stage:0,events:[{id:'a',label:'אושרה',time:t}]}],stuck:[]};
  const r=diff(before as never,[{...base,stage:1,events:[{id:'a',label:'אושרה',time:t},{id:'b',label:'נשלחה',time:t}]}] as never);
  assert.equal(r.notes.length,1);assert.equal(r.notes[0].title,'ההזמנה נשלחה');});
+test('arrived in Israel: one notification, not again for the post office mail',async()=>{const {diff}=await import('../lib/notify');
+ const t=new Date().toISOString();const base={id:'o2',keys:['o2'],name:'כיסוי',shop:'AliExpress',carrier:'',image:'',url:'',tracking:'',order:'2',eta:'',cancelled:false,pickup:null,stage:1};
+ const e0=[{id:'a',label:'נשלחה',time:t}];const e1=[...e0,{id:'b',label:'במדינה/באזור שלכם',time:t}];const e2=[...e1,{id:'c',label:'הגיעה לארץ ובדרך אליך',time:t}];
+ const r=diff({parcels:[{...base,events:e0}],stuck:[]} as never,[{...base,events:e1}] as never);assert.equal(r.notes.filter(n=>n.title==='החבילה הגיעה לארץ').length,1);
+ const r2=diff({parcels:[{...base,events:e1}],stuck:[]} as never,[{...base,events:e2}] as never);assert.equal(r2.notes.filter(n=>n.title==='החבילה הגיעה לארץ').length,0);});

@@ -40,6 +40,9 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
   if(p.customs&&p.stage<3&&(!o.customs||o.customs.at!==p.customs.at)&&now-new Date(p.customs.at).getTime()<3*DAY)notes.push({id:p.id,kind:'customs',title:'לתשלום מכס'+(p.customs.amount?' '+p.customs.amount:''),body:name+' · החבילה לא תשוחרר בלי תשלום',tag:'c:'+p.id});
   // AliExpress is about to close the order while the parcel has not arrived: last chance to open a dispute.
   if(p.stage<4&&p.events.some(e=>GUARD.test(e.label)&&now-new Date(e.time).getTime()<3*DAY&&!o.events.some(x=>x.id===e.id)))notes.push({id:p.id,kind:'guard',title:'ההזמנה תיסגר בקרוב והחבילה לא הגיעה',body:name+' · אפשר עדיין לפתוח מחלוקת ולקבל החזר',tag:'g:'+p.id});
+  // Arrived in Israel (first time only; AliExpress "במדינה/באזור שלכם" and Israel Post "הגיע לארץ" are the same step).
+  {const IL=/הגיע[הו]? לארץ|הגיע לישראל|הגיעה לישראל|במדינה\/באזור שלכם|באזור שלכם|arrived in (?:israel|destination)/i;const e=p.events.find(e=>IL.test(e.label));
+   if(e&&p.stage<3&&!o.events.some(x=>IL.test(x.label))&&now-new Date(e.time).getTime()<3*DAY)notes.push({id:p.id,kind:'new',title:'החבילה הגיעה לארץ',body:name+(p.carrier?' · '+p.carrier:''),tag:'il:'+p.id});}
   if(p.stage>o.stage&&recent){
    if(p.stage===4)notes.push({id:p.id,kind:'delivered',title:'החבילה נמסרה',body:name,tag:'d:'+p.id});
    else if(p.stage===3)notes.push(pickupOrOut(p,name));
