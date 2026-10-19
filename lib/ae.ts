@@ -27,6 +27,16 @@ export function aeEta(text:string,now=new Date()):string{const lines=text.split(
   const near=[lines[i],lines[i+1]||'',lines[i+2]||''].join(' ').slice(0,200);const ds=datesIn(near).filter(x=>{const t=at(x,now);return t>now.getTime()-30*864e5&&t<now.getTime()+120*864e5;});
   if(!ds.length)continue;const a=ds[0],b=ds[1];if(b&&at(b,now)>at(a,now)&&at(b,now)-at(a,now)<40*864e5)return at(a,now)<now.getTime()-864e5?fmt(b):fmt(a)+'-'+fmt(b);return fmt(a);}
  return '';}
+// Runs inside the order page: its text, plus each product's photo and title (not the "you may also like" list below).
+const GRAB=String.raw`let n=0;
+const items=()=>{try{const mk=[...document.querySelectorAll('div,section,h2,h3,span,p')].find(e=>/ייתכן שגם תאהבו|More to love|You may also like|Recommended for you/i.test(e.textContent||'')&&(e.textContent||'').length<60);
+ return [...document.images].filter(i=>/alicdn|aliexpress-media/.test(i.currentSrc||i.src)&&Math.max(i.naturalWidth,i.width)>=60&&!/logo|icon|avatar|banner|\.gif|\.svg/i.test(i.src)&&!(mk&&(mk.compareDocumentPosition(i)&4))).slice(0,8).map(i=>{let e=i,t='';for(let k=0;k<6&&e&&!t;k++){e=e.parentElement;const s=((e&&e.innerText)||'').split('\n').map(x=>x.trim()).find(x=>x.length>12&&!/₪|\$|US |^x\d|×|\d+\s*(?:יח|pcs)/i.test(x));if(s)t=s}return {img:(i.currentSrc||i.src).replace(/_\d+x\d+[^/]*$/,''),title:t.slice(0,200)}})}catch(e){return []}};
+const f=()=>{const t=document.body?document.body.innerText:'';if((t.length>800&&/\d/.test(t))||n++>45)completion(JSON.stringify({u:location.href,t:t.slice(0,30000),items:items()}));else setTimeout(f,300)};f()`;
+// When AliExpress itself will close the order ("המערכת תאשר אוטומטית את הקבלה לאחר 69 ימים"): days from now, or 0.
+export function aeCloseDays(text:string):number{const m=text.match(/(?:תאשר\S* (?:אוטומטית )?את (?:ה)?קבלה|אישור (?:קבלה )?אוטומטי|confirm(?:ed|s)? (?:receipt |delivery )?automatically)[^\d\n]{0,25}(\d{1,3})\s*(?:ימים|יום|days?)/i);return m?+m[1]:0;}
+// "22.10" / "21.10-28.10" -> the moment to count to (a window already started counts to its end).
+export function aeWhen(eta:string,now=new Date()):number{const ds=[...eta.matchAll(/(\d{1,2})\.(\d{1,2})/g)].map(m=>{let t=new Date(now.getFullYear(),+m[2]-1,+m[1],12).getTime();if(t<now.getTime()-120*864e5)t=new Date(now.getFullYear()+1,+m[2]-1,+m[1],12).getTime();return t;});
+ if(!ds.length)return NaN;return ds[0]<now.getTime()&&ds[1]?ds[1]:ds[0];}
 // Runs inside Scriptable (loaded by the tiny script on the phone). `u` = the personal link.
 export const AE_JS=`const log=async m=>{try{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({error:m,ctx:config.runsInApp?'app':config.runsWithSiri?'siri':'shortcut'});await x.loadJSON()}catch(_){}}
 await log('התחיל')
@@ -35,7 +45,7 @@ const r=await new Request(u).loadJSON().catch(()=>null)
 const orders=(r&&r.orders)||[]
 await log('הזמנות: '+orders.length)
 const wv=new WebView()
-const grab="let n=0;const f=()=>{const t=document.body?document.body.innerText:'';if((t.length>800&&/\\\\d/.test(t))||n++>45)completion(JSON.stringify({u:location.href,t:t.slice(0,30000)}));else setTimeout(f,300)};f()"
+const grab=${JSON.stringify(GRAB)}
 async function page(url){await wv.loadURL(url);try{return JSON.parse(await wv.evaluateJavaScript(grab,true))}catch(e){return {u:'',t:''}}}
 const needLogin=p=>/login|passport|signin/i.test(p.u)
 let done=0,sent=[]
@@ -46,7 +56,7 @@ if(orders.length){
   if(config.runsInApp){const a=new Alert();a.title='התחברות לעליאקספרס';a.message='התחבר פעם אחת. אחרי ההתחברות סגור את החלון (Close) והסקריפט ימשיך.';a.addAction('אישור');await a.present();await wv.loadURL('https://login.aliexpress.com/');await wv.present(true);p=await page('https://www.aliexpress.com/p/order/index.html')}
   if(needLogin(p)){const n=new Notification();n.title='Unbox';n.body='צריך להתחבר לעליאקספרס: פתח את הסקריפט Unbox AliExpress';if(!config.runsInApp)await n.schedule();else{const a=new Alert();a.title='לא מחובר';a.message='ההתחברות לא הושלמה. נסה שוב.';a.addAction('אישור');await a.present()}Script.setShortcutOutput('צריך להתחבר לעליאקספרס');Script.complete();return}}
  for(const o of orders.slice(0,12)){const q=await page('https://www.aliexpress.com/p/order/detail.html?orderId='+o);if(!q.t)continue
-  const res=await (()=>{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({order:o,text:q.t});return x.loadJSON().catch(()=>null)})()
+  const res=await (()=>{const x=new Request(u);x.method='POST';x.headers={'Content-Type':'application/json'};x.body=JSON.stringify({order:o,text:q.t,items:q.items||[]});return x.loadJSON().catch(()=>null)})()
   done++;if(res&&res.eta)sent.push(res.eta)}}
 const msg=orders.length?('נבדקו '+done+' הזמנות'+(sent.length?' · נמצאו תאריכים: '+sent.join(', '):' · לא נמצא תאריך')):'אין הזמנות פתוחות מעליאקספרס'
 // A notification, not a dialog: a morning run from Shortcuts must not wait for a tap.
