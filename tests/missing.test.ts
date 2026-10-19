@@ -23,3 +23,7 @@ test('an old wrong flag is dropped on the next merge',()=>{const stale={...pkgA,
 test('order-number placeholders never become product names in the title',()=>{
  const merged={...pkgA,id:'order:9',keys:['order:9','order:8','order:7','tracking:AP9'],name:'שקע + הזמנה …000008',items:['שקע','הזמנה …000008','הזמנה …000007'],pkgByOrder:undefined,pkgItems:undefined} as never;
  const m=mergeParcels([merged]);assert.ok(!/הזמנה …/.test(m[0].name),m[0].name);});
+test('photos follow the product order when each order mail has one photo',()=>{
+ const mk=(o:string,name:string,img:string,t:string)=>({...base,id:'order:'+o,keys:['order:'+o,'tracking:LP1'],name,image:'https://ae-pic-a1.aliexpress-media.com/kf/'+img+'.jpg',tracking:'',order:o,stage:2,events:[{id:o,label:'נשלחה',time:t}]});
+ const m=mergeParcels([mk('3','פאה של סנג\'י','S3','2026-10-03T00:00:00Z'),mk('2','תחפושת זורו','S2','2026-10-02T00:00:00Z'),mk('1','חולצה של פרנקי','S1','2026-10-01T00:00:00Z')] as never);
+ assert.deepEqual(m[0].images!.map(u=>u.match(/kf\/(\w+)/)![1]),m[0].items!.map(n=>n.includes('פרנקי')?'S1':n.includes('זורו')?'S2':'S3'));});
