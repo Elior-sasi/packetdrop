@@ -6,7 +6,7 @@ const monOf=(s:string)=>{const k=s.toLowerCase().replace(/^ב/,'').slice(0,3);re
 const EN='(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\\.?';
 const HE='ב?(ינו|פבר|מרץ|מרס|אפר|מאי|יונ|יול|אוג|ספט|אוק|נוב|דצמ)[א-ת]*[׳\'"]?';
 // Words around the date that mean "this is when it comes" (not order date, payment date or "ordered on").
-const KEY=/(?:estimated delivery|delivery by|deliver(?:ed|y)? (?:by|on|before|between)|arriv(?:e|es|al)(?: by| on| between)?|expected (?:delivery|by)|delivery date|delivery:|guaranteed|זמן אספקה|אספקה עד|צפי (?:ה)?הגעה|צפי (?:ה)?אספקה|יגיע(?:ו)? (?:עד|בין|ב)|תגיע (?:עד|בין|ב)|הגעה (?:עד|משוערת|צפויה)|מסירה (?:עד|משוערת|צפויה)|משלוח (?:עד|צפוי)|צפוי(?:ה)? להגיע)/i;
+const KEY=/(?:תקופת (?:ה)?אספקה|estimated delivery|delivery by|deliver(?:ed|y)? (?:by|on|before|between)|arriv(?:e|es|al)(?: by| on| between)?|expected (?:delivery|by)|delivery date|delivery:|guaranteed|זמן אספקה|אספקה עד|צפי (?:ה)?הגעה|צפי (?:ה)?אספקה|יגיע(?:ו)? (?:עד|בין|ב)|תגיע (?:עד|בין|ב)|הגעה (?:עד|משוערת|צפויה)|מסירה (?:עד|משוערת|צפויה)|משלוח (?:עד|צפוי)|צפוי(?:ה)? להגיע)/i;
 type D={d:number;m:number};
 function datesIn(s:string):D[]{const out:D[]=[];let m:RegExpExecArray|null;
  const rx=[new RegExp(EN+'\\s*(\\d{1,2})','gi'),new RegExp('(\\d{1,2})\\s*'+EN,'gi'),new RegExp('(\\d{1,2})\\s*'+HE,'g'),new RegExp(HE+'\\s*(\\d{1,2})','g'),/(?<![\d.])(\d{1,2})[./](\d{1,2})(?![\d.]*\d{3})/g];
@@ -20,10 +20,12 @@ function datesIn(s:string):D[]{const out:D[]=[];let m:RegExpExecArray|null;
 const fmt=(x:D)=>x.d+'.'+x.m;
 const at=(x:D,now:Date)=>{let t=new Date(now.getFullYear(),x.m-1,x.d).getTime();if(t<now.getTime()-120*864e5)t=new Date(now.getFullYear()+1,x.m-1,x.d).getTime();return t;};
 // "24.10" or "24.10-30.10", or '' when the page holds no delivery date.
+// The order page's own line ("תקופת האספקה: Oct 11 - 22") wins over other dated lines (fast-delivery coupon, refund).
+const STRONG=/תקופת (?:ה)?אספקה|delivery period|estimated delivery|זמן אספקה משוער/i;
 export function aeEta(text:string,now=new Date()):string{const lines=text.split(/\n+/).map(l=>l.trim()).filter(Boolean);
- for(let i=0;i<lines.length;i++){if(!KEY.test(lines[i]))continue;
+ for(const key of [STRONG,KEY])for(let i=0;i<lines.length;i++){if(!key.test(lines[i]))continue;
   const near=[lines[i],lines[i+1]||'',lines[i+2]||''].join(' ').slice(0,200);const ds=datesIn(near).filter(x=>{const t=at(x,now);return t>now.getTime()-30*864e5&&t<now.getTime()+120*864e5;});
-  if(!ds.length)continue;const a=ds[0],b=ds[1];if(b&&at(b,now)>at(a,now)&&at(b,now)-at(a,now)<40*864e5)return fmt(a)+'-'+fmt(b);return fmt(a);}
+  if(!ds.length)continue;const a=ds[0],b=ds[1];if(b&&at(b,now)>at(a,now)&&at(b,now)-at(a,now)<40*864e5)return at(a,now)<now.getTime()-864e5?fmt(b):fmt(a)+'-'+fmt(b);return fmt(a);}
  return '';}
 // Runs inside Scriptable (loaded by the tiny script on the phone). `u` = the personal link.
 export const AE_JS=`const r=await new Request(u).loadJSON().catch(()=>null)
