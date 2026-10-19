@@ -9,7 +9,7 @@ const HOSTS=/(?:^|\.)(?:aliexpress-media\.com|alicdn\.com|media-amazon\.com|ssl-
 const key=(u:string)=>(u.match(/\/kf\/([A-Za-z0-9]+)/)?.[1]||u.replace(/[?#].*$/,'')).toLowerCase().slice(0,200);
 const PROMPT='זו תמונת מוצר מחנות אונליין. כתוב רק את שם המוצר בעברית, 2 עד 4 מילים, כמו שאדם היה קורא לו (למשל "חולצת אנימה", "מקלט USB אלחוטי", "שקע חכם"). בלי מותג, בלי צבע, בלי מידה, בלי פיסוק.';
 // Costumes, wigs and fan items: the photo plus the store title, to name the character and series (only when sure).
-const CHAR=(title:string)=>`זו תמונה של מוצר מחנות אונליין. כותרת החנות: "${title.slice(0,200)}".\nזהה את הדמות ואת הסדרה (אנימה, סרט, משחק) אם אתה בטוח, לפי התמונה והכותרת יחד. כתוב שם קצר בעברית, 2 עד 6 מילים, למשל "פאה של פרנקי מוואן פיס" או "תחפושת אוסופ מוואן פיס". אם אינך בטוח בדמות, כתוב רק את סוג המוצר (למשל "פאה כחולה"). בלי מותג חנות, בלי מידה, בלי פיסוק.`;
+const CHAR=(title:string)=>`זו תמונה של מוצר מחנות אונליין. כותרת החנות: "${title.slice(0,200)}".\nקבע מה המוצר לפי התמונה (תחפושת, פאה, כובע, סל כביסה, חולצה...), וזהה את הדמות או הסדרה (אנימה, סרט, משחק) אם אתה בטוח, לפי התמונה והכותרת יחד. כתוב שם קצר בעברית, 2 עד 6 מילים, למשל "פאה של פרנקי מוואן פיס", "כובע הקש של לופי", "סל כביסה של בליץ'". אם אינך בטוח בדמות, כתוב רק את סוג המוצר (למשל "פאה כחולה"). בלי מותג חנות, בלי מידה, בלי פיסוק.`;
 export async function POST(req:NextRequest){const H={'Cache-Control':'no-store'};
  if(req.headers.get('origin')!==req.nextUrl.origin)return Response.json({error:'forbidden'},{status:403,headers:H});
  const apiKey=process.env.GEMINI_API_KEY;if(!apiKey)return Response.json({names:{},enabled:false},{headers:H});
