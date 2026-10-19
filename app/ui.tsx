@@ -225,14 +225,14 @@ function NextGroup({ps,came,when,onOpen}:{ps:Parcel[];came:string[];when:number;
  const big=a?a+'/'+n:days<=0?'היום':days===1?'מחר':String(days);const unit=a?'הגיעו':days>1?'ימים':'';
  const k=n+' חבילות מגיעות '+(days<=0?'היום':days===1?'מחר':'בעוד '+days+' ימים');
  const show=order.slice(0,3),rest=n-show.length;const C=2*Math.PI*40,seg=C/Math.min(n,8),gap=n>1?7:0;
- const how=(p:Parcel)=>p.stage===4?'✓ הגיעה':'✓ לאיסוף'+(p.pickup?.code?' · קוד '+p.pickup.code:'');
+ const how=(p:Parcel)=>came.includes(p.id)?'✓ הגיעה':isPickup(p)?'לאיסוף'+(p.pickup?.code?' · קוד '+p.pickup.code:''):'';
  return <section className="nextCard nc-ring nc-group" aria-label={k+(a?', '+a+' כבר הגיעו':'')}>
   <div className="nc-k nc-top" aria-hidden="true">{k}</div>
   <div className="nc-row" aria-hidden="true"><svg className="ring" viewBox="0 0 92 92"><g transform="rotate(-90 46 46)" fill="none" strokeWidth="8" strokeLinecap="round">
    {Array.from({length:Math.min(n,8)},(_,i)=><circle key={i} cx="46" cy="46" r="40" stroke={i<a?'#3fd49a':'#4aa8ff55'} strokeDasharray={(seg-gap)+' '+(C-seg+gap)} strokeDashoffset={-i*seg}/>)}</g>
    <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?24:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
    <div className="nc-info"/><div className="nc-stack">{show.map((p,i)=><div key={p.id} style={{zIndex:9-i}}><ThumbOne p={p}/></div>)}</div></div>
-  <ul className="nc-list">{show.map(p=>{const c=came.includes(p.id);return <li key={p.id}><button type="button" className={c?'nc-came':''} onClick={()=>onOpen(p.id)}><span>{bidi(p.name)}</span>{c&&<em>{how(p)}</em>}</button></li>;})}{rest>0&&<li className="nc-more" aria-hidden="true">{'ועוד '+rest}</li>}</ul></section>;}
+  <ul className="nc-list">{show.map(p=>{const c=came.includes(p.id);return <li key={p.id}><button type="button" className={c?'nc-came':''} onClick={()=>onOpen(p.id)}><span>{bidi(p.name)}</span>{how(p)&&<em className={c?'':'nc-pick'}>{how(p)}</em>}</button></li>;})}{rest>0&&<li className="nc-more" aria-hidden="true">{'ועוד '+rest}</li>}</ul></section>;}
 function Bar({p}:{p:Parcel}){return <div className={'bar '+tone(p)} aria-hidden="true">{STEP.map((_,i)=><i key={i} className={!p.cancelled&&i<=step(p)?'on':''}/>)}</div>;}
 
 // Bottom sheet chrome: a grab bar you can pull down to close, and a close button.
@@ -393,10 +393,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // A delivery window that has already started ("19.10-26.10" on the 19th): count to its end, not "today".
  const etaWhen=(p:Parcel)=>{const t=etaAt(p);const m=p.eta.match(/-(\d{1,2})\.(\d{1,2})/);if(!m||t>Date.now())return t;const y=new Date().getFullYear();let e=new Date(y,+m[2]-1,+m[1],12).getTime();if(e<t)e=new Date(y+1,+m[2]-1,+m[1],12).getTime();return e;};
  const byEta=(list:Parcel[])=>[...list].sort((a,b)=>{const u=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return u(a)-u(b)||etaAt(a)-etaAt(b)||(b as {last?:number}).last!-(a as {last?:number}).last!;});
- // Today's parcels as one group: those still due today and those that already came today, so the ring shows how many arrived.
+ // Today's parcels as one group: those due today (a parcel that reached a pickup point today stays here, with its code) and those delivered today; only delivery turns its part of the ring green.
  const isToday=(t:number)=>Number.isFinite(t)&&new Date(t).toDateString()===new Date().toDateString();
  const cameAt=(p:Parcel)=>p.cancelled?NaN:p.stage===4?new Date(p.events.at(-1)?.time||0).getTime():isPickup(p)?new Date((p.events.find(e=>/איסוף|pickup|collection/i.test(e.label))||p.events.at(-1))?.time||0).getTime():NaN;
- const todayGroup=(()=>{const due=byEta(active).filter(p=>!isPickup(p)&&(outToday(p)||(!!p.eta||(est(p)&&!est(p)!.late))&&isToday(etaWhen(p))));const came=parcels.filter(p=>isToday(cameAt(p)));return due.length&&due.length+came.length>1?{due,came}:null;})();
+ const todayGroup=(()=>{const due=byEta(active).filter(p=>isPickup(p)?isToday(cameAt(p)):outToday(p)||(!!p.eta||(est(p)&&!est(p)!.late))&&isToday(etaWhen(p)));const came=parcels.filter(p=>p.stage===4&&isToday(cameAt(p)));return due.length&&due.length+came.length>1?{due,came}:null;})();
  const nextP=todayGroup?{p:todayGroup.due[0],t:Date.now(),group:[...todayGroup.due,...todayGroup.came],came:todayGroup.came.map(p=>p.id)}:(()=>{const l=byEta(active).filter(p=>isPickup(p)||outToday(p)||!!p.eta||(est(p)&&!est(p)!.late));const p=l[0];if(!p)return null;const t=isPickup(p)||outToday(p)?Date.now():etaWhen(p);if(!Number.isFinite(t))return null;
   // Several parcels due the same day share the hero card.
   const day=(x:number)=>new Date(x).toDateString();const group=isPickup(p)?[p]:l.filter(x=>!isPickup(x)&&day(outToday(x)?Date.now():etaWhen(x))===day(t));return {p,t,group:group.length?group:[p],came:[] as string[]};})();
