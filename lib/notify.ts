@@ -85,7 +85,8 @@ export function morning(state:State,now=new Date()):{note:Note|null;day:string}{
  const il=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Jerusalem'}));const day=il.getFullYear()+'-'+(il.getMonth()+1)+'-'+il.getDate();
  if(il.getDay()===0||il.getHours()<8||il.getHours()>=10||state.morning===day)return {note:null,day:state.morning||''};
  const marks=state.marks||{};const live=state.parcels.filter(p=>p.stage===3&&!p.cancelled&&!p.ret&&!marks[p.id]&&!p.keys.some(k=>marks[k])&&now.getTime()-last(p)<16*DAY);
- const pick=live.filter(waitingAtPickup);const out=live.filter(p=>!waitingAtPickup(p)&&OUT.test(latestLabel(p))&&now.getTime()-last(p)<DAY);
+ // A pickup is mentioned only while fresh (5 days): an older one was most likely collected without the app hearing about it.
+ const pick=live.filter(p=>waitingAtPickup(p)&&now.getTime()-last(p)<5*DAY);const out=live.filter(p=>!waitingAtPickup(p)&&OUT.test(latestLabel(p))&&now.getTime()-last(p)<DAY);
  if(!pick.length&&!out.length)return {note:null,day};
  const title=out.length&&pick.length?'למסירה היום: '+out.length+' · לאיסוף: '+pick.length:out.length?(out.length===1?'חבילה יוצאת למסירה היום':out.length+' חבילות יוצאות למסירה היום'):(pick.length===1?'חבילה מחכה לך לאיסוף':pick.length+' חבילות מחכות לך לאיסוף');
  const line=(p:Parcel)=>nameOf(p)+(waitingAtPickup(p)?(p.pickup?.place?' ב'+p.pickup.place:'')+(p.pickup?.code?' · קוד '+p.pickup.code:''):'');
