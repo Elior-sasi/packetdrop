@@ -192,6 +192,8 @@ function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
  const sorted=[...imgs].map((u,k)=>({u,p:pos(u),k})).sort((a,b)=>a.p-b.p||a.k-b.k);const seen=new Set<number>();const first:string[]=[],rest:string[]=[];
  for(const x of sorted){if(x.p<999&&!seen.has(x.p)){seen.add(x.p);first.push(x.u);}else rest.push(x.u);}return [...first,...rest];}
 export function mergeParcels(rows:Parcel[]){
+ // Old saves from before the Israel Post fix: the mail's accessibility icon was taken for the product.
+ rows=rows.map(p=>/תפריט נגישות|accessibility/i.test(p.name)||/inforu\.net/i.test(p.image||'')?{...p,name:/תפריט נגישות|accessibility/i.test(p.name)?'חבילה':p.name,image:/inforu\.net/i.test(p.image||'')?'':p.image}:p);
  const parent=new Map<string,string>();const find=(k:string):string=>{const p=parent.get(k)??k;if(p===k)return k;const r=find(p);parent.set(k,r);return r;};
  for(const p of rows){const keys=p.keys?.length?p.keys:[p.id];for(const k of keys)if(!parent.has(k))parent.set(k,k);for(const k of keys.slice(1))parent.set(find(k),find(keys[0]));}
  // AliExpress ships several orders from one checkout in a single package, but its package mails name only one of them.

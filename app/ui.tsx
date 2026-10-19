@@ -176,7 +176,8 @@ function freshEta(p:Parcel,all:Parcel[]):Parcel{if(!p.eta||p.stage>=3||p.cancell
  const em=p.eta.match(/-(\d{1,2})\.(\d{1,2})/);let end=em?new Date(y,+em[2]-1,+em[1]).getTime():start;if(end<start)end=new Date(y+1,+em![2]-1,+em![1]).getTime();
  return e.to<end?{...p,eta:''}:p;}
 // Orders a package lists only by number ("הזמנה …306914"): once their photos have names, show the names instead.
-function fillUnnamed(p:Parcel,vision:Record<string,string>):Parcel{const items=p.items||[];if(!items.some(t=>/^הזמנה …/.test(t)))return p;
+const COSPLAY=/תחפושת|קוספליי|cosplay|פאה|wig/i;
+function fillUnnamed(p:Parcel,vision:Record<string,string>):Parcel{const ch=p.image&&COSPLAY.test(p.name)?vision['c:'+photoKey(p.image)]:'';if(ch&&!(p.items||[]).length)p={...p,name:ch};const items=p.items||[];if(!items.some(t=>/^הזמנה …/.test(t)))return p;
  const names=[...new Set((p.images||[]).filter(u=>!p.named?.[photoKey(u)]).map(u=>vision[photoKey(u)]).filter(Boolean))];if(!names.length)return p;
  let k=0;const next=items.map(t=>/^הזמנה …/.test(t)&&k<names.length?names[k++]:t);const real=next.filter(t=>!/^הזמנה …/.test(t)),left=next.length-real.length;
  return {...p,items:next,name:real.slice(0,4).join(' + ')+(real.length>4||left?' ועוד '+(Math.max(0,real.length-4)+left):'')};}
@@ -362,6 +363,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  useEffect(()=>{const want:string[]=[];for(const m of data?.parcels||[]){if(!isGeneric(m.name)||m.stage>=4||m.cancelled)continue;const imgs=[m.image,...(m.images||[])].filter(Boolean) as string[];if(!imgs.length||imgs.some(u=>photoNames[photoKey(u)]))continue;for(const u of imgs)if(!visionNames[photoKey(u)]&&!asked.current.has(u)&&/aliexpress-media|alicdn|media-amazon|cdn\.shopify/.test(u))want.push(u);}
   // Packages that list some orders only by number: name their unnamed photos too (last 60 days, delivered ones included).
   for(const m of data?.parcels||[]){if(m.cancelled||!(m.items||[]).some(t=>/^הזמנה …/.test(t))||Date.now()-new Date(m.events.at(-1)?.time||0).getTime()>60*864e5)continue;for(const u of (m.images||[]))if(!m.named?.[photoKey(u)]&&!photoNames[photoKey(u)]&&!visionNames[photoKey(u)]&&!asked.current.has(u)&&/aliexpress-media|alicdn|media-amazon|cdn\.shopify/.test(u))want.push(u);}
+  // Costumes and wigs: ask with the store title so the character can be named.
+  const hints:Record<string,string>={};for(const m of data?.parcels||[]){if(m.cancelled||!m.image||!COSPLAY.test(m.name)||visionNames['c:'+photoKey(m.image)]||asked.current.has('c:'+m.image)||Date.now()-new Date(m.events.at(-1)?.time||0).getTime()>120*864e5||!/aliexpress-media|alicdn|media-amazon|cdn\.shopify/.test(m.image))continue;hints[m.image]=m.name;asked.current.add('c:'+m.image);if(Object.keys(hints).length>=4)break;}
+  if(Object.keys(hints).length)fetch('/api/vision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:Object.keys(hints),hints})}).then(r=>r.json()).then(d=>{if(d?.names&&Object.keys(d.names).length)setVisionNames(v=>{const n={...v,...d.names};try{localStorage.setItem('pd_vision',JSON.stringify(n));}catch{}return n;});}).catch(()=>{});
   if(!want.length)return;want.forEach(u=>asked.current.add(u));
   fetch('/api/vision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:want.slice(0,6)})}).then(r=>r.json()).then(d=>{if(d?.names&&Object.keys(d.names).length)setVisionNames(v=>{const n={...v,...d.names};try{localStorage.setItem('pd_vision',JSON.stringify(n));}catch{}return n;});}).catch(()=>{});},[data,photoNames,visionNames]);
  const [,setDescTick]=useState(()=>{try{Object.assign(DESC,JSON.parse(localStorage.getItem('pd_desc')||'{}'));}catch{}return 0;});const descAsked=useRef(new Set<string>());
@@ -385,7 +389,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const returned=!got&&RETURNED.test(p.events.at(-1)?.label||'');
   return {...p,got,returned,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got&&!returned,ask:ask&&!returned,last,stage:stale||got||returned?4:p.stage,real:p.stage,name:titles[p.id]||byPhoto(m)||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
-  .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}).map((p,_,all)=>freshEta(fillUnnamed(p,visionNames),all)),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames]);
+  .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}).map((p,_,all)=>freshEta(titles[p.id]?p:fillUnnamed(p,visionNames),all)),[data,titles,tracks,marks,manual,snooze,phoneParcels,photoNames,visionNames]);
  const learned=useMemo(()=>learn(parcels),[parcels]);const est=(p:Parcel)=>p.eta?null:estimate(p,learned);
  const active=parcels.filter(p=>p.stage<4&&!p.cancelled),done=parcels.filter(p=>p.stage===4&&!p.cancelled||p.cancelled&&!!p.refund);
  // On the way: what is due first comes first (carrier date, else your own estimate); pickups and today's deliveries stay on top.
