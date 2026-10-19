@@ -4,6 +4,7 @@ import {db,dbOn,smsUser} from '@/lib/push';
 import {mergeParcels,type Parcel} from '@/lib/parcels';
 import {pointKey,daysLeft} from '@/lib/pickup';
 import {gemini} from '@/lib/gemini';
+import {travelMinutes,planRound} from '@/lib/routes';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 // "Near a pickup point" alerts. The phone (Shortcuts) asks with the personal link for parcels waiting at a point,
 // each with the point's coordinates, and turns them into iPhone reminders that fire on arrival.
@@ -59,15 +60,18 @@ export async function POST(req:NextRequest){if(req.headers.get('origin')!==req.n
  // Cities for the settings list (looked up once per point, a few at a time - OpenStreetMap asks for gentle use).
  // Point details for the app: town, opening hours (Google's weekly periods), phone, coordinates.
  if(Array.isArray(b.cities)){const out:Record<string,string>={};const info:Record<string,Geo|null>={};for(const k of (b.cities as unknown[]).filter((x):x is string=>typeof x==='string'&&x.length>2&&x.length<300).slice(0,6)){const g=await geocode(s,k);out[k]=g?.city||'';info[k]=g;}return Response.json({ok:true,cities:out,info},{headers:H});}
- // Travel time from home to each point (Google Routes): walking, driving or public transport. Cached 6 hours (transit changes by time).
- if(b.travel&&typeof b.travel.home==='string'&&b.travel.home.length>4){const gk=process.env.GOOGLE_MAPS_KEY;if(!gk)return Response.json({ok:false,why:'no key'},{headers:H});
-  const mode=({walk:'WALK',drive:'DRIVE',transit:'TRANSIT'} as Record<string,string>)[String(b.travel.mode)]||'WALK';const home=String(b.travel.home).slice(0,200);const out:Record<string,number|null>={};
-  for(const p of (Array.isArray(b.travel.points)?b.travel.points:[]).slice(0,6) as {k?:unknown;lat?:unknown;lon?:unknown}[]){if(typeof p.k!=='string'||typeof p.lat!=='number'||typeof p.lon!=='number')continue;
-   const ck=mode+'|'+home+'|'+p.lat.toFixed(5)+','+p.lon.toFixed(5);const c=(await s`select minutes from travel_times where k=${ck} and at>now()-interval '6 hours'`)[0];if(c){out[p.k]=c.minutes as number|null;continue;}
-   let min:number|null=null;try{const r=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'routes.duration'},body:JSON.stringify({origin:{address:home},destination:{location:{latLng:{latitude:p.lat,longitude:p.lon}}},travelMode:mode,languageCode:'he',regionCode:'IL'}),signal:AbortSignal.timeout(9000)});
-    const d=(await r.json())?.routes?.[0]?.duration;if(d)min=Math.max(1,Math.round(parseInt(String(d))/60));}catch{}
-   await s`insert into travel_times(k,minutes) values(${ck},${min}) on conflict(k) do update set minutes=excluded.minutes,at=now()`;out[p.k]=min;}
+ // Travel time from home to each point (Google Routes): walking, driving or public transport.
+ if(b.travel&&typeof b.travel.home==='string'&&b.travel.home.length>4){if(!process.env.GOOGLE_MAPS_KEY)return Response.json({ok:false,why:'no key'},{headers:H});
+  const mode=String(b.travel.mode);const home=String(b.travel.home).slice(0,200);const out:Record<string,number|null>={};
+  for(const p of (Array.isArray(b.travel.points)?b.travel.points:[]).slice(0,6) as {k?:unknown;lat?:unknown;lon?:unknown}[]){if(typeof p.k!=='string'||typeof p.lat!=='number'||typeof p.lon!=='number')continue;out[p.k]=await travelMinutes(s,home,mode,p.lat,p.lon);}
   return Response.json({ok:true,minutes:out,mode},{headers:H});}
+ // One pickup round through several points: best order and total minutes.
+ if(b.plan&&typeof b.plan.home==='string'){const pts=(Array.isArray(b.plan.points)?b.plan.points:[]).filter((p:{lat?:unknown;lon?:unknown})=>typeof p?.lat==='number'&&typeof p?.lon==='number').slice(0,8);
+  return Response.json({ok:true,plan:await planRound(String(b.plan.home).slice(0,200),String(b.plan.mode),pts)},{headers:H});}
+ // Home address and travel mode, kept on the server for the "time to leave" notification.
+ if(typeof b.home==='string'||typeof b.mode==='string'){await s`alter table point_prefs add column if not exists home text, add column if not exists mode text`;
+  await s`insert into point_prefs(user_id,home,mode) values(${me.id},${typeof b.home==='string'?b.home.slice(0,200):null},${typeof b.mode==='string'?b.mode.slice(0,10):null}) on conflict(user_id) do update set home=coalesce(excluded.home,point_prefs.home),mode=coalesce(excluded.mode,point_prefs.mode)`;
+  return Response.json({ok:true},{headers:H});}
  const cur=(await s`select enabled,off from point_prefs where user_id=${me.id}`)[0]||{enabled:true,off:[]};
  let enabled=cur.enabled as boolean,off=new Set<string>(cur.off as string[]);
  if(typeof b.enabled==='boolean')enabled=b.enabled;if(typeof b.key==='string'&&b.key.length<300){if(b.off)off.add(b.key);else off.delete(b.key);}

@@ -6,6 +6,8 @@ import {parseMessage,mergeParcels,type Parcel,type Message} from '@/lib/parcels'
 import {trackAll} from '@/lib/track';
 import {baldarByPhone} from '@/lib/tapuz';
 import {diff,withTrack,reminders,weekly,morning,nameOf,type State} from '@/lib/notify';
+import {daysLeft,pointKey,minutesToClose} from '@/lib/pickup';
+import {travelMinutes} from '@/lib/routes';
 import {open,send,db,type Sub} from '@/lib/push';
 import {prettyNames} from '@/lib/names';
 export type Row={user_id:string;refresh:string;subs:Sub[];state:State;seen:string[];checked_at:string|null};
@@ -26,6 +28,17 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY,phone).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]||(p.tracking?t['KX:'+p.tracking]:undefined)||(!p.tracking&&p.order?(p.via||[]).map(h=>t['TZ:'+h+':'+p.order]).find(Boolean):undefined)));}
  // With no baseline yet, the first check only records the current state.
  const {notes,stuck}=state.parcels.length?diff(state,parcels):{notes:[],stuck:state.stuck};
+ // Time to leave: a parcel waits at a point that closes within 1.5 hours (Google hours) - once a day per parcel, with the way from home.
+ const leave:typeof notes=[];
+ try{const pref=(await sql`select home,mode,enabled from point_prefs where user_id=${u.user_id}`)[0] as {home?:string;mode?:string;enabled?:boolean}|undefined;
+  if(pref?.enabled!==false){const today=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'});const il=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Jerusalem'}));
+   for(const p of parcels){if(p.stage!==3||p.cancelled||!p.pickup||!(p.pickup.place||p.pickup.address)||state.marks![p.id]||p.keys.some(k=>state.marks![k])||daysLeft(p)<0)continue;
+    const g=(await sql`select lat,lon,periods from geo_points where k=${'v2|'+pointKey(p.pickup)}`)[0];if(!g?.periods)continue;
+    const left=minutesToClose(g.periods,il);if(left==null||left>90||left<15)continue;
+    const tag='lv:'+p.id+':'+today;if((state.reminded![tag]||[]).length)continue;state.reminded![tag]=[1];
+    const min=pref?.home&&g.lat!=null?await travelMinutes(sql,pref.home,pref.mode||'walk',g.lat,g.lon):null;const how=pref?.mode==='drive'?'נסיעה':pref?.mode==='transit'?'בתחבורה ציבורית':'הליכה';
+    leave.push({id:p.id,kind:'pickup',title:(p.pickup.place||'נקודת האיסוף')+' נסגרת בעוד '+(left>=60?'שעה'+(left>=75?' וחצי':''):left+' דק׳'),body:nameOf(p)+(min?' · '+min+' דק׳ '+how+' מהבית':'')+(p.pickup.code?' · קוד '+p.pickup.code:''),tag});}}}catch{}
+ notes.push(...leave);
  const rem=reminders({...state,parcels});const wk=weekly({...state,parcels});const mo=morning({...state,parcels});const allNotes=[...notes,...rem.notes,...(wk.note?[wk.note]:[]),...(mo.note?[mo.note]:[])];
  // Notifications use the same short Hebrew names the app shows, not the store's long title.
  if(allNotes.length){const ps=parcels.filter(p=>allNotes.some(n=>n.id===p.id)||(mo.note&&p.stage===3)).slice(0,30);const pretty=await prettyNames(ps,sql).catch(()=>new Map<string,string>());

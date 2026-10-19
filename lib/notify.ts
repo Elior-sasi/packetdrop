@@ -73,7 +73,8 @@ export function reminders(state:State,now=Date.now()):{notes:Note[];reminded:Rec
   if(Number.isFinite(left)&&left>=0&&left<=1&&!done.includes(-1)){reminded[p.id]=[...done,-1,-3,2];notes.push({id:p.id,kind:'pickup',title:left===0?'היום האחרון לאיסוף':'מחר היום האחרון לאיסוף',body:nameOf(p)+where+code+' · אחרי זה היא חוזרת לשולח',tag:'rd1:'+p.id});}
   else if(Number.isFinite(left)&&left>1&&left<=3&&!done.includes(-3)){reminded[p.id]=[...done,-3,2];notes.push({id:p.id,kind:'pickup',title:'נשארו '+left+' ימים לאיסוף',body:nameOf(p)+where+code+' · אחרי זה היא חוזרת לשולח',tag:'rd3:'+p.id});}
   else if(days>=2&&days<16&&!done.includes(2)){reminded[p.id]=[...done,2];notes.push({id:p.id,kind:'pickup',title:'מחכה לך'+where+' כבר יומיים',body:nameOf(p)+code,tag:'r2:'+p.id});}}
- for(const id of Object.keys(reminded))if(!state.parcels.some(p=>p.id===id&&waitingAtPickup(p)))delete reminded[id];
+ // "Time to leave" marks (lv:<id>:<day>) are kept for 3 days so each one fires once a day.
+ for(const id of Object.keys(reminded)){if(id.startsWith('lv:')){const d=id.split(':').at(-1)||'';if(now-new Date(d).getTime()>3*DAY)delete reminded[id];continue;}if(!state.parcels.some(p=>p.id===id&&waitingAtPickup(p)))delete reminded[id];}
  return {notes,reminded};}
 // Sunday morning (Israel time) summary, once a week.
 export function weekly(state:State,now=new Date()):{note:Note|null;week:string}{

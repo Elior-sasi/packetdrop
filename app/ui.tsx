@@ -515,7 +515,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({travel:{home,mode:tmode,points:pts}})}).then(r=>r.ok?r.json():null).then(d=>{if(d?.minutes)setTravel(d.minutes);}).catch(()=>{});
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[user,home,tmode,travelKeys]);
- const setMode=(m:'walk'|'drive'|'transit')=>{setTmode(m);setPref('pd_tmode',m);};
+ const setMode=(m:'walk'|'drive'|'transit')=>{setTmode(m);setPref('pd_tmode',m);fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})}).catch(()=>{});};
+
  const setPt=(body:{enabled?:boolean;key?:string;off?:boolean})=>{fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.ok?r.json():null).then(d=>{if(d?.ok)setPtPref({enabled:d.enabled,off:d.off});}).catch(()=>{});};
  async function pullSms(){try{const r=await fetch('/api/sms',{cache:'no-store'});if(!r.ok)return;const d=await r.json();if(d.link)setSmsLink(d.link);if(d.widget)setWidgetUrl(d.widget);setSmsLast(d.last||null);if(d.items?.length)applySms(d.items.map((x:{text:string})=>x.text));}catch{}}
  const smsRef=useRef(pullSms);smsRef.current=pullSms;
@@ -527,6 +528,13 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   onContextMenu:(e:React.MouseEvent)=>{e.preventDefault();setMenu(p);},onClick:()=>{if(press.current.fired){press.current.fired=false;return;}setOpenId(p.id);}});
  // Coordinates for Moovit, looked up once per pickup address.
  const pickPoints=active.filter(p=>isPickup(p)&&(p.pickup?.place||p.pickup?.address));
+ // One pickup round when parcels wait at 2+ points: best order from Google, opened in Google Maps.
+ const [plan,setPlan]=useState<{order:number[];minutes:number}|null>(null);
+ const roundPts=pickPoints.map(p=>pointKey(p.pickup!)).filter((k,i,a)=>a.indexOf(k)===i&&ptInfo[k]?.lat);
+ const roundKey=roundPts.join('|')+'#'+tmode+'#'+home;
+ useEffect(()=>{setPlan(null);if(!user||!home||roundPts.length<2)return;fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:{home,mode:tmode,points:roundPts.map(k=>({lat:ptInfo[k]!.lat,lon:ptInfo[k]!.lon}))}})}).then(r=>r.ok?r.json():null).then(d=>{if(d?.plan)setPlan(d.plan);}).catch(()=>{});
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[user,roundKey]);
  useEffect(()=>{const need=[...new Set([...pickPoints,...(open?.pickup?[open]:[])].map(p=>placeQuery(p.pickup!)))].filter(q=>q&&!(q in geo)).slice(0,6);if(!need.length)return;
   void Promise.all(need.map(q=>fetch('/api/geo?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>[q,d.found?{lat:d.lat,lon:d.lon}:null] as const).catch(()=>[q,null] as const))).then(rows=>setGeo(g=>{const n={...g,...Object.fromEntries(rows)};try{localStorage.setItem('pd_geo',JSON.stringify(n));}catch{}return n;}));},[pickPoints.length,open?.id]);
  // Today: pickups waiting and couriers on the way.
@@ -631,7 +639,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {user&&(()=>{const pts=[...new Map(parcels.filter(p=>p.pickup&&(p.pickup.place||p.pickup.address)&&!!goodPlace(p.pickup.place||p.pickup.address)).map(p=>[pointKey(p.pickup!),p.pickup!.place||p.pickup!.address] as const)).entries()].map(([k,n])=>[k,n,ptCity[k]||''] as const).filter(([,n,c])=>!ptQ.trim()||(n+' '+c).includes(ptQ.trim()));return <section className="set"><h3><MapPin size={20}/> התראה ליד נקודת איסוף</h3>
    <p className="setNote">כשמחכה לך חבילה ואתה מגיע לנקודת האיסוף, הטלפון מזכיר לך מה מחכה שם ואת הקוד. נקודה חדשה נוספת לרשימה לבד, והתראה עליה פעילה עד שתכבה אותה.</p>
    <label className="setRow" htmlFor="homeIn"><span>כתובת הבית, לזמן ההגעה לנקודות</span></label>
-   <input id="homeIn" className="phoneIn" type="text" autoComplete="street-address" placeholder="רחוב, מספר, עיר" value={homeDraft} onChange={e=>setHomeDraft(e.target.value)} onBlur={()=>{const v=homeDraft.trim();if(v!==home){setHome(v);setPref('pd_home',v);}}}/>
+   <input id="homeIn" className="phoneIn" type="text" autoComplete="street-address" placeholder="רחוב, מספר, עיר" value={homeDraft} onChange={e=>setHomeDraft(e.target.value)} onBlur={()=>{const v=homeDraft.trim();if(v!==home){setHome(v);setPref('pd_home',v);fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({home:v})}).catch(()=>{});}}}/>
    <label className="setRow"><span>התראה ליד נקודת איסוף</span><input type="checkbox" className="sw" checked={ptPref.enabled} onChange={e=>setPt({enabled:e.target.checked})}/></label>
    {ptPref.enabled&&pts.length>0&&<><p className="setNote">נקודות האיסוף שלי:</p><input className="phoneIn" type="search" placeholder="חיפוש נקודה או עיר" aria-label="חיפוש נקודת איסוף או עיר" value={ptQ} onChange={e=>setPtQ(e.target.value)}/>{pts.map(([k,name,city])=><label key={k} className="setRow"><span>{name}{city&&<small className="ptCity">{' · '+city}</small>}</span><input type="checkbox" className="sw" aria-label={'התראה בנקודה '+name+(city?', '+city:'')} checked={!ptPref.off.includes(k)} onChange={e=>setPt({key:k,off:!e.target.checked})}/></label>)}</>}
    {ptPref.enabled&&!pts.length&&<p className="setNote">עדיין לא היו לך חבילות בנקודות איסוף.</p>}
@@ -655,7 +663,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {!configured&&<section className="notice"><h2>Unbox מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
   {!user?<section className="panel empty"><Mail size={44}/><h2>כל החבילות שלך במקום אחד</h2><p>התחבר עם Google כדי לאסוף את הודעות ההזמנה והמשלוח מ־Gmail.</p><form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form></section>:<>
    {(waiting)&&<div className="loader" role="status"><Mark cls="lmark" anim="bob"/><p>{progress?'מביא את החבילות שלך…':'בודק את Gmail…'}</p>{slow&&!progress&&<button className="ghost" onClick={()=>location.reload()}>לוקח יותר מדי זמן? נסה שוב</button>}</div>}
-   {!(waiting)&&section==='today'&&<div className="list">{today.length?<>{pickPoints.map(p=>{const pk=p.pickup!;const q=placeQuery(pk);return <section key={p.id} className="box mapCard">
+   {!(waiting)&&section==='today'&&<div className="list">{today.length?<>{plan&&roundPts.length>1&&(()=>{const ord=plan.order.map(i=>roundPts[i]);const names=ord.map(k=>pickPoints.find(p=>pointKey(p.pickup!)===k)?.pickup?.place||k);const tm=tmode==='drive'?'driving':tmode==='transit'?'transit':'walking';
+     const url='https://www.google.com/maps/dir/?api=1&origin='+encodeURIComponent(home)+'&destination='+encodeURIComponent(home)+'&waypoints='+encodeURIComponent(ord.map(k=>ptInfo[k]!.lat+','+ptInfo[k]!.lon).join('|'))+'&travelmode='+tm;
+     return <section className="box roundCard"><h3><Navigation size={18}/> מסלול איסוף אחד</h3><ol className="roundList">{names.map((n,i)=><li key={i}>{n}</li>)}</ol><p className="travelTime">{'בערך '+plan.minutes+' דק׳ '+(tmode==='drive'?'נסיעה':'הליכה')+', מהבית וחזרה'}</p><a className="primary btnLink" href={url} target="_blank" rel="noreferrer"><Navigation size={18}/> פתח את המסלול ב־Google Maps</a></section>;})()}{pickPoints.map(p=>{const pk=p.pickup!;const q=placeQuery(pk);return <section key={p.id} className="box mapCard">
      <iframe title={'מפה: '+pk.place} src={'https://maps.google.com/maps?q='+encodeURIComponent(q)+'&hl=iw&z=16&output=embed'} loading="lazy" referrerPolicy="no-referrer-when-downgrade"/>
      <p className="place">{pk.place||pk.address}</p>{pk.place&&pk.address&&<p className="addr">{pk.address}</p>}<PointExtras pk={pk} info={ptInfo[pointKey(pk)]} minutes={travel[pointKey(pk)]} mode={tmode} setMode={setMode} hasHome={!!home}/>{pk.hours&&<p className="addr">שעות: {pk.hours}</p>}{(()=>{const d=daysLeft(p);return Number.isFinite(d)&&d<=5&&d>=0?<p className="leftTag">{d===0?'היום האחרון לאיסוף':d===1?'מחר היום האחרון לאיסוף':'נשארו '+d+' ימים לאיסוף'}</p>:null;})()}
      <p className="addr">{bidi(p.name)}</p>{pk.code&&<button className="code" onClick={()=>copy(pk.code)}><KeyRound size={20}/><span>קוד איסוף</span><b dir="ltr">{pk.code}</b>{copied===pk.code?' ✓':<Copy size={17}/>}</button>}

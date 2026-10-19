@@ -35,3 +35,8 @@ export function periodsText(periods:unknown,now=new Date()):string{if(!Array.isA
  let best=Infinity;for(const p of ps){if(!p.open)continue;let a=at(p.open);if(a<=t)a+=W;if(a<best)best=a;}if(!Number.isFinite(best))return '';
  const days=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];const sameDay=Math.floor(best/1440)%7===now.getDay()&&best-t<1440;
  return 'סגור · נפתח '+(sameDay?'ב־'+hm(best):(best-t<2880&&Math.floor(best/1440)%7===(now.getDay()+1)%7?'מחר ב־'+hm(best):'ביום '+days[Math.floor(best/1440)%7]+' ב־'+hm(best)));}
+// Minutes until the point closes, when it is open now (from Google's periods). null when closed or unknown.
+export function minutesToClose(periods:unknown,now=new Date()):number|null{if(!Array.isArray(periods))return null;const W=7*1440,t=now.getDay()*1440+now.getHours()*60+now.getMinutes();
+ const at=(x:{day:number;hour?:number;minute?:number})=>x.day*1440+(x.hour||0)*60+(x.minute||0);
+ for(const p of periods as {open?:{day:number;hour?:number;minute?:number};close?:{day:number;hour?:number;minute?:number}}[]){if(!p.open||!p.close)continue;let a=at(p.open),b=at(p.close);if(b<=a)b+=W;for(const off of [0,-W])if(t>=a+off&&t<b+off)return b+off-t;}
+ return null;}
