@@ -314,3 +314,4 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .labelRow{display:flex;gap:8px;margin:8px 0}.labelRow>*{flex:1;margin:0!important}.labelRes{margin:6px 0 10px;padding:12px;border-radius:14px;background:#13263a;border:1px solid #2a4c6c}.labelRes p{margin:4px 0}.labelRes .teal{color:#2ed3c6}.labelRes .err{color:#ff8a7a}
 .primary.btnLink{color:#05182b}
 .app.detailOn>:not(.sheet):not(dialog):not(.toast):not(.menuWrap){display:none}
+.search .micBtn{margin:0;padding:6px}.search input+.micBtn{margin-inline-start:auto}.search .micBtn+.micBtn{margin-inline-start:-8px}
