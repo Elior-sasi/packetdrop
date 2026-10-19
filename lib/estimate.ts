@@ -1,17 +1,23 @@
 // Delivery estimates from the user's own past parcels (shared by the app and the server-side check page).
 import type {Parcel as P} from '@/lib/parcels';
 type Parcel=P&{stale?:boolean;got?:boolean;returned?:boolean};
+// Events are not always stored in time order, so "first" means earliest by time.
+function first(p:Parcel,r:RegExp,after=0){let t=0;for(const e of p.events){const x=new Date(e.time).getTime();if(r.test(e.label)&&x>after&&(!t||x<t))t=x;}return t;}
 export const SHIP_RE=/נשלח|יצאה מהמחסן|shipped|dispatched|נאספ/i;
-const shippedAt=(p:Parcel)=>new Date((p.events.find(e=>SHIP_RE.test(e.label))||p.events[0])?.time||0).getTime();
+const shippedAt=(p:Parcel)=>first(p,SHIP_RE)||Math.min(...p.events.map(e=>new Date(e.time).getTime()));
 const routeKey=(p:Parcel)=>p.shop+'|'+(p.carrier&&!/AliExpress|Cainiao/i.test(p.carrier)?p.carrier:'');
 export type Est={from:number;to:number;n:number;avg:number;late:boolean;scope:'route'|'shop';stage:string};
 // Milestones along the way; the estimate starts from the latest one the parcel has reached, using how long YOUR past parcels took from there.
 const MILES:[string,RegExp][]=[['מהמשלוח',SHIP_RE],['מיציאה מארץ המוצא',/יצאה מארץ המוצא|יצאה בטיסה|נמסרה לחברת ההובלה|יצאה מאזור המוצא|בתעבורה/i],['מההגעה לישראל',/הגיעה לארץ|נחתה|הגיעה לחברת ההובלה|במדינה|באזור שלכם|הגיע לארץ/i],['מהשחרור ממכס',/שוחררה מהמכס/i],['מחברת המסירה',/חברת המסירה|חברת המשלוחים המקומית|המקומית/i]];
-const mileAt=(p:Parcel,k:number)=>{if(k===0)return shippedAt(p);const e=p.events.find(e=>MILES[k][1].test(e.label));return e?new Date(e.time).getTime():0;};
+const mileAt=(p:Parcel,k:number)=>k===0?shippedAt(p):first(p,MILES[k][1]);
+// Reached you: ready for pickup, out for delivery or delivered. Not "handed to the carrier/airline" at the origin, which also says נמסרה.
+const DONE=/מוכנה לאיסוף|זמינה לאיסוף|ממתינ\S* לאיסוף|הגיעה לנקודת ה?איסוף|יצאה למסירה|בדרך למסירה|השליח בדרך|ready for pickup|available for pickup|out for delivery|(?<!ל)נמסר(?!\S* ל?(?:חברת|הובלה|שילוח|טיסה|שליח|מוביל))|delivered/i;
+const ORIGIN=/חברת ההובלה|הובלה הבינלאומית|לשילוח|לטיסה|carrier|airline|origin/i;
+const isDone=(l:string)=>DONE.test(l)&&!ORIGIN.test(l);
 export function learn(all:Parcel[]){const days:Record<string,number[]>={};
  for(const p of all){if(p.stage<4||p.cancelled||(p as {stale?:boolean}).stale||(p as {got?:boolean}).got||(p as {returned?:boolean}).returned)continue;// "Arrived" = ready for pickup or out for delivery or delivered, whichever came first; time waiting at the pickup point does not count.
-  const done=p.events.find(e=>/לאיסוף|מוכנה לאיסוף|ממתינ[הה]? לאיסוף|יצאה למסירה|בדרך למסירה|השליח בדרך|נמסר|נאספה|delivered|ready for pickup|out for delivery/i.test(e.label));const end=new Date((done||p.events.at(-1)!).time).getTime();
-  MILES.forEach((_,k)=>{const t=mileAt(p,k);if(!t)return;const d=(end-t)/864e5;if(!(d>0.1&&d<90))return;for(const key of [routeKey(p),p.shop+'|*'])(days[key+'#'+k]??=[]).push(d);});}
+  const lastT=Math.max(...p.events.map(e=>new Date(e.time).getTime()));
+  MILES.forEach((_,k)=>{const t=mileAt(p,k);if(!t)return;let end=0;for(const e of p.events){const x=new Date(e.time).getTime();if(x>t&&isDone(e.label)&&(!end||x<end))end=x;}const d=((end||lastT)-t)/864e5;if(!(d>0.1&&d<90))return;for(const key of [routeKey(p),p.shop+'|*'])(days[key+'#'+k]??=[]).push(d);});}
  return days;}
 export const pct=(a:number[],q:number)=>{const s=[...a].sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round(q*(s.length-1))))];};
 // Israel Post and couriers do not deliver on Saturday.

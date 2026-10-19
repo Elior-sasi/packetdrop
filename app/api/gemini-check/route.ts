@@ -12,7 +12,7 @@ export async function GET(req:NextRequest){const H={'Cache-Control':'no-store'};
  // ?eta=1: why each parcel on the way shows the date it does (from the notification server's copy of the parcels).
  if(req.nextUrl.searchParams.get('eta')&&dbOn()){const {sql,ready}=db();await ready;const row=(await sql`select state from push_users where user_id=${me.id}`)[0];
   const all=mergeParcels(((row?.state as {parcels?:Parcel[]})?.parcels)||[]);const days=learn(all as never);
-  const counts=Object.fromEntries(Object.entries(days).map(([k,v])=>[k,v.length]));
+  const counts=Object.fromEntries(Object.entries(days).map(([k,v])=>{const a=[...v].sort((x,y)=>x-y);return [k,a.length+' · '+a.map(d=>d.toFixed(1)).join(',')];}));
   const live=all.filter(p=>p.stage<4&&!p.cancelled).slice(0,12).map(p=>{const e=estimate({...p,eta:''} as never,days);return {name:p.name.slice(0,30),shop:p.shop,carrier:p.carrier,stage:p.stage,eta:p.eta,last:p.events.at(-1)?.label?.slice(0,40),est:e?{from:new Date(e.from).toISOString().slice(0,10),to:new Date(e.to).toISOString().slice(0,10),n:e.n,late:e.late,from_point:e.stage}:null};});
   return Response.json({history:counts,live},{headers:H});}
  // ?track=NUMBER: what Cainiao (AliExpress's carrier system) says about it, including its delivery window.
