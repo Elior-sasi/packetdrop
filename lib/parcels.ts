@@ -2,6 +2,8 @@ import {baldarHost} from '@/lib/tapuz';
 import * as cheerio from 'cheerio';
 import {heName} from '@/lib/hename';
 export type Event={id:string;label:string;time:string};
+// A pickup place must read like a name: starts with a letter, no message fragments ("(183-381)-הגיע ל...").
+export const goodPlace=(p:string)=>p&&/^[\u05D0-\u05EAA-Za-z0-9"']/.test(p)&&!/הגיע|\d{3}-\d{3}|^\d+$/.test(p)?p:'';
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string;until?:string};
 export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[];orderItems?:Record<string,string[]>;pkgByOrder?:Record<string,string[]>;link?:string};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
@@ -120,7 +122,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const postShelf=post?text.match(/[A-Z]{2}\d{8,12}[A-Z]{0,2}\s*([\u05D0-\u05EA]\s?\d{1,4})(?=\s|[\u05D0-\u05EA])/)?.[1]||'':'';
  // The last day to collect, when the notice says it ("ניתן לאסוף עד 25.10", "יוחזר לשולח ב־27/10").
  const until=text.match(/(?:לאסוף|איסוף|ייאסף|תיאסף|יוחזר|תוחזר|תישמר|יישמר|שמורה|collect)[^.\n\d]{0,30}?(?:עד|לפני|ב־?|by|until)\s*(?:ה?תאריך\s*)?(\d{1,2}[./]\d{1,2})/i)?.[1]||'';
- const pickup:Pickup|null=postWait?{place:postWait[1].trim(),address:'',code:postShelf,url:'',hours:'',...(until?{until}:{})}:place||code?{place,address,code,url:pickupUrl,hours,...(until?{until}:{})}:null;
+ const pickup:Pickup|null=postWait&&goodPlace(postWait[1].trim())?{place:goodPlace(postWait[1].trim()),address:'',code:postShelf,url:'',hours:'',...(until?{until}:{})}:goodPlace(place)||code?{place:goodPlace(place),address,code,url:pickupUrl,hours,...(until?{until}:{})}:null;
  // No order and no parcel number: newsletters, surveys and receipts without shipping. Not a parcel.
  if(!order&&!tracking&&!extra.size)return null;
  let name='',image='';
@@ -266,7 +268,7 @@ export function parseSms(raw:string,now=new Date()):Parcel|null{
  const hours=(text.match(/שעות(?:\s*פתיחה)?\s*:?\s*([^.\n]{4,60})/)?.[1]||'').trim();
  let stage=stageOf(text);if((code||place)&&stage<3)stage=3;if(stage<0)stage=2;
  const carrier=carrierFrom(text,'');
- const pickup=place||code?{place,address,code,url:'',hours:hours||undefined}:null;
+ const pickup=goodPlace(place)||code?{place:goodPlace(place),address,code,url:'',hours:hours||undefined}:null;
  const label=stage===3&&pickup?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===4?'נמסרה':stage===3?'יצאה למסירה':'עדכון מ־SMS';
  // Israeli stores' couriers (Tapuz, KSP…) mention the store's order number; it joins the SMS to the order mail.
  const order=text.match(/הזמנ\S*\s*(?:מס['׳]?|מספר)?\s*:?\s*#?\s*(\d{6,12})/)?.[1]||text.match(new RegExp(tracking+'\\s*(?:מספר|הזמנה|/)\\s*(\\d{6,12})'))?.[1]||'';const shop=shops.find(([r])=>r.test(text))?.[1]||'';
