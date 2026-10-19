@@ -7,10 +7,10 @@ import {gemini} from '@/lib/gemini';
 import type {db} from '@/lib/push';
 type Sql=ReturnType<typeof db>['sql'];
 const PROMPT=`אלה כותרות של מוצרים מחנויות אונליין (לרוב תרגום מכונה גרוע). לכל כותרת כתוב שם קצר, טבעי ומדויק בעברית, 2 עד 7 מילים.
-חשוב לשמור את הפרטים שמזהים את המוצר: שם הדמות והסדרה בתחפושות ובמוצרי מעריצים (למשל "תחפושת ג'ינבה מוואן פיס"), הדגם המדויק שהמוצר מתאים לו (למשל "כיסוי ל־AirPods 4", "מגן מסך ל־iPhone 15 Pro"), ושמות מותגים ודגמים (Logitech F710).
+חשוב לשמור את הפרטים שמזהים את המוצר: שם הדמות והסדרה בתחפושות ובמוצרי מעריצים (למשל "תחפושת ג'ינבה מוואן פיס"), הדגם המדויק שהמוצר מתאים לו (למשל "כיסוי ל־AirPods 4", "מגן מסך ל־iPhone 15 Pro"), ושמות מותגים ודגמים (Logitech F710). אם הכותרת מונה כמה דגמים שהמוצר מתאים להם (למשל "AirPods 5 /4/Pro"), אל תבחר ואל תמנה אותם: כתוב רק את המשפחה ("כיסוי ל־AirPods").
 אם הכותרת מתארת דמות בלי לכתוב את שמה, זהה אותה מהתיאור אם אתה בטוח. בלי צבע, מידה, כמות, מילות שיווק או פיסוק מיותר.
 החזר JSON בלבד: מערך מחרוזות באותו סדר ובאותו מספר כמו הקלט.`;
-const h=(s:string)=>createHash('sha1').update('v2|'+s).digest('hex');
+const h=(s:string)=>createHash('sha1').update('v3|'+s).digest('hex');
 export async function shortNames(input:string[],sql:Sql|null):Promise<Record<string,string>>{
  const titles=[...new Set(input.filter(t=>typeof t==='string'&&t.length>3&&t.length<300))].slice(0,25);const out:Record<string,string>={};
  const apiKey=process.env.GEMINI_API_KEY;if(!apiKey||!titles.length)return out;
