@@ -1,6 +1,6 @@
 import {NextRequest} from 'next/server';
 import {identity} from '@/lib/identity';
-import {cainiao} from '@/lib/track';
+import {cainiao,track} from '@/lib/track';
 import {gemini} from '@/lib/gemini';
 export const runtime='nodejs';
 // Signed-in check that the Gemini key works (opened in the browser); never shows the key.
@@ -8,7 +8,8 @@ export async function GET(req:NextRequest){const H={'Cache-Control':'no-store'};
  try{await identity(req,false);}catch{return Response.json({ok:false,why:'לא מחובר'},{status:401,headers:H});}
  // ?track=NUMBER: what Cainiao (AliExpress's carrier system) says about it, including its delivery window.
  const n=(req.nextUrl.searchParams.get('track')||'').trim().toUpperCase();
- if(n){const c=await cainiao([n]).catch(()=>null);const t=c?.tracks[n];return Response.json({cainiao:c?.status||'error',found:!!t,eta:t?.eta||null,last:t?.events.at(-1)?.text||null},{headers:H});}
+ if(n){const c=await cainiao([n]).catch(()=>null);const t=c?.tracks[n];const key=process.env.TRACK17_KEY;const s17=key?await track([n],key).catch(e=>({err:String(e)}) as never):null;const t17=s17?(s17 as Record<string,{eta?:unknown;status?:string;pending?:boolean}>)[n]:null;
+  return Response.json({cainiao:c?.status||'error',found:!!t,eta:t?.eta||null,t17key:!!key,t17:t17?{status:t17.status,eta:t17.eta||null,pending:!!t17.pending}:null},{headers:H});}
  // ?vision=1: the costume photo test (photo + store title), step by step.
  if(req.nextUrl.searchParams.get('vision')){const u='https://ae-pic-a1.aliexpress-media.com/kf/S09b8d11643714bde9ed1fea85895a021q.jpg';
   const img=await fetch(u,{signal:AbortSignal.timeout(8000)}).catch(e=>({ok:false,status:0,err:String(e)}) as never as Response);if(!img.ok)return Response.json({step:'image',status:img.status},{headers:H});
