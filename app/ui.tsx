@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {heName,fixSeries} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
 import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X,Share2,Wallet,Users,Phone,Sparkles,Send,Camera,Image as ImageIcon} from 'lucide-react';
@@ -337,7 +337,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  useEffect(()=>{if(!user)return;void loadBackup().finally(()=>void sync());fetch('/api/titles',{cache:'no-store'}).then(async r=>{const d=await r.json();if(r.ok){setTitles(d.titles||{});setStorage(!!d.storage);}}).catch(()=>{});return()=>controller.current?.abort();},[user?.id]);
  useEffect(()=>{if(edit)dialog.current?.showModal();else dialog.current?.close();},[edit]);
  // While a sheet or menu is open the page behind it must not scroll (iOS needs the body pinned in place).
- const locked=!!(openId||menu||adding);
+ // The parcel page covers the whole screen: the list under it is taken out of the page instead of pinning the body
+ // (iOS sometimes left the list blank after a pinned body was released), and the scroll position comes back on return.
+ const locked=!!(menu||adding)&&!openId;const detailY=useRef<number|null>(null),listY=useRef(0);
+ useEffect(()=>{const f=()=>{if(!document.querySelector('.detailOn'))listY.current=window.scrollY;};window.addEventListener('scroll',f,{passive:true});return()=>window.removeEventListener('scroll',f);},[]);
+ useLayoutEffect(()=>{if(openId){if(detailY.current===null)detailY.current=listY.current;return;}const y=detailY.current;detailY.current=null;if(y!==null){window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y));}},[openId]);
  useEffect(()=>{if(!locked)return;const y=window.scrollY;const b=document.body.style;b.position='fixed';b.top=-y+'px';b.left='0';b.right='0';b.overflow='hidden';
   return()=>{b.position='';b.top='';b.left='';b.right='';b.overflow='';window.scrollTo(0,y);};},[locked]);
  // Refresh again whenever the app comes back to the screen (iPhone keeps home-screen apps alive in the background).
@@ -473,7 +477,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Opening a notification lands on that parcel.
  const want=useRef<string|null>(null);useEffect(()=>{try{want.current=new URLSearchParams(location.search).get('p');}catch{}},[]);
  useEffect(()=>{const id=want.current;if(id&&data?.parcels.some(p=>p.id===id)){want.current=null;setOpenId(id);history.replaceState(null,'','/');}},[data]);
- const go=(v:typeof view)=>{setView(v);setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
+ const go=(v:typeof view)=>{setView(v);detailY.current=null;setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
  // Manual corrections: "received" / "hide", kept on the phone, in the cloud backup and on the notification server.
  function persist(nextMarks:Record<string,'got'|'hide'>,nextManual:MailParcel[]){try{localStorage.setItem('pd_marks',JSON.stringify(nextMarks));localStorage.setItem('pd_manual',JSON.stringify(nextManual));}catch{}
   marksRef.current=nextMarks;manualRef.current=nextManual;void saveBackup(saved.current);if(pushOn.current)void pushPost({marks:nextMarks}).catch(()=>{});}
@@ -557,8 +561,13 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Parcels ordered for someone else: tracked as usual, left out of the summary and spending.
  // Voice search: "איפה השקע?" -> the matching parcel and where it is, read out by VoiceOver (live region) or the phone's voice.
  // "שאל את Unbox": free questions answered by Gemini from the parcel list (sent with the question, not stored).
- const askData=()=>parcels.filter(p=>!p.cancelled||p.refund).slice(0,120).map(p=>{const e=est(p);const first=p.events[0]?.time,last=p.events.at(-1)?.time;
-  return [nice(p.name),p.shop,statusText(p),p.eta?'צפי '+p.eta:e&&!e.late?'הערכה '+estText(e):'',p.pickup?.place?'נקודה: '+p.pickup.place+(p.pickup.code?' קוד '+p.pickup.code:''):'',p.price?'מחיר '+p.price:'',p.refund?'החזר '+(p.refund.amount||''):'',first?'הוזמנה '+new Date(first).toLocaleDateString('he-IL'):'',p.stage>=4&&last?'הגיעה '+new Date(last).toLocaleDateString('he-IL'):'',p.carrier?'שליח '+p.carrier:'',p.tracking?'מעקב '+p.tracking:''].filter(Boolean).join(' | ');}).join('\n');
+ // Everything the app itself knows about each parcel, so the assistant can explain dates, not only repeat them.
+ const askData=()=>{const dd=(t?:string|number)=>t?new Date(t).toLocaleDateString('he-IL',{day:'numeric',month:'numeric'}):'';const dt=(t:string)=>new Date(t).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'});
+  return parcels.filter(p=>!p.cancelled||p.refund).slice(0,80).map(p=>{const e=est(p);const first=p.events[0]?.time,last=p.events.at(-1)?.time;const ae=p.order&&aeEtas[p.order];const ce=p.link&&courEtas[p.link];const left=isPickup(p)?daysLeft(p):NaN;const cl=p.order&&aeCloses[p.order];
+   const etaSrc=ae?'צפי מעמוד ההזמנה בחנות '+ae:ce?'צפי מאתר השליח '+ce.eta:p.eta?'צפי מהמייל של החנות '+p.eta:'';
+   const estTxt=!p.eta&&e?(e.late?'מאחרת לעומת חבילות קודמות':'הערכה '+estText(e))+` (חישוב: ${e.n} חבילות קודמות ${e.scope==='route'?'באותו מסלול':'מאותה חנות'}, ממוצע ${e.avg} ימים ${e.stage})`:'';
+   const evs=p.events.slice(-8).map(x=>dt(x.time)+' '+x.label).join('; ');
+   return ['• '+nice(p.name),p.shop,statusText(p),etaSrc,estTxt,(p.items||[]).length>1?'בחבילה: '+(p.items||[]).join(', '):'',p.pickup?.place?'נקודה: '+p.pickup.place+(p.pickup.address?', '+p.pickup.address:'')+(p.pickup.code?' קוד '+p.pickup.code:'')+(Number.isFinite(left)?' נשארו '+left+' ימים לאיסוף':''):'',cl?'החנות תסגור את ההזמנה ב־'+dd(cl):'',p.price?'מחיר '+p.price:'',p.refund?'החזר '+(p.refund.amount||''):'',first?'הוזמנה '+dd(first):'',p.stage>=4&&last?'הגיעה '+dd(last):'',p.carrier?'שליח '+p.carrier:'',p.tracking?'מעקב '+p.tracking:'',p.order?'הזמנה '+p.order:'',evs?'אירועים: '+evs:''].filter(Boolean).join(' | ');}).join('\n');};
  async function ask(q0?:string){const q=(q0??askDraft).trim();if(!q||askBusy)return;const hist=askMsgs.slice(-10);const next=[...askMsgs,{role:'user' as const,text:q}];setAskMsgs(next);setAskDraft('');setAskBusy(true);
   try{const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q,history:hist,data:askData()})});const d=await r.json().catch(()=>({}));
    const a=d.answer||(d.error==='busy'?'Gemini עמוס כרגע. נסה שוב בעוד דקה.':'לא הצלחתי לענות עכשיו. נסה שוב.');const all=[...next,{role:'model' as const,text:a}].slice(-30);setAskMsgs(all);try{localStorage.setItem('pd_ask',JSON.stringify(all));}catch{}}
@@ -574,6 +583,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const listen=()=>{const W=window as unknown as {webkitSpeechRecognition?:new()=>any;SpeechRecognition?:new()=>any};const R=W.SpeechRecognition||W.webkitSpeechRecognition;if(!R||listening)return;
   const r=new R();r.lang='he-IL';r.interimResults=false;r.maxAlternatives=1;setListening(true);setHeard('');setHeardSay('');
   r.onresult=(ev:any)=>{const said=String(ev.results?.[0]?.[0]?.transcript||'');const term=said.replace(/[?؟.!]/g,' ').replace(/^\s*(?:איפה|מה עם|מה קורה עם|מתי (?:מגיע|מגיעה|יגיע|תגיע)|תגיד(?: לי)? איפה)\s+/,'').replace(/^(?:ה)(?=[א-ת]{3,})/,'').trim();
+   // A filler word or a fragment ("נו", "אה", "כן") is not a parcel name: ask again instead of searching for it.
+   if(term.replace(/\s/g,'').length<3||/^(?:נו|אה+|אמ+|כן|לא|אוקיי?|רגע|טוב|יאללה|שלום|היי)$/.test(term)){setHeard('לא הבנתי. נסה לומר שם של מוצר, למשל "איפה האוזניות".');setHeardSay('לא הבנתי. נסה לומר שם של מוצר.');return;}
    setSearch(term);const t=term.toLowerCase();const terms=searchTerms(t);const hits=[...byEta(active),...done].filter(p=>{const hay=[p.name,nice(p.name),p.shop,p.carrier,p.tracking,p.order,...(p.items||[])].join(' ').toLowerCase();return terms.some(x=>hay.includes(x));});
    const msg=!hits.length?'לא מצאתי חבילה בשם '+term:hits.length===1?answerFor(hits[0]):'מצאתי '+hits.length+'. '+hits.slice(0,2).map(answerFor).join('. ');setHeard(msg);
    // Spoken version: pickup codes letter by letter ("ב 214" -> "ב 2 1 4"), so they are read clearly.
@@ -597,7 +608,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const waiting=(!data&&!error)||(busy&&!data?.parcels.length);
  const hiddenCount=Object.values(marks).filter(v=>v==='hide').length;
 
- return <main className={['app','app large','app xlarge'][size]+(view==='account'||open?' nonav':'')}>
+ return <main className={['app','app large','app xlarge'][size]+(view==='account'||open?' nonav':'')+(open?' detailOn':'')}>
  {splash!=='off'&&<div className={'splash'+(splash==='out'?' out':'')} aria-hidden="true"><Mark cls="smark" anim="open"/><div className="sname" dir="ltr">Unbox</div></div>}
  {user&&pull>0&&view!=='account'&&<div className={'ptr'+(pull>=80?' ready':'')} style={{transform:'translate(-50%,'+Math.max(0,pull-46)+'px)',opacity:Math.min(1,pull/80)}} aria-hidden="true"><RefreshCw style={{transform:'rotate('+pull*3+'deg)'}}/></div>}
  <header className="top">
@@ -645,9 +656,9 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <button className="ghost" onClick={()=>copy(smsLink)}><Copy size={18}/> {copied===smsLink?'הקישור הועתק ✓':'העתקת הקישור האישי'}</button>
    <p className="setNote" role="status">{smsLast?'הודעה אחרונה הגיעה ב־'+new Date(smsLast.at).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(smsLast.kind==='parcel'?' וזוהתה כחבילה ✓':smsLast.kind==='empty'?', אבל בלי טקסט':', אבל לא נמצא בה מספר מעקב'):'עדיין לא הגיעה אף הודעה מהקיצור.'}</p>
    <p className="setNote">הקישור אישי. אל תשתף אותו.</p></section>}
-  {user&&widgetUrl&&<section className="set"><h3><Smartphone size={20}/> ווידג'ט למסך הבית</h3>
+  {user&&widgetUrl&&<section className="set"><h3><Smartphone size={20}/> ווידג'ט למסך הבית ולמסך הנעילה</h3>
    <p className="setNote">{push==='on'?'עובד דרך אפליקציית Scriptable, ומתעדכן עם ההתראות.':'עובד דרך Scriptable ומתעדכן מהשרת של ההתראות, אז צריך שההתראות יהיו פעילות.'}</p>
-   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox</b>.</li><li>במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← גודל קטן או בינוני. בהגדרות הווידג'ט בחר את הסקריפט <b>Unbox</b>.</li></ol>
+   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox</b>.</li><li>במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← גודל קטן או בינוני. בהגדרות הווידג'ט בחר את הסקריפט <b>Unbox</b>.</li><li>גם למסך הנעילה: לחיצה ארוכה על מסך הנעילה ← <b>התאמה אישית</b> ← <b>מסך נעילה</b> ← הקש על השורה מתחת לשעה או על אזור הווידג'טים ← Scriptable. הקש על הווידג'ט שנוסף ובחר את הסקריפט <b>Unbox</b>. בשורה שמעל השעה מופיע הדבר הדחוף (או קוד האיסוף), במלבן 3 השורות הראשונות של הווידג'ט, ובעיגול - כמה חבילות בדרך.</li></ol>
    <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
   {user&&widgetUrl&&(()=>{const sc=aeLoader(widgetUrl.replace('/api/widget','/api/ae'));return <section className="set"><h3><CalendarCheck size={20}/> תאריכי הגעה מהחנויות</h3>
    <p className="setNote">Scriptable נכנס לעמוד של כל הזמנה פתוחה, בעליאקספרס, באמזון ובחנויות נוספות, ומעתיק את תאריך ההגעה שהחנות נותנת. בפעם הראשונה בכל חנות הוא יבקש להתחבר אליה, וההתחברות נשמרת רק בטלפון שלך.</p>
@@ -803,6 +814,6 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {addErr&&<p className="error" role="alert">{addErr}</p>}
   <button className="primary" disabled={!addNum.trim()}>הוספה למעקב</button></>}</form></div>}
  {user&&!open&&view!=='account'&&<nav aria-label="ניווט ראשי" className={navDrag!==null?'dragging':''} style={{'--tab':navDrag??['list','today','stats'].indexOf(section)} as React.CSSProperties}
-  onTouchStart={e=>navSlide(e,false)} onTouchMove={e=>navSlide(e,true)} onTouchEnd={()=>setNavDrag(null)} onTouchCancel={()=>setNavDrag(null)}>{([['list','חבילות',Package,0],['today','איסוף',MapPin,today.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
+  onTouchStart={e=>navSlide(e,false)} onTouchMove={e=>navSlide(e,true)} onTouchEnd={()=>setNavDrag(null)} onTouchCancel={()=>setNavDrag(null)}>{([['list','חבילות',Package,0],['today','איסוף',MapPin,today.length],['stats','סיכום',ChartColumn,0]] as const).map(([key,label,Icon,n])=><button key={key} className={section===key?'selected':''} aria-current={section===key?'page':undefined} aria-label={label+(n?' '+n:'')} onClick={()=>{setSection(key);detailY.current=null;setOpenId(null);window.scrollTo({top:0});}}><span className="ni"><Icon size={20}/>{data&&!busy&&n>0&&<b className="nb warn">{n}</b>}</span><span>{label}</span></button>)}</nav>}
  </main>;
 }
