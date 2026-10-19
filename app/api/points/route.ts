@@ -14,6 +14,11 @@ async function sql(){const d=db();await d.ready;
  await d.sql`create table if not exists geo_points(k text primary key,lat double precision,lon double precision,at timestamptz not null default now())`;await d.sql`alter table geo_points add column if not exists city text`;
  await d.sql`create table if not exists point_sent(user_id text not null,parcel_id text not null,at timestamptz not null default now(),primary key(user_id,parcel_id))`;return d.sql;}
 async function geocode(s:Awaited<ReturnType<typeof sql>>,k0:string):Promise<{lat:number;lon:number;city:string}|null>{const k='v2|'+k0;const c=(await s`select lat,lon,city from geo_points where k=${k}`)[0];if(c&&(c.city!=null||c.lat==null))return c.lat==null?null:{lat:c.lat as number,lon:c.lon as number,city:String(c.city||'')};
+ // Google Maps first when a key is set (it knows shop names); the free map otherwise.
+ const gk=process.env.GOOGLE_MAPS_KEY;
+ if(gk){try{const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'places.location,places.addressComponents'},body:JSON.stringify({textQuery:k0,languageCode:'he',regionCode:'IL',maxResultCount:1}),signal:AbortSignal.timeout(8000)});
+  const pl=(await r.json())?.places?.[0];if(pl?.location){const city=String((pl.addressComponents||[]).find((c:{types?:string[]})=>c.types?.includes('locality'))?.longText||'');
+   await s`insert into geo_points(k,lat,lon,city) values(${k},${pl.location.latitude},${pl.location.longitude},${city}) on conflict(k) do update set lat=excluded.lat,lon=excluded.lon,city=excluded.city`;return {lat:pl.location.latitude,lon:pl.location.longitude,city};}}catch{}}
  // A shop name alone ("סופר הקשתות") is often unknown to the map; then try without the first words, i.e. the street and town.
  let hit:{lat:string;lon:string;address?:{city?:string;town?:string;village?:string;suburb?:string}}|undefined;const words=k0.split(' ');
  const tries=[k0,...[1,2,3].map(n=>words.slice(n).join(' ')).filter(x=>x.length>3&&/\d|\s/.test(x))].filter((x,i,a)=>a.indexOf(x)===i).slice(0,3);
