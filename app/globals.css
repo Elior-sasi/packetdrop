@@ -304,3 +304,5 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .ptCity{color:#9fb4c8;font-weight:400}
 .btnLink{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;color:inherit;margin-top:10px;box-sizing:border-box;width:100%}
 .nc-list button{flex-wrap:wrap;row-gap:2px}.nc-list button em{margin-inline-start:auto}
+.travel{margin-top:10px}.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button{flex:1;min-width:90px;padding:9px 6px;border-radius:12px;border:1px solid #2c4a66;background:#0f1d2b;color:#cfe4f7;font-size:calc(14px*var(--fs));font-weight:600}.seg button.on{background:#1d4d7a;border-color:#4aa8ff;color:#fff}
+.travelTime{margin:8px 0 0;font-weight:700;color:#9fd2ff}

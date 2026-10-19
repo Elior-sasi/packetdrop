@@ -11,14 +11,19 @@ export const runtime='nodejs';export const dynamic='force-dynamic';
 const H={'Cache-Control':'no-store'};
 async function sql(){const d=db();await d.ready;
  await d.sql`create table if not exists point_prefs(user_id text primary key,enabled boolean not null default true,off jsonb not null default '[]')`;
- await d.sql`create table if not exists geo_points(k text primary key,lat double precision,lon double precision,at timestamptz not null default now())`;await d.sql`alter table geo_points add column if not exists city text`;
+ await d.sql`create table if not exists geo_points(k text primary key,lat double precision,lon double precision,at timestamptz not null default now())`;await d.sql`alter table geo_points add column if not exists city text, add column if not exists periods jsonb, add column if not exists phone text, add column if not exists src text`;
+ await d.sql`create table if not exists travel_times(k text primary key,minutes int,at timestamptz not null default now())`;
  await d.sql`create table if not exists point_sent(user_id text not null,parcel_id text not null,at timestamptz not null default now(),primary key(user_id,parcel_id))`;return d.sql;}
-async function geocode(s:Awaited<ReturnType<typeof sql>>,k0:string):Promise<{lat:number;lon:number;city:string}|null>{const k='v2|'+k0;const c=(await s`select lat,lon,city from geo_points where k=${k}`)[0];if(c&&(c.city!=null||c.lat==null))return c.lat==null?null:{lat:c.lat as number,lon:c.lon as number,city:String(c.city||'')};
+type Geo={lat:number;lon:number;city:string;periods?:unknown;phone?:string};
+async function geocode(s:Awaited<ReturnType<typeof sql>>,k0:string):Promise<Geo|null>{const k='v2|'+k0;const gk=process.env.GOOGLE_MAPS_KEY;const c=(await s`select lat,lon,city,periods,phone,src from geo_points where k=${k}`)[0];
+ // A point found before Google was connected is looked up again once in Google (for its hours and phone).
+ if(c&&(c.city!=null||c.lat==null)&&!(gk&&c.src!=='g'))return c.lat==null?null:{lat:c.lat as number,lon:c.lon as number,city:String(c.city||''),periods:c.periods||undefined,phone:c.phone||undefined};
  // Google Maps first when a key is set (it knows shop names); the free map otherwise.
- const gk=process.env.GOOGLE_MAPS_KEY;
- if(gk){try{const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'places.location,places.addressComponents'},body:JSON.stringify({textQuery:k0,languageCode:'he',regionCode:'IL',maxResultCount:1}),signal:AbortSignal.timeout(8000)});
+ if(gk){try{const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'places.location,places.addressComponents,places.regularOpeningHours.periods,places.nationalPhoneNumber'},body:JSON.stringify({textQuery:k0,languageCode:'he',regionCode:'IL',maxResultCount:1}),signal:AbortSignal.timeout(8000)});
   const pl=(await r.json())?.places?.[0];if(pl?.location){const city=String((pl.addressComponents||[]).find((c:{types?:string[]})=>c.types?.includes('locality'))?.longText||'');
-   await s`insert into geo_points(k,lat,lon,city) values(${k},${pl.location.latitude},${pl.location.longitude},${city}) on conflict(k) do update set lat=excluded.lat,lon=excluded.lon,city=excluded.city`;return {lat:pl.location.latitude,lon:pl.location.longitude,city};}}catch{}}
+   const periods=pl.regularOpeningHours?.periods||null;const phone=String(pl.nationalPhoneNumber||'');
+   await s`insert into geo_points(k,lat,lon,city,periods,phone,src) values(${k},${pl.location.latitude},${pl.location.longitude},${city},${periods?JSON.stringify(periods):null},${phone},'g') on conflict(k) do update set lat=excluded.lat,lon=excluded.lon,city=excluded.city,periods=excluded.periods,phone=excluded.phone,src='g'`;return {lat:pl.location.latitude,lon:pl.location.longitude,city,periods:periods||undefined,phone:phone||undefined};}}catch{}
+  if(c)return c.lat==null?null:{lat:c.lat as number,lon:c.lon as number,city:String(c.city||'')};}
  // A shop name alone ("סופר הקשתות") is often unknown to the map; then try without the first words, i.e. the street and town.
  let hit:{lat:string;lon:string;address?:{city?:string;town?:string;village?:string;suburb?:string}}|undefined;const words=k0.split(' ');
  const tries=[k0,...[1,2,3].map(n=>words.slice(n).join(' ')).filter(x=>x.length>3&&/\d|\s/.test(x))].filter((x,i,a)=>a.indexOf(x)===i).slice(0,3);
@@ -27,7 +32,7 @@ async function geocode(s:Awaited<ReturnType<typeof sql>>,k0:string):Promise<{lat
  // Not on the map by name: ask Google (through Gemini's Google Search) which town this pickup point is in.
  if(!city){try{const g=await gemini({contents:[{parts:[{text:`חפש בגוגל: נקודת איסוף חבילות או חנות בישראל בשם "${k0.slice(0,120)}". באיזו עיר או יישוב היא נמצאת? ענה רק בשם העיר בעברית, בלי שום מילה נוספת. אם לא מצאת, ענה: לא ידוע`}]}],tools:[{google_search:{}}],generationConfig:{temperature:0,maxOutputTokens:256}},20000);
   const a=g.ok?g.text.replace(/[."'\n]/g,' ').trim():'';if(a&&a.length<=25&&!/לא ידוע|unknown/i.test(a)&&/^[\u05D0-\u05EA\s\-־׳]+$/.test(a))city=a;}catch{}}
- await s`insert into geo_points(k,lat,lon,city) values(${k},${hit?+hit.lat:null},${hit?+hit.lon:null},${city}) on conflict(k) do update set lat=excluded.lat,lon=excluded.lon,city=excluded.city`;return hit?{lat:+hit.lat,lon:+hit.lon,city}:null;}
+ await s`insert into geo_points(k,lat,lon,city,src) values(${k},${hit?+hit.lat:null},${hit?+hit.lon:null},${city},${gk?'g':'o'}) on conflict(k) do update set lat=excluded.lat,lon=excluded.lon,city=excluded.city,src=excluded.src`;return hit?{lat:+hit.lat,lon:+hit.lon,city}:null;}
 // Still waiting: not marked received, and inside the time the point keeps it (an old one was most likely collected already).
 const waiting=(p:Parcel,marks:Record<string,string>)=>p.stage===3&&!p.cancelled&&!!p.pickup&&!!(p.pickup.place||p.pickup.address)&&!marks[p.id]&&!p.keys.some(k=>marks[k])&&daysLeft(p)>=0;
 export async function GET(req:NextRequest){if(!dbOn())return Response.json({ok:false},{status:503,headers:H});const s=await sql();const q=req.nextUrl.searchParams;
@@ -52,7 +57,17 @@ export async function POST(req:NextRequest){if(req.headers.get('origin')!==req.n
  if(!dbOn())return Response.json({ok:false},{status:503,headers:H});let me:{id:string};try{me=await identity(req,false) as {id:string};}catch{return Response.json({ok:false},{status:401,headers:H});}
  const b=await req.json().catch(()=>({}));const s=await sql();
  // Cities for the settings list (looked up once per point, a few at a time - OpenStreetMap asks for gentle use).
- if(Array.isArray(b.cities)){const out:Record<string,string>={};for(const k of (b.cities as unknown[]).filter((x):x is string=>typeof x==='string'&&x.length>2&&x.length<300).slice(0,6)){const g=await geocode(s,k);out[k]=g?.city||'';}return Response.json({ok:true,cities:out},{headers:H});}
+ // Point details for the app: town, opening hours (Google's weekly periods), phone, coordinates.
+ if(Array.isArray(b.cities)){const out:Record<string,string>={};const info:Record<string,Geo|null>={};for(const k of (b.cities as unknown[]).filter((x):x is string=>typeof x==='string'&&x.length>2&&x.length<300).slice(0,6)){const g=await geocode(s,k);out[k]=g?.city||'';info[k]=g;}return Response.json({ok:true,cities:out,info},{headers:H});}
+ // Travel time from home to each point (Google Routes): walking, driving or public transport. Cached 6 hours (transit changes by time).
+ if(b.travel&&typeof b.travel.home==='string'&&b.travel.home.length>4){const gk=process.env.GOOGLE_MAPS_KEY;if(!gk)return Response.json({ok:false,why:'no key'},{headers:H});
+  const mode=({walk:'WALK',drive:'DRIVE',transit:'TRANSIT'} as Record<string,string>)[String(b.travel.mode)]||'WALK';const home=String(b.travel.home).slice(0,200);const out:Record<string,number|null>={};
+  for(const p of (Array.isArray(b.travel.points)?b.travel.points:[]).slice(0,6) as {k?:unknown;lat?:unknown;lon?:unknown}[]){if(typeof p.k!=='string'||typeof p.lat!=='number'||typeof p.lon!=='number')continue;
+   const ck=mode+'|'+home+'|'+p.lat.toFixed(5)+','+p.lon.toFixed(5);const c=(await s`select minutes from travel_times where k=${ck} and at>now()-interval '6 hours'`)[0];if(c){out[p.k]=c.minutes as number|null;continue;}
+   let min:number|null=null;try{const r=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':gk,'X-Goog-FieldMask':'routes.duration'},body:JSON.stringify({origin:{address:home},destination:{location:{latLng:{latitude:p.lat,longitude:p.lon}}},travelMode:mode,languageCode:'he',regionCode:'IL'}),signal:AbortSignal.timeout(9000)});
+    const d=(await r.json())?.routes?.[0]?.duration;if(d)min=Math.max(1,Math.round(parseInt(String(d))/60));}catch{}
+   await s`insert into travel_times(k,minutes) values(${ck},${min}) on conflict(k) do update set minutes=excluded.minutes,at=now()`;out[p.k]=min;}
+  return Response.json({ok:true,minutes:out,mode},{headers:H});}
  const cur=(await s`select enabled,off from point_prefs where user_id=${me.id}`)[0]||{enabled:true,off:[]};
  let enabled=cur.enabled as boolean,off=new Set<string>(cur.off as string[]);
  if(typeof b.enabled==='boolean')enabled=b.enabled;if(typeof b.key==='string'&&b.key.length<300){if(b.off)off.add(b.key);else off.delete(b.key);}

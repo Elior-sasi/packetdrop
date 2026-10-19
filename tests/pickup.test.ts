@@ -14,3 +14,11 @@ test('days left to collect',()=>{
  const p={id:'x',keys:['x'],name:'',shop:'',carrier:'',image:'',url:'',tracking:'',order:'',eta:'',stage:3,cancelled:false,pickup:{place:'סופר פארם',address:'',code:'',url:''},events:[{id:'a',label:'ממתינה לאיסוף',time:new Date(2026,9,10,9).toISOString()}]};
  assert.equal(daysLeft(p as never,mon10.getTime()),5);
  assert.equal(daysLeft({...p,pickup:{...p.pickup,until:'21.10'}} as never,mon10.getTime()),2);});
+test('Google opening periods',async()=>{const {periodsText}=await import('../lib/pickup');
+ const ps=[0,1,2,3,4].map(d=>({open:{day:d,hour:9,minute:0},close:{day:d,hour:21,minute:0}})).concat([{open:{day:5,hour:9,minute:0},close:{day:5,hour:14,minute:0}}]);
+ assert.equal(periodsText(ps,new Date(2026,9,19,10,0)),'פתוח עכשיו · עד 21:00');
+ assert.equal(periodsText(ps,new Date(2026,9,19,22,0)),'סגור · נפתח מחר ב־9:00');
+ assert.equal(periodsText(ps,new Date(2026,9,19,7,0)),'סגור · נפתח ב־9:00');
+ assert.equal(periodsText(ps,new Date(2026,9,24,12,0)),'סגור · נפתח מחר ב־9:00');
+ assert.equal(periodsText(ps,new Date(2026,9,23,16,0)),'סגור · נפתח ביום ראשון ב־9:00');
+ assert.equal(periodsText([{open:{day:0,hour:0}}]),'פתוח 24 שעות');});

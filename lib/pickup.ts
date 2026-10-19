@@ -24,3 +24,14 @@ export function openNow(hours:string,now=new Date()):{open:boolean;until?:string
 export const hoursText=(hours:string,now=new Date())=>{const o=openNow(hours,now);if(!o)return '';return o.open?'פתוח עכשיו · עד '+o.until:o.opens?'סגור · נפתח ב־'+o.opens:o.today||'';};
 // One name per pickup point (place + address), used for the user's on/off choices.
 export const pointKey=(pk:{place?:string;address?:string})=>[pk.place,pk.address].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+// Google's weekly opening periods ({open:{day,hour,minute},close:{...}}, day 0 = Sunday) -> the same text as hoursText.
+type GP={open?:{day:number;hour?:number;minute?:number};close?:{day:number;hour?:number;minute?:number}};
+export function periodsText(periods:unknown,now=new Date()):string{if(!Array.isArray(periods)||!periods.length)return '';const ps=periods as GP[];
+ if(ps.length===1&&ps[0].open&&!ps[0].close)return 'פתוח 24 שעות';
+ const W=7*1440,t=now.getDay()*1440+now.getHours()*60+now.getMinutes();const at=(x:{day:number;hour?:number;minute?:number})=>x.day*1440+(x.hour||0)*60+(x.minute||0);
+ const hm=(m:number)=>{m=((m%1440)+1440)%1440;return Math.floor(m/60)+':'+String(m%60).padStart(2,'0');};
+ for(const p of ps){if(!p.open||!p.close)continue;let a=at(p.open),b=at(p.close);if(b<=a)b+=W;for(const off of [0,-W])if(t>=a+off&&t<b+off)return 'פתוח עכשיו · עד '+hm(b);}
+ // Closed: when it opens next (today, else the day).
+ let best=Infinity;for(const p of ps){if(!p.open)continue;let a=at(p.open);if(a<=t)a+=W;if(a<best)best=a;}if(!Number.isFinite(best))return '';
+ const days=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];const sameDay=Math.floor(best/1440)%7===now.getDay()&&best-t<1440;
+ return 'סגור · נפתח '+(sameDay?'ב־'+hm(best):(best-t<2880&&Math.floor(best/1440)%7===(now.getDay()+1)%7?'מחר ב־'+hm(best):'ביום '+days[Math.floor(best/1440)%7]+' ב־'+hm(best)));}
