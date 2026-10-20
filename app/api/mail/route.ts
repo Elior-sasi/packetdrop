@@ -14,6 +14,6 @@ export async function GET(req:NextRequest){const H={'Cache-Control':'private, no
   let html=find(m.payload,'text/html');if(!html){const t=find(m.payload,'text/plain')||m.snippet||'';html='<div style="white-space:pre-wrap;font-family:sans-serif">'+esc(t)+'</div>';}
   // No scripts, no forms; links open outside the app.
   html=html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<form[\s\S]*?<\/form>/gi,'');
-  const page='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>body{margin:0;padding:8px;background:#fff;color:#111;word-wrap:break-word}img{max-width:100%;height:auto}table{max-width:100%!important}</style></head><body>'+html+'</body></html>';
+  const page='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>html,body{overflow-x:hidden}body{margin:0;padding:8px;background:#fff;color:#111;word-wrap:break-word}img{max-width:100%;height:auto}table{max-width:100%!important}</style></head><body>'+html+'</body></html>';
   return Response.json({subject:h('subject'),from:h('from').replace(/<[^>]*>/,'').replace(/"/g,'').trim(),date:Number(m.internalDate)||0,html:page,threadId:m.threadId||''},{headers:H});
  }catch{return Response.json({error:'fail'},{status:500,headers:H});}}
