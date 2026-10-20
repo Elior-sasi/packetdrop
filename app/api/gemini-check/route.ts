@@ -10,9 +10,9 @@ export const runtime='nodejs';export const maxDuration=60;
 export async function GET(req:NextRequest){const H={'Cache-Control':'no-store'};
  let me:{id:string};try{me=await identity(req,false) as {id:string};}catch{return Response.json({ok:false,why:'לא מחובר'},{status:401,headers:H});}
  // ?push=1: is Gmail telling the server about new mail? Last push, Gmail watch renewal, last check of the mailbox.
- if(req.nextUrl.searchParams.get('push')&&dbOn()){const {sql,ready}=db();await ready;const m=Object.fromEntries((await sql`select k,v from push_meta where k in ('gpush-any',${'gpush:'+me.id},${'watch:'+me.id})`).map(r=>[r.k,r.v]));
+ if(req.nextUrl.searchParams.get('push')&&dbOn()){const {sql,ready}=db();await ready;const m=Object.fromEntries((await sql`select k,v from push_meta where k in ('gpush-any',${'gpush:'+me.id},${'watch:'+me.id},${'sent:'+me.id})`).map(r=>[r.k,r.v]));
   const row=(await sql`select checked_at,jsonb_array_length(subs) n,email from push_users where user_id=${me.id}`)[0];
-  return Response.json({any_push:m['gpush-any']||null,my_push:m['gpush:'+me.id]||null,watch:m['watch:'+me.id]||null,checked:row?.checked_at||null,phones:row?.n??0,topic:!!process.env.GMAIL_TOPIC},{headers:H});}
+  return Response.json({any_push:m['gpush-any']||null,my_push:m['gpush:'+me.id]||null,watch:m['watch:'+me.id]||null,last_notification:m['sent:'+me.id]||null,checked:row?.checked_at||null,phones:row?.n??0,topic:!!process.env.GMAIL_TOPIC},{headers:H});}
  // ?eta=1: why each parcel on the way shows the date it does (from the notification server's copy of the parcels).
  if(req.nextUrl.searchParams.get('eta')&&dbOn()){const {sql,ready}=db();await ready;const row=(await sql`select state from push_users where user_id=${me.id}`)[0];
   const all=mergeParcels(((row?.state as {parcels?:Parcel[]})?.parcels)||[]);const days=learn(all as never);

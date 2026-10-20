@@ -27,7 +27,10 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  const numbers=[...parcels.filter(p=>p.tracking&&p.stage<4&&!p.cancelled).map(p=>p.tracking).slice(0,36),...(phone?parcels.filter(p=>p.tracking&&p.carrier==='K Express'&&p.stage<4&&!p.cancelled).map(p=>'KX:'+p.tracking).slice(0,4):[]),...parcels.filter(p=>!p.tracking&&p.order&&p.via?.length&&p.stage<4&&!p.cancelled&&Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<45*864e5).flatMap(p=>p.via!.map(h=>'TZ:'+h+':'+p.order)).slice(0,6)];
  if(numbers.length){const t=await trackAll(numbers,process.env.TRACK17_KEY,phone).catch(()=>({} as Awaited<ReturnType<typeof trackAll>>));parcels=parcels.map(p=>withTrack(p,t[p.tracking?.toUpperCase()]||(p.tracking?t['KX:'+p.tracking]:undefined)||(!p.tracking&&p.order?(p.via||[]).map(h=>t['TZ:'+h+':'+p.order]).find(Boolean):undefined)));}
  // With no baseline yet, the first check only records the current state.
- const {notes,stuck}=state.parcels.length?diff(state,parcels):{notes:[],stuck:state.stuck};
+ // Compare with what the server last NOTIFIED about, not with the parcels the app posted: when the app opens first
+ // it saves the new mail into the state, and comparing with that would swallow the notification.
+ const base=(u.state as {base?:Parcel[]})?.base;const prev={...state,parcels:Array.isArray(base)&&base.length?base:state.parcels};
+ const {notes,stuck}=prev.parcels.length?diff(prev,parcels):{notes:[],stuck:state.stuck};
  // Time to leave: a parcel waits at a point that closes within 1.5 hours (Google hours) - once a day per parcel, with the way from home.
  const leave:typeof notes=[];
  try{const pref=(await sql`select home,mode,enabled from point_prefs where user_id=${u.user_id}`)[0] as {home?:string;mode?:string;enabled?:boolean}|undefined;
@@ -46,9 +49,12 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  let subs=u.subs;let sent=0;
  const batch=allNotes.length>4?[{title:'Unbox',body:allNotes.length+' עדכונים חדשים בחבילות',tag:'many',url:'/'}]:allNotes.map(n=>({title:n.title,body:n.body,tag:n.tag,url:'/?p='+encodeURIComponent(n.id)}));
  for(const n of batch){const alive:Sub[]=[];for(const s of subs){const ok=await send(s,n).catch(()=>true);if(ok)alive.push(s);}subs=alive;sent++;}
+ if(sent)try{await sql`insert into push_meta(k,v) values(${'sent:'+u.user_id},now()) on conflict(k) do update set v=now()`;}catch{}
  const keep=parcels.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
  const newSeen=[...seen,...msgs.map(m=>m.id)].slice(-1500);
- await sql`update push_users set state=${JSON.stringify({parcels:keep,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,morning:mo.day,view:(u.state as {view?:unknown})?.view,phone})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
+ // The baseline for the next comparison: only what notifications need (keys, stage, events, customs, refund, missing items).
+ const baseNext=keep.map(p=>({id:p.id,keys:p.keys,name:'',shop:'',carrier:'',image:'',url:'',tracking:'',order:'',eta:'',stage:p.stage,cancelled:p.cancelled,pickup:null,ret:p.ret,events:p.events.map(e=>({id:e.id,label:e.label,time:e.time})),...(p.customs?{customs:p.customs}:{}),...(p.refund?{refund:p.refund}:{}),...(p.missing?{missing:p.missing}:{})}));
+ await sql`update push_users set state=${JSON.stringify({parcels:keep,base:baseNext,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,morning:mo.day,view:(u.state as {view?:unknown})?.view,phone})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
  return {sent};
 }
 // Gmail instant push: ask Gmail to tell our Pub/Sub topic about new mail. A watch lasts 7 days, so it is renewed every 6.
