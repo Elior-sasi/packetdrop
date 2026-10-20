@@ -490,7 +490,10 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Tapping a notification opens its parcel: on a cold start through ?p=, and while the app is already open through a message from the service worker.
  const [wantTick,setWantTick]=useState(0);
  useEffect(()=>{const onMsg=(e:MessageEvent)=>{const d=e.data as {type?:string;url?:string};if(d?.type!=='open'||!d.url)return;try{const id=new URL(d.url,location.origin).searchParams.get('p');if(id){want.current=id;setWantTick(t=>t+1);}}catch{}};
-  navigator.serviceWorker?.addEventListener('message',onMsg);return()=>navigator.serviceWorker?.removeEventListener('message',onMsg);},[]);
+  const fromCache=async()=>{try{if(typeof caches==='undefined')return;const c=await caches.open('unbox-open');const r=await c.match('/__open');if(!r)return;await c.delete('/__open');const d=await r.json() as {url?:string;at?:number};if(d.url&&Date.now()-(d.at||0)<10*60000)onMsg({data:{type:'open',url:d.url}} as MessageEvent);}catch{}};
+  const onShow=()=>{if(document.visibilityState==='visible')void fromCache();};void fromCache();
+  navigator.serviceWorker?.addEventListener('message',onMsg);document.addEventListener('visibilitychange',onShow);window.addEventListener('focus',onShow);window.addEventListener('pageshow',onShow);
+  return()=>{navigator.serviceWorker?.removeEventListener('message',onMsg);document.removeEventListener('visibilitychange',onShow);window.removeEventListener('focus',onShow);window.removeEventListener('pageshow',onShow);};},[]);
  useEffect(()=>{const id=want.current;if(!id)return;const p=parcels.find(x=>x.id===id||x.keys.includes(id));if(!p)return;want.current=null;setView(p.stage>=4?'done':'active');setSection('list');setMail(null);setAskOpen(false);setOpenId(p.id);try{history.replaceState(null,'','/');}catch{}},[parcels,wantTick]);
  const go=(v:typeof view)=>{setView(v);detailY.current=null;setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
  // Manual corrections: "received" / "hide", kept on the phone, in the cloud backup and on the notification server.
