@@ -242,7 +242,10 @@ export function mergeParcels(rows:Parcel[]){
   // Per order: products its order mail listed that none of its shipping mails named. Judged only for orders of 2+ products where
   // at least one product did match (so the two mails name things comparably); a single-product order that shipped is never flagged.
   const pkgItems=[...new Set(list.flatMap(p=>p.pkgItems||[]))];const norm=(t:string)=>heName(polishName(t)).replace(/[.…\s]+$/,'').trim();const head=(t:string)=>norm(t).split(' ').slice(0,3).join(' ');
-  const sameItem=(a:string,b:string)=>{const na=norm(a),nb=norm(b);return !!na&&!!nb&&(na===nb||na.startsWith(nb)||nb.startsWith(na)||head(a)===head(b));};
+  // Same product named a bit differently ("USB Nano Dongle Receiver for F710" / "עבור USB Nano Dongle R..."): enough shared words counts.
+  const words=(t:string)=>new Set(t.toLowerCase().replace(/[.…]+$/,'').split(/[^a-z0-9\u0590-\u05ff]+/).filter(w=>w.length>=3&&!/^(?:for|the|and|with|עבור|של|עם|לגברים|לנשים)$/.test(w)).map(w=>w.replace(/^ל(?=[\u0590-\u05ff]{3})/,'')));
+  const overlap=(a:string,b:string)=>{const A=words(a),B=words(b);if(!A.size||!B.size)return false;let n=0;for(const w of A)if(B.has(w))n++;return n>=2||n/Math.min(A.size,B.size)>=0.6;};
+  const sameItem=(a:string,b:string)=>{const na=norm(a),nb=norm(b);return !!na&&!!nb&&(na===nb||na.startsWith(nb)||nb.startsWith(na)||head(a)===head(b)||overlap(a,b)||overlap(na,nb));};
   const merge=(f:'orderItems'|'pkgByOrder')=>{const m:Record<string,string[]>={};for(const p of list)for(const [o,v] of Object.entries(p[f]||{}))m[o]=[...new Set([...(m[o]||[]),...v])];return m;};
   const orderItems=merge('orderItems'),pkgByOrder=merge('pkgByOrder');const found:string[]=[];
   for(const [o,ordered] of Object.entries(orderItems)){const inPkg=pkgByOrder[o];if(!inPkg?.length||ordered.length<2)continue;const miss=ordered.filter(it=>!inPkg.some(x=>sameItem(it,x)));if(miss.length&&miss.length<ordered.length)found.push(...miss);}
