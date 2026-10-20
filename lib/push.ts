@@ -12,6 +12,8 @@ export type Sub={endpoint:string;keys:{p256dh:string;auth:string}};
 export async function send(sub:Sub,payload:object){const k=vapid();
  try{await webpush.sendNotification(sub,JSON.stringify(payload),{vapidDetails:{subject:'https://packetdrop.vercel.app/privacy',publicKey:k.publicKey,privateKey:k.privateKey},TTL:86400,urgency:'high'});return true;}
  catch(e){const code=(e as {statusCode?:number}).statusCode;if(code===404||code===410)return false;throw e;}}
+// Sends one notification to every phone of a user; a phone whose subscription is gone (404/410) is dropped, a passing error keeps it.
+export async function deliver(subs:Sub[],payload:object,sender:(s:Sub,p:object)=>Promise<boolean>=send){const alive:Sub[]=[];for(const s of subs){const ok=await sender(s,payload).catch(()=>true);if(ok)alive.push(s);}return alive;}
 const DB_URL=()=>process.env.DATABASE_URL||process.env.STORAGE_URL||process.env.POSTGRES_URL||'';
 export const dbOn=()=>!!DB_URL();
 let ready:Promise<unknown>|null=null;

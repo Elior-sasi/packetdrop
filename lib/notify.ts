@@ -3,6 +3,7 @@ import {polishName,type Parcel} from '@/lib/parcels';
 import {heName} from '@/lib/hename';
 import {pickupSince,daysLeft} from '@/lib/pickup';
 import type {TrackInfo} from '@/lib/track';
+import {statusOf} from '@/lib/status';
 export type Note={id:string;kind:'new'|'pickup'|'out'|'delivered'|'stuck'|'guard'|'customs';title:string;body:string;tag:string};
 export type State={parcels:Parcel[];stuck:string[];marks?:Record<string,string>;reminded?:Record<string,number[]>;weekly?:string;morning?:string};
 const DAY=864e5;
@@ -53,6 +54,12 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
    const FAIL=/מסירה נכשל|ניסיון (?:ה)?מסירה|לא נמצא(?:ה)? (?:בכתובת|בבית)|הנמען לא נמצא|לא היה מענה|לא נמסר(?:ה)? - |delivery (?:attempt|failed|unsuccessful)|unable to deliver|attempted delivery/i;
    const fail=p.events.find(e=>FAIL.test(e.label)&&!o.events.some(x=>x.id===e.id)&&now-new Date(e.time).getTime()<2*DAY);
    if(p.stage<4&&fail)notes.push({id:p.id,kind:'out',title:'ניסיון המסירה נכשל',body:name+(p.carrier?' · '+p.carrier:'')+' · כדאי לתאם מסירה חדשה',tag:'fd:'+p.id+':'+fail.id});}
+  // A tracking number appeared for an order that had none (and it is not the same mail that says it shipped).
+  if(p.tracking&&!o.tracking&&p.stage<4&&recent&&!(p.stage===1&&o.stage<1))notes.push({id:p.id,kind:'new',title:'התקבל מספר מעקב',body:name+' · '+p.tracking+(p.carrier?' · '+p.carrier:''),tag:'tn:'+p.id});
+  // Trouble on the way (returned to sender, held, address problem, lost, damaged) - once per event. Failed delivery has its own note above.
+  {const FAIL=/מסירה נכשל|ניסיון (?:ה)?מסירה|delivery (?:attempt|failed|unsuccessful)|unable to deliver|attempted delivery/i;
+   const ex=p.events.find(e=>statusOf(e.label)==='EXCEPTION'&&!FAIL.test(e.label)&&!o.events.some(x=>x.id===e.id||x.label===e.label)&&now-new Date(e.time).getTime()<2*DAY);
+   if(p.stage<4&&ex)notes.push({id:p.id,kind:'stuck',title:'בעיה במשלוח',body:name+' · '+ex.label.slice(0,80),tag:'ex:'+p.id+':'+ex.id});}
   // Arrived in Israel (first time only; AliExpress "במדינה/באזור שלכם" and Israel Post "הגיע לארץ" are the same step).
   {const IL=/הגיע[הו]? לארץ|הגיע לישראל|הגיעה לישראל|במדינה\/באזור שלכם|באזור שלכם|arrived in (?:israel|destination)/i;const e=p.events.find(e=>IL.test(e.label));
    if(e&&p.stage<3&&!o.events.some(x=>IL.test(x.label))&&now-new Date(e.time).getTime()<3*DAY)notes.push({id:p.id,kind:'new',title:'החבילה הגיעה לארץ',body:name+(p.carrier?' · '+p.carrier:''),tag:'il:'+p.id});}

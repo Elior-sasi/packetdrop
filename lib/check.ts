@@ -8,7 +8,7 @@ import {baldarByPhone} from '@/lib/tapuz';
 import {diff,withTrack,reminders,weekly,morning,nameOf,type State} from '@/lib/notify';
 import {daysLeft,pointKey,minutesToClose} from '@/lib/pickup';
 import {travelMinutes} from '@/lib/routes';
-import {open,send,db,type Sub} from '@/lib/push';
+import {open,deliver,db,type Sub} from '@/lib/push';
 import {prettyNames} from '@/lib/names';
 export type Row={user_id:string;refresh:string;subs:Sub[];state:State;seen:string[];checked_at:string|null};
 export async function access(refresh:string){
@@ -48,7 +48,7 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
   for(const n of allNotes)for(const p of (n.tag.startsWith('m:')?ps:ps.filter(x=>x.id===n.id))){const v=pretty.get(p.id);const old=nameOf(p);if(v&&old&&old!==v){n.body=n.body.split(old).join(v);n.title=n.title.split(old).join(v);}}}
  let subs=u.subs;let sent=0;
  const batch=allNotes.length>4?[{title:'Unbox',body:allNotes.length+' עדכונים חדשים בחבילות',tag:'many',url:'/'}]:allNotes.map(n=>({title:n.title,body:n.body,tag:n.tag,url:'/?p='+encodeURIComponent(n.id)}));
- for(const n of batch){const alive:Sub[]=[];for(const s of subs){const ok=await send(s,n).catch(()=>true);if(ok)alive.push(s);}subs=alive;sent++;}
+ for(const n of batch){subs=await deliver(subs,n);sent++;}
  if(sent)try{await sql`insert into push_meta(k,v) values(${'sent:'+u.user_id},now()) on conflict(k) do update set v=now()`;}catch{}
  const keep=parcels.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
  const newSeen=[...seen,...msgs.map(m=>m.id)].slice(-1500);

@@ -95,12 +95,24 @@ export async function cainiao(numbers:string[]):Promise<{tracks:Record<string,Tr
 export function combine(a?:TrackInfo,b?:TrackInfo):TrackInfo|undefined{if(!a||a.pending&&!a.events.length)return b||a;if(!b)return a;
  const seen=new Set<string>();const events=[...a.events,...b.events].sort((x,y)=>x.time.localeCompare(y.time)).filter(e=>{const k=e.time.slice(0,16)+e.text;if(seen.has(k))return false;seen.add(k);return true;}).slice(-40);
  const lead=b.stage>a.stage?b:a;return {...lead,carrier:a.carrier||b.carrier,eta:a.eta||b.eta,events,pending:false};}
-export async function trackSources(all:string[],key?:string,phone=''){let ok17=!!key;
- // "TZ:<order>" = an Israeli store order looked up at Tapuz; everything else goes to 17TRACK / Cainiao.
- const tz=all.filter(n=>n.startsWith('TZ:')).slice(0,8);const kx=phone?all.filter(n=>n.startsWith('KX:')).slice(0,4):[];const numbers=all.filter(n=>!/^(?:TZ|KX):/.test(n));
- const [tzRes,kxRes]=await Promise.all([Promise.all(tz.map(n=>tapuz(n.slice(3)).catch(()=>null))),Promise.all(kx.map(n=>kexpress(n.slice(3),phone).catch(()=>null)))]);
- const [t17,c]=await Promise.all([key&&numbers.length?track(numbers,key).catch(()=>{ok17=false;return {} as Record<string,TrackInfo>;}):Promise.resolve({} as Record<string,TrackInfo>),numbers.length?cainiao(numbers):Promise.resolve({tracks:{} as Record<string,TrackInfo>,status:'idle'})]);const cn=c.tracks;
- const out:Record<string,TrackInfo>={};for(const n of new Set([...Object.keys(t17),...Object.keys(cn)])){const x=combine(t17[n],cn[n]);if(x)out[n]=x;}
- tz.forEach((n,i)=>{const t=tzRes[i];if(t)out[n]=t;});kx.forEach((n,i)=>{const t=kxRes[i];if(t)out[n]=t;});
- return {tracks:out,sources:{t17:ok17,cainiao:c.status}};}
+// Tracking providers: each one says which numbers it can follow and fetches them. Adding a carrier = adding a provider.
+// A provider that fails or is not configured returns nothing; the others (and Gmail) keep working.
+export type TrackCtx={key?:string;phone?:string};
+export interface TrackingProvider{name:string;canTrack(n:string,ctx:TrackCtx):boolean;limit:number;getTracking(numbers:string[],ctx:TrackCtx):Promise<{tracks:Record<string,TrackInfo>;status?:string}>}
+const plain=(n:string)=>!/^(?:TZ|KX):/.test(n);
+export const PROVIDERS:TrackingProvider[]=[
+ {name:'17track',limit:40,canTrack:(n,c)=>!!c.key&&plain(n),getTracking:async(ns,c)=>({tracks:await track(ns,c.key!)})},
+ {name:'cainiao',limit:40,canTrack:n=>plain(n),getTracking:async ns=>cainiao(ns)},
+ // "TZ:<host>:<order>" = an Israeli store order looked up at Tapuz.
+ {name:'tapuz',limit:8,canTrack:n=>n.startsWith('TZ:'),getTracking:async ns=>{const r=await Promise.all(ns.map(n=>tapuz(n.slice(3)).catch(()=>null)));const t:Record<string,TrackInfo>={};ns.forEach((n,i)=>{if(r[i])t[n]=r[i]!;});return {tracks:t};}},
+ // "KX:<number>" = K Express, which needs the phone number on the parcel.
+ {name:'kexpress',limit:4,canTrack:(n,c)=>!!c.phone&&n.startsWith('KX:'),getTracking:async(ns,c)=>{const r=await Promise.all(ns.map(n=>kexpress(n.slice(3),c.phone!).catch(()=>null)));const t:Record<string,TrackInfo>={};ns.forEach((n,i)=>{if(r[i])t[n]=r[i]!;});return {tracks:t};}},
+];
+export async function trackSources(all:string[],key?:string,phone='',providers:TrackingProvider[]=PROVIDERS){const ctx:TrackCtx={key,phone};
+ const runs=await Promise.allSettled(providers.map(p=>{const ns=all.filter(n=>p.canTrack(n,ctx)).slice(0,p.limit);return ns.length?p.getTracking(ns,ctx):Promise.resolve({tracks:{} as Record<string,TrackInfo>,status:'idle'});}));
+ const got:Record<string,Record<string,TrackInfo>>={};const status:Record<string,string>={};
+ runs.forEach((r,i)=>{const p=providers[i];if(r.status==='fulfilled'){got[p.name]=r.value.tracks||{};status[p.name]=r.value.status||'ok';}else{got[p.name]={};status[p.name]='error';}});
+ // Same number from several providers: merge their events into one timeline (combine drops duplicates).
+ const out:Record<string,TrackInfo>={};for(const n of new Set(Object.values(got).flatMap(t=>Object.keys(t)))){let x:TrackInfo|undefined;for(const p of providers){const t=got[p.name]?.[n];if(t)x=x?combine(x,t)||x:t;}if(x)out[n]=x;}
+ return {tracks:out,sources:{t17:!!key&&status['17track']!=='error',cainiao:status['cainiao']||'idle'}};}
 export async function trackAll(numbers:string[],key?:string,phone=''){return (await trackSources(numbers,key,phone)).tracks;}
