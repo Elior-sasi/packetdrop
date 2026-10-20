@@ -494,7 +494,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const onShow=()=>{if(document.visibilityState==='visible')void fromCache();};void fromCache();
   navigator.serviceWorker?.addEventListener('message',onMsg);document.addEventListener('visibilitychange',onShow);window.addEventListener('focus',onShow);window.addEventListener('pageshow',onShow);
   return()=>{navigator.serviceWorker?.removeEventListener('message',onMsg);document.removeEventListener('visibilitychange',onShow);window.removeEventListener('focus',onShow);window.removeEventListener('pageshow',onShow);};},[]);
- useEffect(()=>{const id=want.current;if(!id)return;const p=parcels.find(x=>x.id===id||x.keys.includes(id));if(!p)return;want.current=null;setView(p.stage>=4?'done':'active');setSection('list');setMail(null);setAskOpen(false);setOpenId(p.id);try{history.replaceState(null,'','/');}catch{}},[parcels,wantTick]);
+ useEffect(()=>{const id=want.current;if(!id)return;const p=parcels.find(x=>x.id===id||x.keys.includes(id));if(!p)return;want.current=null;fetch('/api/push?step=open').catch(()=>{});setView(p.stage>=4?'done':'active');setSection('list');setMail(null);setAskOpen(false);setOpenId(p.id);try{history.replaceState(null,'','/');}catch{}},[parcels,wantTick]);
  const go=(v:typeof view)=>{setView(v);detailY.current=null;setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
  // Manual corrections: "received" / "hide", kept on the phone, in the cloud backup and on the notification server.
  function persist(nextMarks:Record<string,'got'|'hide'>,nextManual:MailParcel[]){try{localStorage.setItem('pd_marks',JSON.stringify(nextMarks));localStorage.setItem('pd_manual',JSON.stringify(nextManual));}catch{}
