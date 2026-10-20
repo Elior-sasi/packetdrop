@@ -487,7 +487,11 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function testPush(){setPushMsg('');try{await pushPost({test:true});setPushMsg('נשלחה התראת בדיקה.');}catch(e){setPushMsg(e instanceof Error?e.message:'השליחה נכשלה');}}
  // Opening a notification lands on that parcel.
  const want=useRef<string|null>(null);useEffect(()=>{try{want.current=new URLSearchParams(location.search).get('p');}catch{}},[]);
- useEffect(()=>{const id=want.current;if(id&&data?.parcels.some(p=>p.id===id)){want.current=null;setOpenId(id);history.replaceState(null,'','/');}},[data]);
+ // Tapping a notification opens its parcel: on a cold start through ?p=, and while the app is already open through a message from the service worker.
+ const [wantTick,setWantTick]=useState(0);
+ useEffect(()=>{const onMsg=(e:MessageEvent)=>{const d=e.data as {type?:string;url?:string};if(d?.type!=='open'||!d.url)return;try{const id=new URL(d.url,location.origin).searchParams.get('p');if(id){want.current=id;setWantTick(t=>t+1);}}catch{}};
+  navigator.serviceWorker?.addEventListener('message',onMsg);return()=>navigator.serviceWorker?.removeEventListener('message',onMsg);},[]);
+ useEffect(()=>{const id=want.current;if(!id)return;const p=parcels.find(x=>x.id===id||x.keys.includes(id));if(!p)return;want.current=null;setView(p.stage>=4?'done':'active');setSection('list');setMail(null);setAskOpen(false);setOpenId(p.id);try{history.replaceState(null,'','/');}catch{}},[parcels,wantTick]);
  const go=(v:typeof view)=>{setView(v);detailY.current=null;setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
  // Manual corrections: "received" / "hide", kept on the phone, in the cloud backup and on the notification server.
  function persist(nextMarks:Record<string,'got'|'hide'>,nextManual:MailParcel[]){try{localStorage.setItem('pd_marks',JSON.stringify(nextMarks));localStorage.setItem('pd_manual',JSON.stringify(nextManual));}catch{}
