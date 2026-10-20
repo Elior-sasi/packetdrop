@@ -7,5 +7,7 @@ self.addEventListener('notificationclick',e=>{e.notification.close();const url=n
  // iPhone may freeze the page before a message arrives, and may open the app on its last screen: the wanted parcel is also left
  // in a small cache entry that the page reads when it comes to the front.
  fetch('/api/push?step=click',{credentials:'include'}).catch(()=>{});
+ let pid=null;try{pid=new URL(url).searchParams.get('p');}catch{}
+ const told=pid?fetch('/api/push?step=want&p='+encodeURIComponent(pid),{credentials:'include'}).catch(()=>{}):Promise.resolve();
  const keep=caches.open('unbox-open').then(c=>c.put('/__open',new Response(JSON.stringify({url,at:Date.now()})))).catch(()=>{});
- e.waitUntil(keep.then(()=>self.clients.matchAll({type:'window',includeUncontrolled:true})).then(list=>{const c=list[0];if(c){try{c.postMessage({type:'open',url});}catch{}return c.focus().catch(()=>{});}return self.clients.openWindow(url);}));});
+ e.waitUntil(Promise.all([keep,told]).then(()=>self.clients.matchAll({type:'window',includeUncontrolled:true})).then(list=>{const c=list[0];if(c){try{c.postMessage({type:'open',url});}catch{}return c.focus().catch(()=>{});}return self.clients.openWindow(url);}));});

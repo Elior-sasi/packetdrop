@@ -11,6 +11,13 @@ const keep=(list:Parcel[])=>list.filter(p=>p&&Array.isArray(p.keys)&&Array.isArr
 export async function GET(req:NextRequest){
  // ?step=click|open: the phone reports a tapped notification and the parcel actually opening (check page shows both).
  const step=req.nextUrl.searchParams.get('step');if((step==='click'||step==='open'||step==='miss')&&dbOn()){try{const u=await pushIdentity(req);const {sql,ready}=db();await ready;await sql`insert into push_meta(k,v) values(${step+':'+u.id},now()) on conflict(k) do update set v=now()`;}catch{}return Response.json({ok:true},{headers:H});}
+ // The tapped notification's parcel is also kept on the server for 3 minutes: the app asks for it when it comes to the front
+ // (on iPhone neither the worker's message nor its cache reliably reach a page that was asleep).
+ if(step==='want'&&dbOn()){try{const u=await pushIdentity(req);const {sql,ready}=db();await ready;await sql`create table if not exists push_want(user_id text primary key,pid text not null,at timestamptz not null)`;
+  const pid=req.nextUrl.searchParams.get('p');
+  if(pid){await sql`insert into push_want(user_id,pid,at) values(${u.id},${pid.slice(0,250)},now()) on conflict(user_id) do update set pid=excluded.pid,at=now()`;return Response.json({ok:true},{headers:H});}
+  const r=await sql`delete from push_want where user_id=${u.id} returning pid,at`;const w=r[0];
+  return Response.json({p:w&&Date.now()-new Date(w.at).getTime()<180e3?w.pid:null},{headers:H});}catch{return Response.json({p:null},{headers:H});}}
  return Response.json({enabled:dbOn(),publicKey:dbOn()?vapid().publicKey:''},{headers:H});}
 export async function POST(req:NextRequest){
  if(req.headers.get('origin')!==req.nextUrl.origin)return Response.json({error:'בקשה לא מורשית'},{status:403});
