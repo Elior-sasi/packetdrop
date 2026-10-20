@@ -42,9 +42,9 @@ export function lock(L:Line[]):{inline:string;rect:string[]}{const red=L.find(x=
 export const RENDER=`
 const fam=config.widgetFamily||''
 if(fam.startsWith('accessory')){const w=new ListWidget();w.url='https://packetdrop.vercel.app';const lk=(r&&r.lock)||{inline:'Unbox',rect:['Unbox']}
- if(fam==='accessoryInline'){const t=w.addText(lk.inline);t.font=Font.mediumSystemFont(13)}
+ if(fam==='accessoryInline'){const t=w.addText('\u200F'+lk.inline);t.font=Font.mediumSystemFont(13)}
  else if(fam==='accessoryCircular'){const n=w.addText(String((r&&r.transit)||0));n.font=Font.boldSystemFont(22);n.centerAlignText();const s=w.addText('בדרך');s.font=Font.systemFont(10);s.centerAlignText()}
- else{lk.rect.forEach((x,i)=>{const t=w.addText(x);t.font=i?Font.systemFont(12):Font.boldSystemFont(14);t.lineLimit=1;t.minimumScaleFactor=0.8})}
+ else{lk.rect.forEach((x,i)=>{const t=w.addText('\u200F'+x);t.font=i?Font.systemFont(12):Font.boldSystemFont(14);t.lineLimit=1;t.minimumScaleFactor=0.8})}
  w.refreshAfterDate=new Date(Date.now()+15*60000);Script.setWidget(w);Script.complete();return}
 const fam2=config.widgetFamily||'small'
 const w=new ListWidget();w.url='https://packetdrop.vercel.app';w.setPadding(6,14,10,14)
@@ -54,7 +54,7 @@ const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadIm
 if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*22/img.size.height,22);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
 w.addSpacer(8)
 const F={big:22,title:17,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#cfe3f2',gray:'#9aa6b2',red:'#ff8a7a'}
-function put(st,x,i){if(i===3)st.addSpacer(6);else if(i)st.addSpacer(2);const t=st.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=x.s==='title'?0.6:0.75}
+function put(st,x,i){if(i===3)st.addSpacer(6);else if(i)st.addSpacer(2);const t=st.addText('\u200F'+x.t);t.rightAlignText();t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=x.s==='title'?0.6:0.75}
 // Progress bar: 5 steps (ordered, shipped, on the way, pickup / out for delivery, delivered), filled from the right.
 function bar(width,done){const n=5,gap=4,h=6,sc=3;const ctx=new DrawContext();ctx.opaque=false;ctx.respectScreenScale=false;ctx.size=new Size(width*sc,h*sc);const sw=(width-gap*(n-1))/n
  for(let k=0;k<n;k++){const x=(width-(k+1)*sw-k*gap)*sc;const p=new Path();p.addRoundedRect(new Rect(x,0,sw*sc,h*sc),h*sc/2,h*sc/2);ctx.addPath(p);ctx.setFillColor(k<done?new Color('#2ed3c6'):new Color('#ffffff',0.13));ctx.fillPath()}
