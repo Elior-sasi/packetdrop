@@ -64,5 +64,5 @@ export async function watch(u:Row,sql:ReturnType<typeof db>['sql']){const topic=
  if(r.ok)await sql`insert into push_meta(k,v) values(${k},now()) on conflict(k) do update set v=now()`;}
 
 // Remembers why a user's last background check failed (shown on the check page), without any mail data.
-export async function noteError(userId:string,e:unknown,sql:ReturnType<typeof db>['sql']){const msg=(e instanceof Error?e.message+(e.stack?' @ '+(e.stack.split('\n')[1]||'').trim():''):String(e)).replace(/[A-Za-z0-9_\-]{24,}/g,'…').slice(0,240);
+export async function noteError(userId:string,e:unknown,sql:ReturnType<typeof db>['sql']){const msg=(e instanceof Error?e.message+(e.stack?' @ '+e.stack.split('\n').slice(1,8).map(l=>l.trim().replace(/^at /,'')).join(' | '):''):String(e)).replace(/[A-Za-z0-9_\-]{24,}/g,'…').slice(0,900);
  try{await sql`create table if not exists check_errors(user_id text primary key,at timestamptz not null default now(),msg text not null)`;await sql`insert into check_errors(user_id,at,msg) values(${userId},now(),${msg}) on conflict(user_id) do update set at=now(),msg=excluded.msg`;}catch{}}
