@@ -152,7 +152,7 @@ function pairCouriers<T extends Parcel&{stale?:boolean}>(P:T[],titles:Record<str
  pairs.sort((x,y)=>x[0]-y[0]);const usedC=new Set<number>(),usedO=new Set<number>(),map=new Map<number,number>();
  for(const [,ci,oi] of pairs){if(usedC.has(ci)||usedO.has(oi))continue;usedC.add(ci);usedO.add(oi);map.set(ci,oi);}
  return P.flatMap((x,i)=>{if(usedO.has(i))return [];const oi=map.get(i);if(oi===undefined)return [x];const o=P[oi];
-  return [{...x,name:titles[x.id]||o.name,image:o.image,order:x.order||o.order,events:[...o.events,...x.events].sort((a,b)=>a.time.localeCompare(b.time))}];});}
+  return [{...x,keys:[...new Set([...x.keys,...o.keys])],name:titles[x.id]||o.name,image:o.image,order:x.order||o.order,events:[...o.events,...x.events].sort((a,b)=>a.time.localeCompare(b.time))}];});}
 // ---- Arrival estimate learned from the user's own delivered parcels (no outside guessing) ----
 // Orders a package lists only by number ("הזמנה …306914"): once their photos have names, show the names instead.
 // Costumes and fan merchandise: named from the photo + title, so the character and the real product type are right.
@@ -488,13 +488,13 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Opening a notification lands on that parcel.
  const want=useRef<string|null>(null);useEffect(()=>{try{want.current=new URLSearchParams(location.search).get('p');}catch{}},[]);
  // Tapping a notification opens its parcel: on a cold start through ?p=, and while the app is already open through a message from the service worker.
- const [wantTick,setWantTick]=useState(0);
+ const [wantTick,setWantTick]=useState(0);const missed=useRef<string|null>(null);
  useEffect(()=>{const onMsg=(e:MessageEvent)=>{const d=e.data as {type?:string;url?:string};if(d?.type!=='open'||!d.url)return;try{const id=new URL(d.url,location.origin).searchParams.get('p');if(id){want.current=id;setWantTick(t=>t+1);}}catch{}};
   const fromCache=async()=>{try{if(typeof caches==='undefined')return;const c=await caches.open('unbox-open');const r=await c.match('/__open');if(!r)return;await c.delete('/__open');const d=await r.json() as {url?:string;at?:number};if(d.url&&Date.now()-(d.at||0)<10*60000)onMsg({data:{type:'open',url:d.url}} as MessageEvent);}catch{}};
   const onShow=()=>{if(document.visibilityState==='visible')void fromCache();};void fromCache();
   navigator.serviceWorker?.addEventListener('message',onMsg);document.addEventListener('visibilitychange',onShow);window.addEventListener('focus',onShow);window.addEventListener('pageshow',onShow);
   return()=>{navigator.serviceWorker?.removeEventListener('message',onMsg);document.removeEventListener('visibilitychange',onShow);window.removeEventListener('focus',onShow);window.removeEventListener('pageshow',onShow);};},[]);
- useEffect(()=>{const id=want.current;if(!id)return;const p=parcels.find(x=>x.id===id||x.keys.includes(id));if(!p)return;want.current=null;fetch('/api/push?step=open').catch(()=>{});setView(p.stage>=4?'done':'active');setSection('list');setMail(null);setAskOpen(false);setOpenId(p.id);try{history.replaceState(null,'','/');}catch{}},[parcels,wantTick]);
+ useEffect(()=>{const id=want.current;if(!id)return;const p=parcels.find(x=>x.id===id||x.keys.includes(id));if(!p){if(parcels.length&&missed.current!==id){missed.current=id;fetch('/api/push?step=miss').catch(()=>{});}return;}want.current=null;fetch('/api/push?step=open').catch(()=>{});setView(p.stage>=4?'done':'active');setSection('list');setMail(null);setAskOpen(false);setOpenId(p.id);try{history.replaceState(null,'','/');}catch{}},[parcels,wantTick]);
  const go=(v:typeof view)=>{setView(v);detailY.current=null;setOpenId(null);window.scrollTo({top:0,behavior:'smooth'});};
  // Manual corrections: "received" / "hide", kept on the phone, in the cloud backup and on the notification server.
  function persist(nextMarks:Record<string,'got'|'hide'>,nextManual:MailParcel[]){try{localStorage.setItem('pd_marks',JSON.stringify(nextMarks));localStorage.setItem('pd_manual',JSON.stringify(nextManual));}catch{}
