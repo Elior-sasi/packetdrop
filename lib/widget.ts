@@ -56,16 +56,16 @@ w.addSpacer(8)
 const F={big:22,title:17,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#cfe3f2',gray:'#9aa6b2',red:'#ff8a7a'}
 function put(st,x,i){if(i===3)st.addSpacer(6);else if(i)st.addSpacer(2);const t=st.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=x.s==='title'?0.6:0.75}
 // Progress bar: 5 steps (ordered, shipped, on the way, pickup / out for delivery, delivered), filled from the right.
-function bar(width,done){const n=5,gap=4,h=6,sc=3;const ctx=new DrawContext();ctx.opaque=false;ctx.respectScreenScale=false;ctx.size=new Size(width*sc,h*sc);const sw=(width-gap*(n-1))/n
- for(let k=0;k<n;k++){const x=(width-(k+1)*sw-k*gap)*sc;const p=new Path();p.addRoundedRect(new Rect(x,0,sw*sc,h*sc),h*sc/2,h*sc/2);ctx.addPath(p);ctx.setFillColor(k<done?new Color('#2ed3c6'):new Color('#ffffff',0.13));ctx.fillPath()}
- const im=w.addImage(ctx.getImage());im.imageSize=new Size(width,h)}
+function bar(width,done){const n=5,gap=4,h=6;const sw=Math.floor((width-gap*(n-1))/n);const row=w.addStack();row.layoutHorizontally();row.spacing=gap
+ // Stacks keep their exact size (an image could be stretched past the edge). In Hebrew the first one is on the right.
+ for(let k=0;k<n;k++){const s=row.addStack();s.size=new Size(sw,h);s.cornerRadius=h/2;s.backgroundColor=k<done?new Color('#2ed3c6'):new Color('#ffffff',0.13)}}
 if(!r||!r.ok||!r.lines){const e=w.addText('אין נתונים כרגע');e.textColor=Color.gray();e.font=Font.mediumSystemFont(14)}else{
  const max=fam2==='large'?10:3
  let photo=null;if(fam2==='medium'&&r.top&&r.top.img)photo=await new Request(r.top.img).loadImage().catch(()=>null)
  if(photo){const row=w.addStack();row.layoutHorizontally();row.centerAlignContent();const col=row.addStack();col.layoutVertically();r.lines.slice(0,3).forEach((x,i)=>put(col,x,i));row.addSpacer();const pi=row.addImage(photo);pi.imageSize=new Size(84,84);pi.cornerRadius=14}
  else r.lines.slice(0,max).forEach((x,i)=>put(w,x,i))}
 w.addSpacer()
-if(r&&r.top&&r.top.done)bar(fam2==='small'?124:290,r.top.done)
+if(r&&r.top&&r.top.done)bar(fam2==='small'?118:280,r.top.done)
 w.refreshAfterDate=new Date(Date.now()+15*60000)
 if(config.runsInWidget)Script.setWidget(w);else await w.presentMedium()
 Script.complete()
