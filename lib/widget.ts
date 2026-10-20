@@ -65,7 +65,7 @@ if(!r||!r.ok||!r.lines){const e=w.addText('אין נתונים כרגע');e.text
  if(photo){const row=w.addStack();row.layoutHorizontally();row.centerAlignContent();const col=row.addStack();col.layoutVertically();r.lines.slice(0,3).forEach((x,i)=>put(col,x,i));row.addSpacer();const pi=row.addImage(photo);pi.imageSize=new Size(84,84);pi.cornerRadius=14}
  else r.lines.slice(0,max).forEach((x,i)=>put(w,x,i))}
 w.addSpacer()
-if(r&&r.top&&r.top.done)bar(fam2==='small'?140:fam2==='medium'?310:310,r.top.done)
+if(r&&r.top&&r.top.done)bar(fam2==='small'?124:290,r.top.done)
 w.refreshAfterDate=new Date(Date.now()+15*60000)
 if(config.runsInWidget)Script.setWidget(w);else await w.presentMedium()
 Script.complete()
