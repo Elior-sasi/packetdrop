@@ -24,9 +24,9 @@ export function lines(all:Parcel[],names:Record<string,string>,when:Record<strin
  // Urgent first, in red: the last day to collect, or the point closes within 1.5 hours.
  for(const p of pick){const d=daysLeft(p,now),c=closeIn[p.id];const why=c!=null&&c<=90?(p.pickup?.place||'הנקודה')+' נסגרת בעוד '+(c>=60?'שעה':c+' דק׳'):d===0?'היום האחרון לאיסוף':d===1?'מחר היום האחרון לאיסוף':'';
   if(why){L=card(why,'red',p,where(p));top=p;break;}}
- if(!L.length&&out.length){top=out[0];L=card(out.length>1?out.length+' מגיעות היום':'מגיעה היום','teal',top,[top.shop,others(rest.length)].filter(Boolean).join(' · '));}
+ if(!L.length&&out.length){top=out[0];L=card(out.length>1?out.length+' מגיעות היום':'מגיעה היום','teal',top,[others(rest.length),top.shop].filter(Boolean).join(' · '));}
  if(!L.length&&pick.length){top=pick[0];L=card(pick.length>1?pick.length+' מחכות לאיסוף':'מחכה לאיסוף','teal',top,where(top));}
- if(!L.length){const next=rest.find(p=>when[p.id]);if(next){top=next;L=card(dayText(when[next.id],now),'teal',next,[next.shop,others(rest.length-1)].filter(Boolean).join(' · '));}}
+ if(!L.length){const next=rest.find(p=>when[p.id]);if(next){top=next;L=card(dayText(when[next.id],now),'teal',next,[others(rest.length-1),next.shop].filter(Boolean).join(' · '));}}
  if(!L.length&&rest.length)L=card(rest.length+' בדרך','teal',null,'עוד אין מועד הגעה');
  if(!L.length)return [{t:'אין חבילות בדרך',s:'mid',c:'gray'}];
  // The rest, for the large widget (small and medium show only the card).
@@ -54,7 +54,7 @@ const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadIm
 if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*22/img.size.height,22);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
 w.addSpacer(8)
 const F={big:22,title:17,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#cfe3f2',gray:'#9aa6b2',red:'#ff8a7a'}
-function put(st,x,i){if(i===3)st.addSpacer(6);else if(i)st.addSpacer(2);const t=st.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=0.75}
+function put(st,x,i){if(i===3)st.addSpacer(6);else if(i)st.addSpacer(2);const t=st.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=x.s==='title'?0.6:0.75}
 // Progress bar: 5 steps (ordered, shipped, on the way, pickup / out for delivery, delivered), filled from the right.
 function bar(width,done){const n=5,gap=4,h=6,sc=3;const ctx=new DrawContext();ctx.opaque=false;ctx.respectScreenScale=false;ctx.size=new Size(width*sc,h*sc);const sw=(width-gap*(n-1))/n
  for(let k=0;k<n;k++){const x=(width-(k+1)*sw-k*gap)*sc;const p=new Path();p.addRoundedRect(new Rect(x,0,sw*sc,h*sc),h*sc/2,h*sc/2);ctx.addPath(p);ctx.setFillColor(k<done?new Color('#2ed3c6'):new Color('#ffffff',0.13));ctx.fillPath()}
