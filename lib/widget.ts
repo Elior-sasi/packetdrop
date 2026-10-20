@@ -1,6 +1,6 @@
 // What the home-screen widget shows, line by line (drawn by the Scriptable script).
 import type {Parcel} from '@/lib/parcels';
-export type Line={t:string;s:'big'|'mid'|'small';c:'white'|'teal'|'light'|'gray'|'red';n?:number};
+export type Line={t:string;s:'big'|'title'|'mid'|'small';c:'white'|'teal'|'light'|'gray'|'red';n?:number};
 import {daysLeft} from '@/lib/pickup';
 const OUT=/יצאה למסירה|בדרך למסירה|השליח בדרך|out for delivery|בדרכו לכתובת|השליח יצור קשר/i;
 const PICK=/לאיסוף|איסוף|pick ?up|collection/i;
@@ -9,17 +9,28 @@ const isPick=(p:Parcel)=>p.stage===3&&(!!p.pickup?.place||PICK.test(p.events.at(
 const isOut=(p:Parcel,now:number)=>p.stage===3&&!isPick(p)&&p.events.some(e=>OUT.test(e.label)&&ilDay(new Date(e.time).getTime())===ilDay(now));
 function whenText(t:number,now:number){const d=Math.round((new Date(ilDay(t)).getTime()-new Date(ilDay(now)).getTime())/864e5);
  if(d<=0)return 'היום';if(d===1)return 'מחר';if(d<7)return 'בעוד '+d+' ימים';const x=new Date(t);return x.toLocaleDateString('he-IL',{day:'numeric',month:'numeric',timeZone:'Asia/Jerusalem'});}
+// Same layout as the Unstage widget: one big coloured line (when / what to do), the product in bold white (up to 2 lines),
+// one small grey line with the details. The large widget lists the other parcels under it.
+const DAYS=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+function dayText(t:number,now:number){const d=Math.round((new Date(ilDay(t)).getTime()-new Date(ilDay(now)).getTime())/864e5);if(d<=0)return 'היום';if(d===1)return 'מחר';
+ const x=new Date(new Date(t).toLocaleString('en-US',{timeZone:'Asia/Jerusalem'}));return 'יום '+DAYS[x.getDay()]+' '+x.getDate()+'.'+(x.getMonth()+1);}
 export function lines(all:Parcel[],names:Record<string,string>,when:Record<string,number>,now=Date.now(),closeIn:Record<string,number>={}):Line[]{
- const list=all.filter(p=>!p.ret);const generic=(n:string)=>/^(?:הזמנה|חבילה)/.test(n);const nm=(p:Parcel)=>(names[p.id]||(generic(p.name)?(p.shop?'הזמנה מ־'+p.shop:'חבילה'):p.name)).slice(0,40);
- const out=list.filter(p=>isOut(p,now)),pick=list.filter(isPick),rest=list.filter(p=>!out.includes(p)&&!pick.includes(p));const L:Line[]=[];
+ const list=all.filter(p=>!p.ret);const generic=(n:string)=>/^(?:הזמנה|חבילה)/.test(n);const nm=(p:Parcel)=>(names[p.id]||(generic(p.name)?(p.shop?'הזמנה מ־'+p.shop:'חבילה'):p.name)).slice(0,60);
+ const out=list.filter(p=>isOut(p,now)),pick=list.filter(isPick),rest=list.filter(p=>!out.includes(p)&&!pick.includes(p)).sort((a,b)=>(when[a.id]||9e15)-(when[b.id]||9e15));
+ const card=(head:string,c:Line['c'],p:Parcel|null,sub:string):Line[]=>[{t:head,s:'big',c},...(p?[{t:nm(p),s:'title' as const,c:'white' as const,n:2}]:[]),...(sub?[{t:sub,s:'small' as const,c:'gray' as const}]:[])];
+ const where=(p:Parcel)=>[p.pickup?.code?'קוד '+p.pickup.code:'',p.pickup?.place||''].filter(Boolean).join(' · ');
+ const others=(n:number)=>n>0?'עוד '+n+' בדרך':'';
+ let L:Line[]=[];let top:Parcel|null=null;
  // Urgent first, in red: the last day to collect, or the point closes within 1.5 hours.
  for(const p of pick){const d=daysLeft(p,now),c=closeIn[p.id];const why=c!=null&&c<=90?(p.pickup?.place||'הנקודה')+' נסגרת בעוד '+(c>=60?'שעה':c+' דק׳'):d===0?'היום האחרון לאיסוף':d===1?'מחר היום האחרון לאיסוף':'';
-  if(why){L.push({t:why,s:'mid',c:'red',n:2});if(p.pickup?.code)L.push({t:'קוד '+p.pickup.code+(p.pickup.place&&c==null?' · '+p.pickup.place:''),s:'small',c:'light'});break;}}
- if(out.length){L.push({t:'למסירה היום',s:'big',c:'teal'});for(const p of out.slice(0,2))L.push({t:nm(p),s:'small',c:'light'});}
- if(pick.length){L.push({t:pick.length+' לאיסוף',s:out.length?'mid':'big',c:'teal'});for(const p of pick.slice(0,2)){L.push({t:p.pickup?.place||nm(p),s:'small',c:'light'});if(p.pickup?.code)L.push({t:'קוד '+p.pickup.code,s:'small',c:'teal'});}}
- if(rest.length)L.push({t:(out.length||pick.length?'עוד ':'')+rest.length+' בדרך',s:out.length||pick.length?'mid':'big',c:'white'});
- if(!out.length&&!pick.length){const next=rest.filter(p=>when[p.id]).sort((a,b)=>when[a.id]-when[b.id])[0];if(next){L.push({t:'הבאה '+whenText(when[next.id],now),s:'mid',c:'teal'});L.push({t:nm(next),s:'small',c:'light',n:2});}}
- if(!L.length)L.push({t:'אין חבילות בדרך',s:'mid',c:'gray'});
+  if(why){L=card(why,'red',p,where(p));top=p;break;}}
+ if(!L.length&&out.length){top=out[0];L=card(out.length>1?out.length+' מגיעות היום':'מגיעה היום','teal',top,[top.shop,others(rest.length)].filter(Boolean).join(' · '));}
+ if(!L.length&&pick.length){top=pick[0];L=card(pick.length>1?pick.length+' מחכות לאיסוף':'מחכה לאיסוף','teal',top,where(top));}
+ if(!L.length){const next=rest.find(p=>when[p.id]);if(next){top=next;L=card(dayText(when[next.id],now),'teal',next,[next.shop,others(rest.length-1)].filter(Boolean).join(' · '));}}
+ if(!L.length&&rest.length)L=card(rest.length+' בדרך','teal',null,'עוד אין מועד הגעה');
+ if(!L.length)return [{t:'אין חבילות בדרך',s:'mid',c:'gray'}];
+ // The rest, for the large widget (small and medium show only the card).
+ for(const p of [...pick,...out,...rest].filter(p=>p!==top).slice(0,6))L.push({t:nm(p)+' · '+(pick.includes(p)?'לאיסוף'+(p.pickup?.code?' '+p.pickup.code:''):out.includes(p)?'היום':when[p.id]?dayText(when[p.id],now):'בדרך'),s:'small',c:'light'});
  return L;}
 
 // Lock screen: one line under the clock, and up to 3 short lines in the rectangle.
@@ -40,9 +51,9 @@ const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadIm
 if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*24/img.size.height,24);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
 w.addSpacer(8)
 if(!r||!r.ok||!r.lines){const e=w.addText('אין נתונים כרגע');e.textColor=Color.gray();e.font=Font.mediumSystemFont(14)}else{
- const F={big:22,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#b5fff8',gray:'#8a96a3',red:'#ff8a7a'}
- const max=config.widgetFamily==='large'?10:4
- r.lines.slice(0,max).forEach((x,i)=>{if(i&&x.s!=='small')w.addSpacer(3);const t=w.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=0.75})}
+ const F={big:22,title:17,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#cfe3f2',gray:'#9aa6b2',red:'#ff8a7a'}
+ const max=config.widgetFamily==='large'?10:config.widgetFamily==='medium'?4:3
+ r.lines.slice(0,max).forEach((x,i)=>{if(i===3)w.addSpacer(6);else if(i)w.addSpacer(2);const t=w.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=0.75})}
 w.addSpacer()
 w.refreshAfterDate=new Date(Date.now()+15*60000)
 if(config.runsInWidget)Script.setWidget(w);else await w.presentSmall()

@@ -8,6 +8,6 @@ test('app view decides; newer parcels still count',()=>{
 test('no view: plain filter',()=>{assert.equal(liveParcels({parcels:[P('a',5),P('old',40)]},now).list.length,1);});
 test('widget: urgent red line for the last day to collect, lock screen text',async()=>{const {lines,lock}=await import('../lib/widget');
  const now=new Date(2026,9,19,10).getTime();const p={id:'a',keys:['a'],name:'אוזניות',shop:'AliExpress',carrier:'',image:'',url:'',tracking:'',order:'',eta:'',stage:3,cancelled:false,pickup:{place:'סופר פארם',address:'',code:'4821',url:''},events:[{id:'e',label:'ממתינה לאיסוף',time:new Date(2026,9,5,12).toISOString()}]};
- const L=lines([p] as never,{},{},now);assert.equal(L[0].c,'red');assert.equal(L[0].t,'היום האחרון לאיסוף');assert.match(L[1].t,/קוד 4821/);
+ const L=lines([p] as never,{},{},now);assert.equal(L[0].c,'red');assert.equal(L[0].t,'היום האחרון לאיסוף');assert.equal(L[1].t,'אוזניות');assert.match(L[2].t,/קוד 4821/);
  const C=lines([{...p,events:[{id:'e',label:'ממתינה לאיסוף',time:new Date(2026,9,18,12).toISOString()}]}] as never,{},{},now,{a:45});assert.equal(C[0].t,'סופר פארם נסגרת בעוד 45 דק׳');
  assert.match(lock(L).inline,/היום האחרון/);});
