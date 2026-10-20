@@ -657,7 +657,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    <div className="setRow"><span>Cainiao</span><span className={'bstate '+(sources?.cainiao==='ok'?'on':'off')}>{!sources?'ייבדק ברענון':sources.cainiao==='ok'?'עובד ✓':sources.cainiao==='blocked'?'חסום':'אין חבילות לבדוק'}</span></div>
    <p className="setNote">המידע מחברות השילוח משלים את מה שכתוב במיילים.</p></section>}
   {user&&<section className="set"><div className="row"><h3><Bell size={20}/> התראות</h3><span className={'bstate '+(push==='on'?'on':'off')}>{push==='on'?'פעיל ✓':push==='busy'||push==='checking'?'…':'כבוי'}</span></div>
-   <p className="setNote">מוכנה לאיסוף עם הקוד, יצאה למסירה, נמסרה, הזמנה חדשה, וחבילה בלי עדכון 10 ימים. נבדק כל חצי שעה בערך, גם כשהאפליקציה סגורה.</p>
+   <p className="setNote">הזמנה חדשה, נשלחה, יצאה מארץ המוצא, הגיעה לארץ, שוחררה מהמכס, אצל חברת המסירה, מוכנה לאיסוף עם הקוד, יצאה למסירה, ניסיון מסירה שנכשל, נמסרה, וחבילה בלי עדכון 10 ימים. מגיע כמה דקות אחרי המייל, גם כשהאפליקציה סגורה.</p>
    {push==='install'?<p className="setNote">באייפון התראות עובדות רק מהאפליקציה במסך הבית. פתח את Unbox מהאייקון ונסה שוב.</p>
    :push==='unsupported'?<p className="setNote">המכשיר או הדפדפן לא תומכים בהתראות.</p>
    :push==='nodb'?<p className="setNote">ההתראות עוד לא הוגדרו בשרת.</p>
