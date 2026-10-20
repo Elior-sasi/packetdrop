@@ -455,7 +455,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const [push,setPush]=useState<'checking'|'install'|'unsupported'|'nodb'|'denied'|'off'|'on'|'busy'>('checking'),[pushMsg,setPushMsg]=useState('');const pushKey=useRef('');const pushOn=useRef(false);pushOn.current=push==='on';
  useEffect(()=>{if(!user)return;void (async()=>{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=matchMedia('(display-mode: standalone)').matches||(navigator as {standalone?:boolean}).standalone===true;
   if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){setPush(ios&&!standalone?'install':'unsupported');return;}
-  try{const reg=await navigator.serviceWorker.register('/sw.js');const s=await fetch('/api/push',{cache:'no-store'}).then(r=>r.json()).catch(()=>({enabled:false}));pushKey.current=s.publicKey||'';
+  try{const reg=await navigator.serviceWorker.register('/sw.js?v=5',{updateViaCache:'none'});reg.update().catch(()=>{});const s=await fetch('/api/push',{cache:'no-store'}).then(r=>r.json()).catch(()=>({enabled:false}));pushKey.current=s.publicKey||'';
    if(!s.enabled){setPush('nodb');return;}if(Notification.permission==='denied'){setPush('denied');return;}
    const sub=await reg.pushManager.getSubscription();setPush(sub&&Notification.permission==='granted'?'on':'off');}catch{setPush('unsupported');}})();},[user?.id]);
  // Widget and Siri use the app's own idea of what is on the way (see lib/live.ts).
@@ -494,7 +494,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const fromServer=async()=>{try{const r=await fetch('/api/push?step=want',{cache:'no-store'});const d=await r.json() as {p?:string|null};if(d?.p){fetch('/api/push?step=seen&how=server&p='+encodeURIComponent(d.p)).catch(()=>{});want.current=d.p;setWantTick(t=>t+1);}}catch{}};
   // Asked right away and again a little later: the worker may still be saving the tapped parcel when the app wakes.
   let timers:number[]=[];const look=()=>{void fromCache();timers.forEach(clearTimeout);timers=[0,1500,4000].map(ms=>window.setTimeout(()=>{void fromServer();},ms));};
-  const onShow=()=>{if(document.visibilityState==='visible')look();};look();
+  // The worker is checked for a newer version every time the app comes to the front (iPhone keeps an old one otherwise).
+  const onShow=()=>{if(document.visibilityState==='visible'){look();navigator.serviceWorker?.getRegistration().then(r=>r?.update()).catch(()=>{});}};look();
   navigator.serviceWorker?.addEventListener('message',onMsg);document.addEventListener('visibilitychange',onShow);window.addEventListener('focus',onShow);window.addEventListener('pageshow',onShow);
   return()=>{timers.forEach(clearTimeout);navigator.serviceWorker?.removeEventListener('message',onMsg);document.removeEventListener('visibilitychange',onShow);window.removeEventListener('focus',onShow);window.removeEventListener('pageshow',onShow);};},[]);
  useEffect(()=>{const id=want.current;if(!id)return;const p=parcels.find(x=>x.id===id||x.keys.includes(id));if(!p){if(parcels.length&&missed.current!==id){missed.current=id;fetch('/api/push?step=miss&p='+encodeURIComponent(id)+'&n='+parcels.length).catch(()=>{});}return;}want.current=null;fetch('/api/push?step=open&p='+encodeURIComponent(id)).catch(()=>{});setView(p.stage>=4?'done':'active');setSection('list');setMail(null);setAskOpen(false);setOpenId(p.id);try{history.replaceState(null,'','/');}catch{}},[parcels,wantTick]);
