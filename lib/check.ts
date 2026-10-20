@@ -47,7 +47,8 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  if(allNotes.length){const ps=parcels.filter(p=>allNotes.some(n=>n.id===p.id)||(mo.note&&p.stage===3)).slice(0,30);const pretty=await prettyNames(ps,sql).catch(()=>new Map<string,string>());
   for(const n of allNotes)for(const p of (n.tag.startsWith('m:')?ps:ps.filter(x=>x.id===n.id))){const v=pretty.get(p.id);const old=nameOf(p);if(v&&old&&old!==v){n.body=n.body.split(old).join(v);n.title=n.title.split(old).join(v);}}}
  let subs=u.subs;let sent=0;
- const batch=allNotes.length>4?[{title:'Unbox',body:allNotes.length+' עדכונים חדשים בחבילות',tag:'many',url:'/'}]:allNotes.map(n=>({title:n.title,body:n.body,tag:n.tag,url:'/?p='+encodeURIComponent(n.id)}));
+ // Each update is its own notification (tapping it opens that parcel); only a flood of more than 10 becomes one summary.
+ const batch=allNotes.length>10?[{title:'Unbox',body:allNotes.length+' עדכונים חדשים בחבילות',tag:'many',url:'/'}]:allNotes.map(n=>({title:n.title,body:n.body,tag:n.tag,url:'/?p='+encodeURIComponent(n.id)}));
  for(const n of batch){subs=await deliver(subs,n);sent++;}
  if(sent)try{await sql`insert into push_meta(k,v) values(${'sent:'+u.user_id},now()) on conflict(k) do update set v=now()`;}catch{}
  const keep=parcels.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
