@@ -48,6 +48,7 @@ export function diff(before:State,after:Parcel[],now=Date.now()):{notes:Note[];s
   {const firstNew=(r:RegExp)=>{const e=p.events.find(e=>r.test(e.label));return e&&!o.events.some(x=>r.test(x.label))&&now-new Date(e.time).getTime()<3*DAY?e:null;};
    const IL0=/הגיע[הו]? לארץ|הגיע(?:ה)? לישראל|במדינה\/באזור שלכם|באזור שלכם|arrived in (?:israel|destination)/i;
    if(p.stage<3&&!p.events.some(e=>IL0.test(e.label))&&firstNew(/יצאה מארץ המוצא|יצא(?:ה)? מארץ המוצא|יצאה בטיסה|יצאה מאזור המוצא|departed (?:from )?(?:the )?(?:origin|country of origin)|left the origin/i))notes.push({id:p.id,kind:'new',title:'החבילה יצאה מארץ המוצא',body:name,tag:'lo:'+p.id});
+   if(p.stage<3&&firstNew(/חברת המשלוחים המקומית|חברת המסירה המקומית|handed (?:over )?to (?:the )?(?:local|last[- ]mile)|local (?:courier|delivery company)/i))notes.push({id:p.id,kind:'new',title:'החבילה אצל חברת המסירה בארץ',body:name+' · היא בדרך אליך',tag:'lc:'+p.id});
    if(p.stage<4&&firstNew(/שוחרר(?:ה)? (?:בהצלחה )?מ(?:ה)?מכס|released (?:from|by) customs|customs clearance (?:is )?complete/i))notes.push({id:p.id,kind:'new',title:'החבילה שוחררה מהמכס',body:name,tag:'cr:'+p.id});
    const FAIL=/מסירה נכשל|ניסיון (?:ה)?מסירה|לא נמצא(?:ה)? (?:בכתובת|בבית)|הנמען לא נמצא|לא היה מענה|לא נמסר(?:ה)? - |delivery (?:attempt|failed|unsuccessful)|unable to deliver|attempted delivery/i;
    const fail=p.events.find(e=>FAIL.test(e.label)&&!o.events.some(x=>x.id===e.id)&&now-new Date(e.time).getTime()<2*DAY);
