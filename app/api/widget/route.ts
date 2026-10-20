@@ -21,4 +21,6 @@ export async function GET(req:NextRequest){
  // Minutes until each waiting point closes (Google hours), for the red urgent line.
  const closeIn:Record<string,number>={};try{const il=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Jerusalem'}));for(const p of list){if(p.stage!==3||!p.pickup)continue;const g=(await sql`select periods from geo_points where k=${'v2|'+pointKey(p.pickup)}`)[0];const m=g?.periods?minutesToClose(g.periods,il):null;if(m!=null)closeIn[p.id]=m;}}catch{}
  const L=lines(list,names,when,Date.now(),closeIn);
- return Response.json({ok:true,updated:row?.checked_at||null,lines:L,lock:lock(L),transit:list.length-pick.length,pickup:pick.slice(0,3).map(p=>({name:(names[p.id]||(generic(p.name)?(p.shop||'חבילה'):p.name)).slice(0,28),place:p.pickup?.place||'',code:p.pickup?.code||''}))},{headers:{'Cache-Control':'no-store'}});}
+ // The parcel on the card: its photo (medium widget) and how far along it is (the bar).
+ const tp=list.find(p=>p.id===L.find(x=>x.id)?.id);const top=tp?{done:Math.min(5,Math.max(1,tp.stage+1)),img:[tp.image,...(tp.images||[])].find(u=>typeof u==='string'&&/^https:\/\//.test(u))||''}:null;
+ return Response.json({ok:true,updated:row?.checked_at||null,lines:L,top,lock:lock(L),transit:list.length-pick.length,pickup:pick.slice(0,3).map(p=>({name:(names[p.id]||(generic(p.name)?(p.shop||'חבילה'):p.name)).slice(0,28),place:p.pickup?.place||'',code:p.pickup?.code||''}))},{headers:{'Cache-Control':'no-store'}});}

@@ -1,6 +1,6 @@
 // What the home-screen widget shows, line by line (drawn by the Scriptable script).
 import type {Parcel} from '@/lib/parcels';
-export type Line={t:string;s:'big'|'title'|'mid'|'small';c:'white'|'teal'|'light'|'gray'|'red';n?:number};
+export type Line={t:string;s:'big'|'title'|'mid'|'small';c:'white'|'teal'|'light'|'gray'|'red';n?:number;id?:string};
 import {daysLeft} from '@/lib/pickup';
 const OUT=/יצאה למסירה|בדרך למסירה|השליח בדרך|out for delivery|בדרכו לכתובת|השליח יצור קשר/i;
 const PICK=/לאיסוף|איסוף|pick ?up|collection/i;
@@ -17,7 +17,7 @@ function dayText(t:number,now:number){const d=Math.round((new Date(ilDay(t)).get
 export function lines(all:Parcel[],names:Record<string,string>,when:Record<string,number>,now=Date.now(),closeIn:Record<string,number>={}):Line[]{
  const list=all.filter(p=>!p.ret);const generic=(n:string)=>/^(?:הזמנה|חבילה)/.test(n);const nm=(p:Parcel)=>(names[p.id]||(generic(p.name)?(p.shop?'הזמנה מ־'+p.shop:'חבילה'):p.name)).slice(0,60);
  const out=list.filter(p=>isOut(p,now)),pick=list.filter(isPick),rest=list.filter(p=>!out.includes(p)&&!pick.includes(p)).sort((a,b)=>(when[a.id]||9e15)-(when[b.id]||9e15));
- const card=(head:string,c:Line['c'],p:Parcel|null,sub:string):Line[]=>[{t:head,s:'big',c},...(p?[{t:nm(p),s:'title' as const,c:'white' as const,n:2}]:[]),...(sub?[{t:sub,s:'small' as const,c:'gray' as const}]:[])];
+ const card=(head:string,c:Line['c'],p:Parcel|null,sub:string):Line[]=>[{t:head,s:'big',c},...(p?[{t:nm(p),s:'title' as const,c:'white' as const,n:2,id:p.id}]:[]),...(sub?[{t:sub,s:'small' as const,c:'gray' as const}]:[])];
  const where=(p:Parcel)=>[p.pickup?.code?'קוד '+p.pickup.code:'',p.pickup?.place||''].filter(Boolean).join(' · ');
  const others=(n:number)=>n>0?'עוד '+n+' בדרך':'';
  let L:Line[]=[];let top:Parcel|null=null;
@@ -46,16 +46,27 @@ if(fam.startsWith('accessory')){const w=new ListWidget();w.url='https://packetdr
  else if(fam==='accessoryCircular'){const n=w.addText(String((r&&r.transit)||0));n.font=Font.boldSystemFont(22);n.centerAlignText();const s=w.addText('בדרך');s.font=Font.systemFont(10);s.centerAlignText()}
  else{lk.rect.forEach((x,i)=>{const t=w.addText(x);t.font=i?Font.systemFont(12):Font.boldSystemFont(14);t.lineLimit=1;t.minimumScaleFactor=0.8})}
  w.refreshAfterDate=new Date(Date.now()+15*60000);Script.setWidget(w);Script.complete();return}
-const w=new ListWidget();w.backgroundColor=new Color('#0a0f14');w.url='https://packetdrop.vercel.app';w.setPadding(6,14,12,14)
+const fam2=config.widgetFamily||'small'
+const w=new ListWidget();w.url='https://packetdrop.vercel.app';w.setPadding(6,14,10,14)
+// Unbox colours: deep blue fading into teal and near-black.
+const g=new LinearGradient();g.colors=[new Color('#16314d'),new Color('#0e2a33'),new Color('#0a1418')];g.locations=[0,0.55,1];g.startPoint=new Point(0,0);g.endPoint=new Point(1,1);w.backgroundGradient=g
 const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadImage().catch(()=>null)
-if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*24/img.size.height,24);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
+if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*22/img.size.height,22);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
 w.addSpacer(8)
+const F={big:22,title:17,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#cfe3f2',gray:'#9aa6b2',red:'#ff8a7a'}
+function put(st,x,i){if(i===3)st.addSpacer(6);else if(i)st.addSpacer(2);const t=st.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=0.75}
+// Progress bar: 5 steps (ordered, shipped, on the way, pickup / out for delivery, delivered), filled from the right.
+function bar(width,done){const n=5,gap=4,h=6,sc=3;const ctx=new DrawContext();ctx.opaque=false;ctx.respectScreenScale=false;ctx.size=new Size(width*sc,h*sc);const sw=(width-gap*(n-1))/n
+ for(let k=0;k<n;k++){const x=(width-(k+1)*sw-k*gap)*sc;const p=new Path();p.addRoundedRect(new Rect(x,0,sw*sc,h*sc),h*sc/2,h*sc/2);ctx.addPath(p);ctx.setFillColor(k<done?new Color('#2ed3c6'):new Color('#ffffff',0.13));ctx.fillPath()}
+ const im=w.addImage(ctx.getImage());im.imageSize=new Size(width,h)}
 if(!r||!r.ok||!r.lines){const e=w.addText('אין נתונים כרגע');e.textColor=Color.gray();e.font=Font.mediumSystemFont(14)}else{
- const F={big:22,title:17,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#cfe3f2',gray:'#9aa6b2',red:'#ff8a7a'}
- const max=config.widgetFamily==='large'?10:config.widgetFamily==='medium'?4:3
- r.lines.slice(0,max).forEach((x,i)=>{if(i===3)w.addSpacer(6);else if(i)w.addSpacer(2);const t=w.addText(x.t);t.font=x.s==='small'?Font.mediumSystemFont(F.small):Font.boldSystemFont(F[x.s]||15);t.textColor=new Color(C[x.c]||'#ffffff');t.lineLimit=x.n||1;t.minimumScaleFactor=0.75})}
+ const max=fam2==='large'?10:3
+ let photo=null;if(fam2==='medium'&&r.top&&r.top.img)photo=await new Request(r.top.img).loadImage().catch(()=>null)
+ if(photo){const row=w.addStack();row.layoutHorizontally();row.centerAlignContent();const col=row.addStack();col.layoutVertically();r.lines.slice(0,3).forEach((x,i)=>put(col,x,i));row.addSpacer();const pi=row.addImage(photo);pi.imageSize=new Size(84,84);pi.cornerRadius=14}
+ else r.lines.slice(0,max).forEach((x,i)=>put(w,x,i))}
 w.addSpacer()
+if(r&&r.top&&r.top.done)bar(fam2==='small'?140:fam2==='medium'?310:310,r.top.done)
 w.refreshAfterDate=new Date(Date.now()+15*60000)
-if(config.runsInWidget)Script.setWidget(w);else await w.presentSmall()
+if(config.runsInWidget)Script.setWidget(w);else await w.presentMedium()
 Script.complete()
 `;
