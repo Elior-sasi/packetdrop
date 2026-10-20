@@ -2,7 +2,7 @@ import {NextRequest} from 'next/server';
 import {createHmac,timingSafeEqual} from 'node:crypto';
 import {identity} from '@/lib/identity';
 import {db,dbOn} from '@/lib/push';
-import {check,watch,type Row} from '@/lib/check';
+import {check,watch,noteError,type Row} from '@/lib/check';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
 // Gmail → Google Pub/Sub → here, the moment new mail arrives, so notifications come in seconds instead of up to 30 minutes.
@@ -26,5 +26,5 @@ export async function POST(req:NextRequest){
  const k='gpush:'+u.user_id;const last=(await sql`select v from push_meta where k=${k}`)[0]?.v;
  if(last&&Date.now()-new Date(last).getTime()<20000)return new Response(null,{status:204});
  await sql`insert into push_meta(k,v) values(${k},now()) on conflict(k) do update set v=now()`;
- try{await check(u,sql);await watch(u,sql);}catch{}
+ try{await check(u,sql);await watch(u,sql);}catch(e){await noteError(u.user_id,e,sql);}
  return new Response(null,{status:204});}
