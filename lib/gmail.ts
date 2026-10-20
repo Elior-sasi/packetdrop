@@ -10,7 +10,10 @@ export const QUERY='-in:spam -in:trash -from:wolt.com {(from:aliexpress.com subj
 export class GmailError extends Error{}
 export function gmailClient(accessToken:string){
  return async function gmail(path:string,attempt=0):Promise<any>{const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+path,{headers:{Authorization:'Bearer '+accessToken},cache:'no-store',signal:AbortSignal.timeout(18000)});
-  if(r.ok)return r.json();
+  // Gmail sometimes answers 200 with an empty body: try again, and never let it stop the whole check.
+  if(r.ok){const t=await r.text().catch(()=>'');if(t.trim()){try{return JSON.parse(t);}catch{}}
+   if(attempt<2){await new Promise(res=>setTimeout(res,600*(attempt+1)));return gmail(path,attempt+1);}
+   if(/^messages\?/.test(path))return {};throw new GmailError('EMPTY '+path.split('?')[0].replace(/[A-Za-z0-9]{12,}/g,'…'));}
   const detail=await r.text().catch(()=>'');
   if(r.status===403&&/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(detail))throw new GmailError('GMAIL_API_DISABLED');
   if(r.status===403&&/insufficient|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(detail))throw new GmailError('NO_GMAIL');
