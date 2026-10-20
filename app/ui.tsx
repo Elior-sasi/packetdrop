@@ -536,7 +536,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  },[user,parcels.length]);
  // Travel time from home to the points where a parcel is waiting (walking / driving / public transport).
  useEffect(()=>{try{const h=localStorage.getItem('pd_home')||'';setHome(h);setHomeDraft(h);const m=localStorage.getItem('pd_tmode');if(m==='walk'||m==='drive'||m==='transit')setTmode(m);}catch{}},[]);
- const travelKeys=parcels.filter(isPickup).map(p=>pointKey(p.pickup!)).filter((k,i,a)=>a.indexOf(k)===i&&ptInfo[k]?.lat).join('|');
+ const travelKeys=parcels.filter(isPickup).map(p=>pointKey(p.pickup)).filter((k,i,a)=>k&&a.indexOf(k)===i&&ptInfo[k]?.lat).join('|');
  useEffect(()=>{if(!user||!home||!travelKeys){setTravel({});return;}const pts=travelKeys.split('|').map(k=>({k,lat:ptInfo[k]!.lat,lon:ptInfo[k]!.lon}));
   fetch('/api/points',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({travel:{home,mode:tmode,points:pts}})}).then(r=>r.ok?r.json():null).then(d=>{if(d?.minutes)setTravel(d.minutes);}).catch(()=>{});
  // eslint-disable-next-line react-hooks/exhaustive-deps

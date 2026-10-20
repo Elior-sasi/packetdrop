@@ -23,7 +23,7 @@ export function openNow(hours:string,now=new Date()):{open:boolean;until?:string
  const next=today.find(([a])=>mins(a)>m);return {open:false,...(next?{opens:next[0]}:{today:'סגור להיום'})};}
 export const hoursText=(hours:string,now=new Date())=>{const o=openNow(hours,now);if(!o)return '';return o.open?'פתוח עכשיו · עד '+o.until:o.opens?'סגור · נפתח ב־'+o.opens:o.today||'';};
 // One name per pickup point (place + address), used for the user's on/off choices.
-export const pointKey=(pk:{place?:string;address?:string})=>[pk.place,pk.address].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+export const pointKey=(pk:{place?:string;address?:string}|null|undefined)=>!pk?'':[pk.place,pk.address].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
 // Google's weekly opening periods ({open:{day,hour,minute},close:{...}}, day 0 = Sunday) -> the same text as hoursText.
 type GP={open?:{day:number;hour?:number;minute?:number};close?:{day:number;hour?:number;minute?:number}};
 export function periodsText(periods:unknown,now=new Date()):string{if(!Array.isArray(periods)||!periods.length)return '';const ps=periods as GP[];
