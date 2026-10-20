@@ -353,7 +353,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const [pull,setPull]=useState(0);const pullStart=useRef<number|null>(null);const pullRef=useRef(0);
  useEffect(()=>{if(!user)return;const PULL=80;
   const start=(e:TouchEvent)=>{pullStart.current=window.scrollY<=0&&!document.body.style.overflow?e.touches[0].clientY:null;};
-  const move=(e:TouchEvent)=>{if(pullStart.current===null)return;const dy=e.touches[0].clientY-pullStart.current;if(dy<=0||window.scrollY>0){pullRef.current=0;setPull(0);return;}pullRef.current=Math.min(130,dy*.55);setPull(pullRef.current);};
+  const move=(e:TouchEvent)=>{if(pullStart.current===null)return;const dy=e.touches[0].clientY-pullStart.current;// A tap moves the finger a little: ignore the first 16px so the refresh icon does not flash on every tap.
+   if(dy<=16||window.scrollY>0){pullRef.current=0;setPull(0);return;}pullRef.current=Math.min(130,(dy-16)*.55);setPull(pullRef.current);};
   const end=()=>{if(pullStart.current!==null&&pullRef.current>=PULL&&!controller.current)void syncRef.current();pullStart.current=null;pullRef.current=0;setPull(0);};
   window.addEventListener('touchstart',start,{passive:true});window.addEventListener('touchmove',move,{passive:true});window.addEventListener('touchend',end);window.addEventListener('touchcancel',end);
   return()=>{window.removeEventListener('touchstart',start);window.removeEventListener('touchmove',move);window.removeEventListener('touchend',end);window.removeEventListener('touchcancel',end);};},[user?.id]);

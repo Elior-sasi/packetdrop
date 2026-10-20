@@ -50,7 +50,7 @@ const fam2=config.widgetFamily||'small'
 const w=new ListWidget();w.url='https://packetdrop.vercel.app';w.setPadding(6,14,10,14)
 // Unbox colours: deep blue fading into teal and near-black.
 const g=new LinearGradient();g.colors=[new Color('#16314d'),new Color('#0e2a33'),new Color('#0a1418')];g.locations=[0,0.55,1];g.startPoint=new Point(0,0);g.endPoint=new Point(1,1);w.backgroundGradient=g
-const img=await new Request('https://packetdrop.vercel.app/wordmark.png').loadImage().catch(()=>null)
+const img=await new Request('https://packetdrop.vercel.app/wordmark.png?v=3').loadImage().catch(()=>null)
 if(img){const i=w.addImage(img);i.imageSize=new Size(img.size.width*22/img.size.height,22);i.rightAlignImage()}else{const t=w.addText('Unbox');t.font=Font.boldSystemFont(16);t.textColor=Color.white()}
 w.addSpacer(8)
 const F={big:22,title:17,mid:15,small:13},C={white:'#ffffff',teal:'#2ed3c6',light:'#cfe3f2',gray:'#9aa6b2',red:'#ff8a7a'}
