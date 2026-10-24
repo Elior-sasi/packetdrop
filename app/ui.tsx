@@ -277,7 +277,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  async function sync(){if(!user||controller.current)return;setSlow(false);void smsRef.current?.();lastSync.current=Date.now();const c=new AbortController();controller.current=c;setBusy(true);setError('');setErrorCode('');setProgress({pct:3,label:'מתחבר ל־Gmail…'});const timeout=setTimeout(()=>c.abort(),300000);
   // No single request may hang the whole check: each one gets its own time limit.
   const lim=(ms:number)=>typeof AbortSignal!=='undefined'&&'any' in AbortSignal&&'timeout' in AbortSignal?(AbortSignal as unknown as {any:(a:AbortSignal[])=>AbortSignal}).any([c.signal,AbortSignal.timeout(ms)]):c.signal;
-  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v20')!=='1';}catch{}
+  let fix7=false;try{fix7=localStorage.getItem('pd_fix_v21')!=='1';}catch{}
   // One full re-read so packages saved before per-order photo names were kept get them (gallery order, unnamed orders).
   try{if(localStorage.getItem('pd_full_v1')!=='1'&&saved.current.length){seen.current=new Set();saved.current=[];localStorage.setItem('pd_full_v1','1');}}catch{}const listUrl='/api/parcels'+(fix7?'?recheck=1':'');
   try{let r=await fetch(listUrl,{signal:lim(25000),cache:'no-store'});if(r.status>=500&&!c.signal.aborted){await new Promise(res=>setTimeout(res,1500));r=await fetch(listUrl,{signal:lim(25000),cache:'no-store'});}const d=await r.json().catch(()=>({error:'הסריקה לא הושלמה. נסה שוב.'}));if(!r.ok){setErrorCode(d.code||'');throw Error(d.error);}
@@ -321,7 +321,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    if(retry.length&&!c.signal.aborted){second=true;setProgress({pct:92,label:'משלים '+retry.length+' מיילים שלא נקראו…'});await new Promise(res=>setTimeout(res,1500));for(let i=0;i<retry.length;i+=10)chunks.push(retry.slice(i,i+10));await worker();}
    // Anything that could not be read again keeps its old copy.
    if(held.length){acc={...acc,parcels:shown(acc.parcels)};saved.current=acc.parcels;}acc={...acc,updated:new Date().toISOString()};setData(acc);
-   if(!c.signal.aborted){retried.current=false;try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v20','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
+   if(!c.signal.aborted){retried.current=false;try{localStorage.setItem('pd_fix_shop','1');localStorage.setItem('pd_fix_price','1');localStorage.setItem('pd_fix_img2','1');localStorage.setItem('pd_fix_qty','1');localStorage.setItem('pd_fix_v21','1');}catch{}setBusy(false);setReading(false);setProgress(null);await Promise.all([loadTracks([...acc.parcels,...manualRef.current]),saveBackup(acc.parcels)]);if(pushOn.current)void pushPost({parcels:[...acc.parcels,...manualRef.current],marks:marksRef.current}).catch(()=>{});}
   }catch(e){
    // A dropped connection ("Load failed" on iPhone) or a slow reply is not an error to show: try once more quietly, then say it in plain Hebrew.
    const net=e instanceof TypeError||(e instanceof Error&&/load failed|failed to fetch|network|timeout/i.test(e.name+' '+e.message));
