@@ -348,3 +348,5 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 fieldset.plain{border:0;margin:0;padding:0;min-width:0}
 .shareBtn{width:100%;margin:12px 0 0;display:flex;align-items:center;justify-content:center;gap:8px}
 .phoneIn.shareWho{text-align:right}
+/* A tall sheet scrolls inside itself; pulling down closes it only from the top. */
+.menu{max-height:calc(100dvh - env(safe-area-inset-top) - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch}
