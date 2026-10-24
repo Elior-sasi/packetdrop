@@ -5,12 +5,12 @@ export type Event={id:string;label:string;time:string};
 // A pickup place must read like a name: starts with a letter, no message fragments ("(183-381)-הגיע ל...").
 export const goodPlace=(p:string)=>p&&/^[\u05D0-\u05EAA-Za-z0-9"']/.test(p)&&!/הגיע|\d{3}-\d{3}|^\d+$/.test(p)?p:'';
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string;until?:string};
-export type Parcel={id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[];orderItems?:Record<string,string[]>;pkgByOrder?:Record<string,string[]>;link?:string};
+export type Parcel={smsOrder?:boolean;id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[];orderItems?:Record<string,string[]>;pkgByOrder?:Record<string,string[]>;link?:string};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
 
-const shops:[RegExp,string][]=[[/aliexpress|עלי ?אקספרס/i,'AliExpress'],[/amazon\.|(?:משלוח מ-?|שנשלח מ)\s?amazon/i,'Amazon'],[/temu/i,'Temu'],[/shein/i,'SHEIN'],[/ebay/i,'eBay'],[/iherb/i,'iHerb'],[/asos/i,'ASOS'],[/zara\./i,'Zara'],[/next\.(?:co\.il|com)/i,'NEXT'],[/ksp\.co\.il/i,'KSP'],[/ivory\.co\.il/i,'Ivory'],[/shufersal/i,'שופרסל'],[/terminalx/i,'Terminal X'],[/urbanica|אורבניקה/i,'Urbanica'],[/apple\.com/i,'Apple'],[/payngo|pay ?& ?go|פיי אנד גו|מחסני חשמל/i,'מחסני חשמל'],[/bug\.co\.il/i,'BUG'],[/castro\.com/i,'Castro'],[/foxhome|פוקס הום/i,'Fox Home']];
+const shops:[RegExp,string][]=[[/aliexpress|עלי ?אקספרס/i,'AliExpress'],[/amazon\.|(?:משלוח מ-?|שנשלח מ)\s?amazon/i,'Amazon'],[/temu/i,'Temu'],[/shein/i,'SHEIN'],[/ebay/i,'eBay'],[/iherb/i,'iHerb'],[/asos/i,'ASOS'],[/zara\./i,'Zara'],[/next\.(?:co\.il|com)/i,'NEXT'],[/ksp\.co\.il/i,'KSP'],[/ivory\.co\.il/i,'Ivory'],[/shufersal/i,'שופרסל'],[/super-?pharm|סופר[- ]?פארם/i,'סופר-פארם'],[/terminalx/i,'Terminal X'],[/urbanica|אורבניקה/i,'Urbanica'],[/apple\.com/i,'Apple'],[/payngo|pay ?& ?go|פיי אנד גו|מחסני חשמל/i,'מחסני חשמל'],[/bug\.co\.il/i,'BUG'],[/castro\.com/i,'Castro'],[/foxhome|פוקס הום/i,'Fox Home']];
 const carriers:[RegExp,string][]=[[/israelpost|postil\.co\.il|דואר ישראל/i,'דואר ישראל'],[/\bups\b|ups\.com/i,'UPS'],[/\bdhl\b/i,'DHL'],[/fedex/i,'FedEx'],[/cainiao/i,'Cainiao'],[/yunexpress/i,'YunExpress'],[/\b4px\b/i,'4PX'],[/\bhfd\b|אחד עד אחד|epost/i,'HFD'],[/k[ .]?express|קיי ?אקספרס/i,'K Express'],[/cheetah|chita-il|צ['׳]יטה/i,"צ'יטה"],[/tapuz|תפוז שליחויות|תפוז משלוחים/i,'תפוז'],[/flying ?cargo|פליינג קרגו/i,'Flying Cargo'],[/getpackage|גט ?פאקג/i,'GetPackage'],[/boxit|בוקסיט/i,'Boxit'],[/yango/i,'Yango']];
 export const brandDomains:Record<string,string>={'מחסני חשמל':'payngo.co.il',BUG:'bug.co.il',Castro:'castro.com','Fox Home':'foxhome.co.il',AliExpress:'aliexpress.com',Amazon:'amazon.com',Temu:'temu.com',SHEIN:'shein.com',eBay:'ebay.com',iHerb:'iherb.com',ASOS:'asos.com',Zara:'zara.com',NEXT:'next.co.il',KSP:'ksp.co.il',Ivory:'ivory.co.il','שופרסל':'shufersal.co.il','Terminal X':'terminalx.com',Urbanica:'urbanica-wh.com','תפוז':'tapuzdelivery.co.il','Flying Cargo':'flyingcargo.co.il',GetPackage:'getpackage.com',Apple:'apple.com','דואר ישראל':'israelpost.co.il',UPS:'ups.com',DHL:'dhl.com',FedEx:'fedex.com',Cainiao:'cainiao.com',YunExpress:'yunexpress.com','4PX':'4px.com',HFD:'hfd.co.il',"צ'יטה":'chita-il.com',Boxit:'boxit.co.il',Yango:'yango.com',Wolt:'wolt.com'};
 
@@ -38,7 +38,7 @@ const STAGE_RULES:[number,RegExp][]=[
  [4,/^delivered\s*:|איך הלך|לכתוב ביקורת|חוויתכם חשובה|שלחו את דעתכם|דרגו את החוויה|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
  [3,/^out for delivery\s*:|מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|ממתין ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|ממתינה ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|טרם נאסף|בדרכו לכתובת|בדרכה לכתובת|השליח יצור קשר|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
  [2,/שוחרר(?:ה)? (?:בהצלחה )?מהמכס|עם חברת המשלוחים המקומית|על ידי חברת המשלוחים המקומית|למרכז המסירה|נקלט במחסני|נקלטה במחסני|במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
- [1,/^shipped\s*:|נשלחה(?! לאימות)|נשלח(?! SMS| לאימות| קוד| אליך קוד)|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
+ [1,/^shipped\s*:|נשלחה(?! לאימות)|נשלח(?! SMS| לאימות| קוד| אליך קוד| את| לך)|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
  [0,/^ordered\s*:|אושרה|מאושרת|התקבלה|תטופל בהקדם|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
 const CANCEL=/is closed|בוטלה|בוטל|ביטול ה?הזמנה|הזמנה בוטלה|order cancel+ed|refund|החזר כספי|הודעה על זיכוי|הזמנתך זוכתה|has been refunded/i;
 // "Packed and waiting for the courier to collect it" is the store's side, not a parcel waiting for the user.
@@ -146,15 +146,23 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  if(!image)$('a').each((_,el)=>{if(image)return;const href=$(el).attr('href')||'';if(!/order-details|package-detail|orderdetail|order_detail|\/gp\/your-account\/order|itemDetail/i.test(href)||/productId=/i.test(href))return;$(el).find('img').each((_,im)=>{if(!image)image=productImg(im);});});
  // Shopify stores: the item title cell ("כסא ארגונומי … × 1").
  if(!name){const t=$('.order-list__item-title').first().text().replace(/\s+/g,' ').trim();if(t.length>3)name=tidyName(t.replace(/\s*[x×]\s*\d{1,3}\s*$/,''));const img=$('.order-list__product-image').first().attr('src');if(name&&img&&!image)image=secureUrl(img);}
- if(!name)$('img').each((_,el)=>{if(image)return;const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking|נגישות|accessib|webview|inforu|^תמונה$/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein|completed|delivered|shipped|ordered|success|check ?mark|in transit)$/i.test(alt)){name=alt;image=src;}});
+ // A photo whose alt text is only the store's name is its logo ("Super-Pharm"), not a product.
+ const letters=(x:string)=>x.toLowerCase().replace(/[^a-z\u0590-\u05FF]/g,'');const brand=letters(from+' '+shop);const isBrand=(alt:string)=>{const a=letters(alt);return a.length>2&&brand.includes(a);};
+ const altItems:string[]=[],altImgs:string[]=[];
+ if(!name)$('img').each((_,el)=>{const e=$(el),alt=(e.attr('alt')||'').trim(),src=secureUrl(e.attr('src')||'');if(src&&alt.length>8&&alt.length<220&&!isBrand(alt)&&!/logo|banner|icon|spacer|facebook|instagram|unsubscribe|tracking|נגישות|accessib|webview|inforu|^תמונה$/i.test(alt+' '+src)&&!/^(amazon|aliexpress|temu|shein|completed|delivered|shipped|ordered|success|check ?mark|in transit)$/i.test(alt)){const t=tidyName(alt);if(!altItems.includes(t)){altItems.push(t);altImgs.push(src);}}});
+ // Every product in the mail (Urbanica-style rows: photo + title), not only the first.
+ if(altItems.length){name=altItems[0]+(altItems.length>1?' ועוד '+(altItems.length-1):'');image=altImgs[0];if(altItems.length>1)for(const t of altItems)if(!listed.includes(t))listed.push(t);}
  // Order tables ("מקט | תיאור | מחיר | כמות", KSP and similar): the description of the first real product row.
  if(!name)$('table').each((_,t)=>{if(name)return;const rows=$(t).children('tbody').children('tr').toArray().concat($(t).children('tr').toArray());
   const cellsOf=(r:any)=>$(r).children('td,th').toArray().map(c=>$(c).text().replace(/\s+/g,' ').trim());let col=-1;
   for(const r of rows){const c=cellsOf(r);if(col<0){col=c.findIndex(x=>/^(?:תיאור(?: פריט| מוצר)?|שם (?:ה)?מוצר|מוצר|פריט)$/.test(x));continue;}
    const d=c[col]||'';if(d.length>4&&!/GIFTPACK|קמפיין|דואר שליחים|משלוח|הובלה|תשלומים|הטבה|סה['"]?כ/i.test(d+' '+c.join(' '))&&c.some(x=>/^\d{4,9}$/.test(x))){const t=tidyName(d);if(!name)name=t;if(!listed.includes(t))listed.push(t);}}if(name)return;});
  if(pdf&&pdf.items.length>1)for(const t of pdf.items)if(!listed.includes(t))listed.push(t);
+ if(altImgs.length>1&&listedImgs.length<2)listedImgs.splice(0,listedImgs.length,...altImgs.slice(0,12));
  if(!name&&pdf?.items.length)name=pdf.items.slice(0,2).join(' + ')+(pdf.items.length>2?' ועוד '+(pdf.items.length-2):'');
- if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').replace(/[\u2066-\u2069\u200e\u200f]/g,'').replace(/^(?:shipped|ordered|delivered|out for delivery|arriving \w+)\s*:\s*(?:\d+\s+)?/i,'').replace(/\s+items?$/i,'').trim()||'חבילה';
+ // A subject that only says the order arrived ("הזמנתך התקבלה באתר …") names the store, not a product.
+ if(!name&&shop&&/^(?:הזמנת[ךה]|ההזמנה(?: שלך)?) (?:התקבלה|אושרה)|^אישור ה?הזמנה|^תודה על ה?הזמנ|^your order (?:has been )?(?:confirmed|received)|^order (?:confirmed|received)/i.test(subject.trim()))name='הזמנה מ־'+shop;
+if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').replace(/[\u2066-\u2069\u200e\u200f]/g,'').replace(/^(?:shipped|ordered|delivered|out for delivery|arriving \w+)\s*:\s*(?:\d+\s+)?/i,'').replace(/\s+items?$/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
  const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
  let stage=stageOf(subject);if(stage<0)stage=stageOf(lead);
@@ -167,7 +175,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  const late=post?text.match(/לא יאוחר מתאריך\s*(\d{1,2})\/(\d{1,2})/):null;const etaAll=eta||(late?(+late[1])+'.'+(+late[2]):'');
  const url=$('a').toArray().map(a=>({text:$(a).text(),url:secureUrl($(a).attr('href')||'')})).find(l=>l.url&&/track|מעקב|לעקוב/i.test(l.text))?.url||'';
  const time=new Date(Number(m.internalDate)||Date.now()).toISOString();
- const keys=[...new Set([...[...orders].map(o=>'order:'+o),...(tracking?['tracking:'+tracking]:[]),...[...extra].map(x=>'tracking:'+x)])];
+ const keys=[...new Set([...[...orders].map(o=>'order:'+o.replace(/^0+(?=\d{6})/,'')),...(tracking?['tracking:'+tracking]:[]),...[...extra].map(x=>'tracking:'+x)])];
  const shownTracking=tracking||[...extra].find(x=>/^(AP|RS)/.test(x))||[...extra].find(x=>/^HFD/.test(x))||[...extra][0]||'';
  // Carrier mails often have a generic subject ("הודעה מחברת המשלוחים"); describe the event instead.
  const genericSubject=(/^הודעה (?:מ|ב)|notification/i.test(subject)&&!/\d{6,}/.test(subject))||/^הודעה על (?:ה?משלוח|דבר דואר|ה?חבילה)/.test(subject);
@@ -213,6 +221,8 @@ export function mergeParcels(rows:Parcel[]){
  const groups=new Map<string,Parcel[]>();for(const p of rows){const root=find((p.keys?.length?p.keys:[p.id])[0]);groups.set(root,[...(groups.get(root)||[]),p]);}
  const out:Parcel[]=[];
  for(const list of groups.values()){
+  // A store SMS about an order shows only next to that order's mail (an order number alone could be a food delivery or a bill).
+  if(list.every(p=>p.smsOrder))continue;
   const sorted=[...list].sort((a,b)=>a.events.at(-1)!.time.localeCompare(b.events.at(-1)!.time));const latest=sorted.at(-1)!;
   const keys=[...new Set(list.flatMap(p=>p.keys?.length?p.keys:[p.id]))].sort((a,b)=>(a.startsWith('order:')?0:1)-(b.startsWith('order:')?0:1)||a.localeCompare(b));
   const events=[...new Map(list.flatMap(p=>p.events).map(e=>[e.id,e])).values()].sort((a,b)=>a.time.localeCompare(b.time));
@@ -265,7 +275,14 @@ export function parseSms(raw:string,now=new Date()):Parcel|null{
   return {id,keys:[id],name:'החזרה'+(shop?' ל־'+shop:''),shop,carrier:carrierFrom(text,''),image:'',url:'',tracking:'',order:'',eta:'',stage:1,cancelled:false,pickup:null,ret:true,events:[{id:'sms:'+id+':'+now.toISOString().slice(0,10),label:'השליח יאסוף ממך את ההחזרה',time:now.toISOString()}]};}
  const tracking=(text.match(/(?:מספר\s*(?:ה?מעקב|ה?משלוח|ה?חבילה|פריט)|מס['׳]?\s*(?:מעקב|משלוח|חבילה)|tracking(?:\s*(?:number|no\.?))?|פריט)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{5,34})/i)?.[1]
   ||text.match(/\b([A-Z]{2}\d{9}[A-Z]{2}|1Z[0-9A-Z]{16}|RS\d{9,}Y?|LP\d{10,}|AP\d{8,}|AE\d{8,})\b/i)?.[1]||text.match(/משלוח\s*(?:מספר|מס['׳]?)?\s*:?\s*#?\s*(\d{6,14})\b/)?.[1]||'').replace(/[^a-z0-9-]/gi,'').toUpperCase();
- if(!tracking)return null;
+// A store's own SMS about an order (Super-Pharm "הזמנת איסוף עצמי מספר 32349432 … תסופק לך עד ליום שני 26/10"): kept by order number,
+ // so it joins the order mail, with the day the store promised.
+ const due=etaOf(text.match(/(?:תסופק|יסופק|תגיע|יגיע|תהיה מוכנה|יהיה מוכן|צפוי\S*|מועד אספקה)[^.\d]{0,30}?(\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)/)?.[1]||'');
+ if(!tracking){const no=text.match(/הזמנ\S*\s+(?:[\u0590-\u05FF]+\s+){0,2}(?:(?:מס['׳]?|מספר)\s*:?)?\s*#?\s*0*(\d{6,12})\b/)?.[1];if(!no)return null;
+  const id='order:'+no;const shop=shops.find(([r])=>r.test(text))?.[1]||'';// "כאשר ההזמנה תהיה מוכנה לאיסוף…" is a promise, not news: those sentences don't set the stage.
+  let st=stageOf(text.split(/[.!]/).filter(x=>!/^\s*(?:כאשר|כש|לאחר|ברגע ש|אם)/.test(x)).join('.'));if(st<0)st=0;
+  const lbl=st>=4?'נמסרה':st===3?'מוכנה לאיסוף':due?'ההזמנה בטיפול, תסופק עד '+due:'עדכון מ־SMS';
+  return {id,keys:[id],name:shop?'הזמנה מ־'+shop:'הזמנה '+no,shop,carrier:'',image:'',url:'',tracking:'',order:no,eta:due,stage:st,cancelled:false,pickup:null,smsOrder:true,events:[{id:'sms:'+id+':'+st+':'+now.toISOString().slice(0,13),label:lbl,time:now.toISOString()}]};}
  const code=text.match(/(?:קוד(?:\s*(?:ה?איסוף|ה?משיכה|לקבלת\s*ה?חבילה|אישור|סודי))?|code)\s*[:\-]?\s*(\d{4,8})\b/i)?.[1]||'';
  const place=(text.match(/(?:לאיסוף|ממתינה|ממתין|מחכה)[^.]{0,30}?\s(?:בנקודת איסוף|בנקודת|בסניף|בחנות|ב)\s*([^.,\n]{3,40}?)(?=[,.]|\s+(?:ב?כתובת|ברחוב|עד|קוד|לפרטים|שעות)|$)/)?.[1]||'').trim();
  const address=(text.match(/(?:בכתובת|כתובת:?|ברחוב)\s*([^.\n]{4,60}?)(?=[.]|\s+(?:עד|קוד|לפרטים|שעות)|$)/)?.[1]||'').trim();
@@ -277,4 +294,4 @@ export function parseSms(raw:string,now=new Date()):Parcel|null{
  // Israeli stores' couriers (Tapuz, KSP…) mention the store's order number; it joins the SMS to the order mail.
  const order=text.match(/הזמנ\S*\s*(?:מס['׳]?|מספר)?\s*:?\s*#?\s*(\d{6,12})/)?.[1]||text.match(new RegExp(tracking+'\\s*(?:מספר|הזמנה|/)\\s*(\\d{6,12})'))?.[1]||'';const shop=shops.find(([r])=>r.test(text))?.[1]||'';
  const link=(text.match(/https?:\/\/(?:hfd\.sh|[a-z0-9.-]*hfd\.co\.il|[a-z0-9.-]*chita-il\.com)\/[^\s"'<>]+/i)?.[0]||'').replace(/^http:/,'https:');
- return {id:'tracking:'+tracking,keys:['tracking:'+tracking,...(order&&order!==tracking?['order:'+order]:[])],name:'חבילה '+tracking,shop,carrier,image:'',url:'',tracking,order,eta:'',stage,cancelled:false,pickup,...(link?{link}:{}),events:[{id:'sms:'+tracking+':'+stage+':'+now.toISOString().slice(0,13),label,time:now.toISOString()}]};}
+ return {id:'tracking:'+tracking,keys:['tracking:'+tracking,...(order&&order!==tracking?['order:'+order]:[])],name:'חבילה '+tracking,shop,carrier,image:'',url:'',tracking,order,eta:due,stage,cancelled:false,pickup,...(link?{link}:{}),events:[{id:'sms:'+tracking+':'+stage+':'+now.toISOString().slice(0,13),label,time:now.toISOString()}]};}
