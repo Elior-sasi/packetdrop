@@ -12,3 +12,6 @@ test('the store logo is not the product, and a "your order arrived" subject name
  assert.equal(s.stage,0);assert.equal(s.eta,'26.10');
  const m=mergeParcels([p,s]);assert.equal(m.length,1);assert.equal(m[0].eta,'26.10');
  assert.equal(mergeParcels([parseSms('הזמנה מספר 99887766 בדרך אליך')!]).length,0);});
+test('two products where one name starts with the other ("סט 6 צלחות" / "סט 6 צלחות קטנות") both stay',()=>{
+ const p=parseMessage(msg('אישור ההזמנה שלך URBANICA','URBANICA HOUSE <info@urbanica-wh.com>',URB,'2026-10-22T10:22:10Z'))!;
+ const m=mergeParcels([p]);assert.equal(m[0].items?.length,4,JSON.stringify(m[0].items));});
