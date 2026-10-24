@@ -439,7 +439,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   // Several parcels due the same day share the hero card; so do all parcels waiting for pickup.
   const day=(x:number)=>new Date(x).toDateString();const group=isPickup(p)?l.filter(isPickup):l.filter(x=>!isPickup(x)&&day(outToday(x)?Date.now():etaWhen(x))===day(t));return {p,t,group:group.length?group:[p],came:[] as string[]};})();
  const q=search.trim().toLowerCase();const qs=searchTerms(q);// A search looks through everything, delivered parcels included.
- const byWords=(q?[...byEta(active),...done]:view==='done'?done:filter==='pickup'?active.filter(isPickup):byEta(active)).filter(p=>{if(!q)return true;const hay=[p.name,p.shop,p.carrier,p.tracking,p.order,...(p.items||[]),...p.keys].join(' ').toLowerCase();return qs.some(t=>hay.includes(t));});
+ // The list: pickups and today's deliveries first, then the parcel with the newest update (the order of `active`); the top card still goes by arrival date.
+ const byWords=(q?[...active,...done]:view==='done'?done:filter==='pickup'?active.filter(isPickup):active).filter(p=>{if(!q)return true;const hay=[p.name,p.shop,p.carrier,p.tracking,p.order,...(p.items||[]),...p.keys].join(' ').toLowerCase();return qs.some(t=>hay.includes(t));});
  // Nothing has the words: show what Gemini matched by meaning ("אנימה" finds the One Piece costume).
  const byMeaning=q&&!byWords.length&&smart?.q===q?[...byEta(active),...done].filter(p=>smart.ids.includes(p.id)):[];const shownAll=byWords.length?byWords:byMeaning;
  const findByMeaning=async(term:string)=>{const items=[...active,...done].map(p=>({id:p.id,name:[nice(p.name),...(p.items||[]).slice(0,3)].join(' / ')}));try{const r=await fetch('/api/find',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:term,items})});const d=await r.json();return (d.ids||[]) as string[];}catch{return [] as string[];}};
