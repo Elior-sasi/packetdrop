@@ -29,7 +29,11 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  // With no baseline yet, the first check only records the current state.
  // Compare with what the server last NOTIFIED about, not with the parcels the app posted: when the app opens first
  // it saves the new mail into the state, and comparing with that would swallow the notification.
- const base=(u.state as {base?:Parcel[]})?.base;const prev={...state,parcels:Array.isArray(base)&&base.length?base:state.parcels};
+ const base0=(u.state as {base?:Parcel[]})?.base;const baseV=(u.state as {baseV?:number})?.baseV;
+ // Baselines saved before v2 lacked the tracking number and pickup code, so "tracking number received" / "pickup code" repeated every check:
+ // an old baseline takes those two from the current reading once (nothing is announced for them), and from then on keeps them.
+ const base=Array.isArray(base0)&&baseV!==2?base0.map(b=>{const c=parcels.find(p=>p.id===b.id||p.keys.some(k=>b.keys.includes(k)));return c?{...b,tracking:c.tracking,pickup:c.pickup}:b;}):base0;
+ const prev={...state,parcels:Array.isArray(base)&&base.length?base:state.parcels};
  const {notes,stuck}=prev.parcels.length?diff(prev,parcels):{notes:[],stuck:state.stuck};
  // Time to leave: a parcel waits at a point that closes within 1.5 hours (Google hours) - once a day per parcel, with the way from home.
  const leave:typeof notes=[];
@@ -54,8 +58,8 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  const keep=parcels.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()<180*864e5).slice(0,300);
  const newSeen=[...seen,...msgs.map(m=>m.id)].slice(-1500);
  // The baseline for the next comparison: only what notifications need (keys, stage, events, customs, refund, missing items).
- const baseNext=keep.map(p=>({id:p.id,keys:p.keys,name:'',shop:'',carrier:'',image:'',url:'',tracking:'',order:'',eta:'',stage:p.stage,cancelled:p.cancelled,pickup:null,ret:p.ret,events:p.events.map(e=>({id:e.id,label:e.label,time:e.time})),...(p.customs?{customs:p.customs}:{}),...(p.refund?{refund:p.refund}:{}),...(p.missing?{missing:p.missing}:{})}));
- await sql`update push_users set state=${JSON.stringify({parcels:keep,base:baseNext,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,morning:mo.day,view:(u.state as {view?:unknown})?.view,phone})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
+ const baseNext=keep.map(p=>({id:p.id,keys:p.keys,name:'',shop:'',carrier:'',image:'',url:'',tracking:p.tracking,order:'',eta:'',stage:p.stage,cancelled:p.cancelled,pickup:p.pickup,ret:p.ret,events:p.events.map(e=>({id:e.id,label:e.label,time:e.time})),...(p.customs?{customs:p.customs}:{}),...(p.refund?{refund:p.refund}:{}),...(p.missing?{missing:p.missing}:{})}));
+ await sql`update push_users set state=${JSON.stringify({parcels:keep,base:baseNext,baseV:2,stuck,marks:state.marks,reminded:rem.reminded,weekly:wk.week,morning:mo.day,view:(u.state as {view?:unknown})?.view,phone})},seen=${JSON.stringify(newSeen)},subs=${JSON.stringify(subs)},checked_at=now() where user_id=${u.user_id}`;
  return {sent};
 }
 // Gmail instant push: ask Gmail to tell our Pub/Sub topic about new mail. A watch lasts 7 days, so it is renewed every 6.

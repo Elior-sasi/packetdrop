@@ -65,3 +65,11 @@ test('push subscriptions: gone phones are dropped, a passing error keeps the pho
  const subs=[{endpoint:'gone'},{endpoint:'ok'},{endpoint:'flaky'}] as unknown as Sub[];
  const alive=await deliver(subs,{title:'x'},async s=>{const e=(s as unknown as {endpoint:string}).endpoint;if(e==='gone')return false;if(e==='flaky')throw new Error('timeout');return true;});
  assert.deepEqual(alive.map(s=>(s as unknown as {endpoint:string}).endpoint),['ok','flaky']);});
+
+test('a parcel with a tracking number and a pickup code is announced once, not on every check',()=>{
+ const before=P({stage:3,tracking:'',events:[{id:'e1',label:'נשלחה',time:ago(48)}]});
+ const after=P({stage:3,tracking:'LP00123',pickup:{place:'סופר פארם',address:'',code:'1234',url:''},events:[{id:'e1',label:'נשלחה',time:ago(48)},{id:'e2',label:'מוכנה לאיסוף',time:ago(1)}]});
+ assert.ok(diff({parcels:[before],stuck:[]},[after],now).notes.length>0);
+ // What the server keeps as its baseline after notifying.
+ const base={...after,name:'',shop:'',image:'',url:'',order:'',eta:''};
+ assert.equal(diff({parcels:[base],stuck:[]},[after],now).notes.length,0);});
