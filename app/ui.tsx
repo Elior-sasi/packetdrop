@@ -414,7 +414,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   const returned=!got&&RETURNED.test(p.events.at(-1)?.label||'');
   return {...p,got,returned,manual:m.keys.some(k=>manual.some(x=>x.keys.includes(k))),stale:stale&&!got&&!returned,ask:ask&&!returned,last,stage:stale||got||returned?4:p.stage,real:p.stage,name:titles[p.id]||byPhoto(m)||displayName(m)};}),titles)
   // Ready for pickup / out for delivery first, then the most recent update; parcels with no tracking number go last.
-  .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||(a.tracking?0:1)-(b.tracking?0:1)||b.last-a.last;}).map(p=>{// AliExpress order page (read on the phone): product photos, and the product title for an order the mails left unnamed.
+  .sort((a,b)=>{const urgent=(p:Parcel)=>isPickup(p)||outToday(p)?0:1;return urgent(a)-urgent(b)||b.last-a.last;}).map(p=>{// AliExpress order page (read on the phone): product photos, and the product title for an order the mails left unnamed.
   const it=p.order?aeItems[p.order]:undefined;if(!it?.length)return p;let r=p;
   if(!p.image&&!p.images?.length)r={...r,image:it[0].img,...(it.length>1?{images:it.map(x=>x.img)}:{})};
   if(!titles[p.id]&&/^(?:הזמנה|חבילה)/.test(p.name)&&it[0].title)r={...r,name:it[0].title};return r;})
