@@ -237,7 +237,7 @@ function NextGroup({ps,came,when,onOpen}:{ps:Parcel[];came:string[];when:number;
  return <section className="nextCard nc-ring nc-group" aria-label={k+(a?', '+a+' כבר הגיעו':'')}>
   <div className="nc-k nc-top" aria-hidden="true">{k}</div>
   <div className="nc-row" aria-hidden="true"><svg className="ring" viewBox="0 0 92 92"><g transform="rotate(-90 46 46)" fill="none" strokeWidth="8" strokeLinecap="round">
-   {Array.from({length:Math.min(n,8)},(_,i)=><circle key={i} cx="46" cy="46" r="40" stroke={i<a?'#3fd49a':'#4aa8ff55'} strokeDasharray={(seg-gap)+' '+(C-seg+gap)} strokeDashoffset={-i*seg}/>)}</g>
+   {allPick?<circle cx="46" cy="46" r="40" stroke="#2ed3c6"/>:Array.from({length:Math.min(n,8)},(_,i)=><circle key={i} cx="46" cy="46" r="40" stroke={i<a?'#3fd49a':'#4aa8ff55'} strokeDasharray={(seg-gap)+' '+(C-seg+gap)} strokeDashoffset={-i*seg}/>)}</g>
    <text x="46" y={unit?50:55} fill="#fff" fontSize={big.length>3?24:big.length>2?26:34} fontWeight="700" textAnchor="middle">{big}</text>{unit&&<text x="46" y="68" fill="#9fd2ff" fontSize="12" textAnchor="middle">{unit}</text>}</svg>
    <div className="nc-info"/><div className="nc-stack">{show.slice(0,3).map((p,i)=><div key={p.id} style={{zIndex:9-i}}><ThumbOne p={p}/></div>)}</div></div>
   <ul className="nc-list">{show.map(p=>{const c=came.includes(p.id);return <li key={p.id}><button type="button" className={c?'nc-came':''} onClick={()=>onOpen(p.id)}><span>{bidi(p.name)}</span>{how(p)&&<em className={c?'':'nc-pick'}>{how(p)}</em>}</button></li>;})}{rest>0&&<li className="nc-more" aria-hidden="true">{'ועוד '+rest}</li>}</ul></section>;}
@@ -450,7 +450,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  // Delivered courier notices with no product (HFD etc.) fold into one row at the bottom of "נמסרו".
  const nameless=(p:Parcel)=>!p.image&&!p.images&&/^(?:הזמנה מ־|חבילה|הזמנה …)/.test(p.name)&&!!p.carrier&&!titles[p.id];
  // A single hero parcel is not repeated below; with a same-day group every parcel keeps its own card in the list.
- const heroIds=showNext&&view==='active'&&filter==='all'&&!q&&nextP&&nextP.group.length<2?[nextP.p.id]:[];
+ // What the top card shows is not repeated below it (a single parcel, or all those waiting for pickup).
+ const heroIds=showNext&&view==='active'&&filter==='all'&&!q&&nextP?(nextP.group.length<2?[nextP.p.id]:nextP.group.every(isPickup)?nextP.group.map(p=>p.id):[]):[];
  const folded=view==='done'&&foldCourier&&!q?shownAll.filter(nameless):[];const shown=(folded.length?shownAll.filter(p=>!folded.includes(p)):shownAll).filter(p=>!heroIds.includes(p.id));
  const pickup=active.filter(isPickup).length;const open=parcels.find(p=>p.id===openId)||null;
  // Phone notifications (Web Push through the service worker).
