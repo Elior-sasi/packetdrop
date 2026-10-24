@@ -350,3 +350,9 @@ fieldset.plain{border:0;margin:0;padding:0;min-width:0}
 .phoneIn.shareWho{text-align:right}
 /* A tall sheet scrolls inside itself; pulling down closes it only from the top. */
 .menu{max-height:calc(100dvh - env(safe-area-inset-top) - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.shareHead{margin:14px 0 6px}
+.shareOpt{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 14px;border-radius:16px;border:1px dashed #3d5470;background:transparent}
+.shareOpt input{width:26px;height:26px;flex:none;accent-color:#2ed3c6}
+.shareOpt span{display:grid;gap:2px}.shareOpt small{color:var(--mut);font-size:calc(15px*var(--fs))}
+.menu>button.primary{background:#4aa8ff;color:#05182b;border:0;justify-content:center;font-weight:700}
+.menu>button.primary:disabled{opacity:.5}
