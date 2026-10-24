@@ -318,3 +318,5 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .mailSheet{z-index:40}.mailSubj{font-size:calc(19px*var(--fs));margin:10px 0 4px}.mailFrame{display:block;width:100%;height:62vh;min-height:200px;border:0;border-radius:14px;background:#fff;margin:8px 0}
 .linkBtn.mailLink{display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:0;color:#7cc4ff;font:inherit;font-size:calc(14px*var(--fs))}
 .app.detailOn>.mailSheet{display:block}
+.zoomNav{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 20px);left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:24px;color:#fff;font-size:17px;font-weight:600}
+.zoomNav button{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;border:0;display:grid;place-items:center}

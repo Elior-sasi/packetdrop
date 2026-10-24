@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {heName,fixSeries} from '@/lib/hename';
 import {signOut} from 'next-auth/react';
-import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X,Share2,Wallet,Users,Phone,Sparkles,Send,Camera,Image as ImageIcon} from 'lucide-react';
+import {Package,CheckCircle2,Settings,RefreshCw,Pencil,ChevronRight,ChevronLeft,ExternalLink,Search,Mail,Copy,MapPin,Navigation,KeyRound,Cloud,CloudUpload,Bell,Plus,CalendarCheck,MapIcon,ChartColumn,EyeOff,PackageCheck,Undo2,ShieldAlert,RotateCcw,Smartphone,Plane,Mic,Volume2,X,Share2,Wallet,Users,Phone,Sparkles,Send,Camera,Image as ImageIcon} from 'lucide-react';
 import {learn,estimate,freshEta,SHIP_RE,type Est} from '@/lib/estimate';
 import {aeLoader} from '@/lib/ae';
 import {goodPlace} from '@/lib/parcels';
@@ -87,7 +87,10 @@ function GoogleButton({label,disabled}:{label:string;disabled?:boolean}){return 
 function Favicon({name,size=18}:{name:string;size?:number}){const [failed,setFailed]=useState(false);const d=domainOf(name);if(!d||failed)return null;return <img className="fav" src={'https://www.google.com/s2/favicons?domain='+d+'&sz=64'} alt="" width={size} height={size} referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>;}
 function Mark({cls,anim}:{cls?:string;anim?:'bob'|'open'}){return <svg className={cls} viewBox="100 76 312 386" aria-hidden="true"><defs><linearGradient id="ug" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#2ed3c6"/><stop offset="1" stopColor="#4aa8ff"/></linearGradient></defs><path d="M150 214 V320 a106 106 0 0 0 212 0 V210" fill="none" stroke="url(#ug)" strokeWidth="58" strokeLinecap="round"/><g className="lid">{anim==="bob"&&<animateTransform attributeName="transform" type="translate" values="0 40;0 -26;0 40" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>}{anim==="open"&&<animateTransform attributeName="transform" type="translate" values="0 56;0 0" dur=".9s" begin=".2s" fill="freeze" calcMode="spline" keySplines=".2 .9 .3 1"/>}<g transform="rotate(-10 112 160)"><rect x="112" y="112" width="288" height="48" rx="16" fill="#4aa8ff"/><rect x="236" y="112" width="40" height="48" fill="#2b7fd4"/></g></g></svg>;}
 // Full-screen photo: pinch with two fingers to zoom, drag to move, double-tap to zoom in or back, ✕ to close.
-function Zoom({src,alt,onClose}:{src:string;alt:string;onClose:()=>void}){const [t,setT]=useState({s:1,x:0,y:0});const pts=useRef(new Map<number,{x:number;y:number}>());const start=useRef<{d:number;s:number;mx:number;my:number;x:number;y:number}|null>(null);const last=useRef(0);
+// With several photos: swipe sideways (when not zoomed in) or use the buttons to move between them.
+function Zoom({src,alt,onClose,imgs,at=0,altOf}:{src:string;alt:string;onClose:()=>void;imgs?:string[];at?:number;altOf?:(i:number)=>string}){const [t,setT]=useState({s:1,x:0,y:0});
+ const many=!!imgs&&imgs.length>1;const [idx,setIdx]=useState(at);const cur=many?imgs![idx]:src;const curAlt=many&&altOf?altOf(idx):alt;const [dx,setDx]=useState(0);
+ const go=(d:number)=>{if(!many)return;setIdx(i=>(i+d+imgs!.length)%imgs!.length);setT({s:1,x:0,y:0});setDx(0);};const pts=useRef(new Map<number,{x:number;y:number}>());const start=useRef<{d:number;s:number;mx:number;my:number;x:number;y:number}|null>(null);const last=useRef(0);
  const img=useRef<HTMLImageElement>(null);
  // The photo never slides past its own edge into the black: it can move only as far as its zoomed size overflows the screen.
  const clamp=(v:{s:number;x:number;y:number})=>{const s=Math.min(5,Math.max(1,v.s));if(s===1)return {s,x:0,y:0};const el=img.current;if(!el)return {s,x:v.x,y:v.y};
@@ -100,12 +103,16 @@ function Zoom({src,alt,onClose}:{src:string;alt:string;onClose:()=>void}){const 
     if(pts.current.size===1){const now=Date.now();if(now-last.current<300)setT(v=>{if(v.s>1)return {s:1,x:0,y:0};const el=img.current;const fill=el?Math.max(innerHeight/el.offsetHeight,innerWidth/el.offsetWidth):2.5;return clamp({s:Math.max(1.5,fill),x:0,y:0});});last.current=now;}}}
    onPointerMove={e=>{if(!pts.current.has(e.pointerId)||!start.current)return;pts.current.set(e.pointerId,{x:e.clientX,y:e.clientY});const a=[...pts.current.values()];const st=start.current;
     if(a.length===2&&st.d){const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);const mx=(a[0].x+a[1].x)/2,my=(a[0].y+a[1].y)/2;setT(clamp({s:st.s*d/st.d,x:st.x+mx-st.mx,y:st.y+my-st.my}));}
-    else if(a.length===1&&t.s>1)setT(clamp({s:t.s,x:st.x+a[0].x-st.mx,y:st.y+a[0].y-st.my}));}}
-   onPointerUp={e=>{pts.current.delete(e.pointerId);begin();}} onPointerCancel={e=>{pts.current.delete(e.pointerId);begin();}}>
-   <img ref={img} src={src} alt={alt} referrerPolicy="no-referrer" draggable={false} style={{transform:`translate(${t.x}px,${t.y}px) scale(${t.s})`}}/></div></div>;}
+    else if(a.length===1&&t.s>1)setT(clamp({s:t.s,x:st.x+a[0].x-st.mx,y:st.y+a[0].y-st.my}));
+    else if(a.length===1&&many&&t.s===1)setDx(a[0].x-st.mx);}}
+   onPointerUp={e=>{pts.current.delete(e.pointerId);
+    // Right to left like the gallery: dragging the photo to the right brings the next one.
+    if(many&&t.s===1&&!pts.current.size){if(dx>60)go(1);else if(dx<-60)go(-1);else setDx(0);}begin();}} onPointerCancel={e=>{pts.current.delete(e.pointerId);begin();}}>
+   <img ref={img} src={cur} alt={curAlt} referrerPolicy="no-referrer" draggable={false} style={{transform:`translate(${t.x+dx}px,${t.y}px) scale(${t.s})`}}/></div>
+  {many&&<div className="zoomNav"><button type="button" aria-label="התמונה הקודמת" onClick={()=>go(-1)}><ChevronRight size={26}/></button><span aria-live="polite">{(idx+1)+' מתוך '+imgs!.length}</span><button type="button" aria-label="התמונה הבאה" onClick={()=>go(1)}><ChevronLeft size={26}/></button></div>}</div>;}
 // Several photos: one at a time, swiped sideways, with dots that show where you are.
 function Gallery({imgs}:{imgs:string[]}){const [at,setAt]=useState(0);const [big,setBig]=useState<number|null>(null);
- return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={trimmed(src)} alt={'תמונה '+(i+1)+' מתוך '+imgs.length+(DESC[src]?': '+DESC[src]:'')} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer" role="button" tabIndex={0} onClick={()=>setBig(i)}/>)}</div>{big!==null&&<Zoom src={imgs[big]} alt={'תמונה '+(big+1)+' מתוך '+imgs.length+(DESC[imgs[big]]?': '+DESC[imgs[big]]:'')} onClose={()=>setBig(null)}/>}
+ return <div className="gal"><div className="galTrack" onScroll={e=>{const el=e.currentTarget;const i=Math.round(Math.abs(el.scrollLeft)/el.clientWidth);if(i!==at)setAt(i);}}>{imgs.map((src,i)=><img key={src} src={trimmed(src)} alt={'תמונה '+(i+1)+' מתוך '+imgs.length+(DESC[src]?': '+DESC[src]:'')} loading={i<2?'eager':'lazy'} referrerPolicy="no-referrer" role="button" tabIndex={0} onClick={()=>setBig(i)}/>)}</div>{big!==null&&<Zoom src={imgs[big]} alt={'תמונה '+(big+1)+' מתוך '+imgs.length+(DESC[imgs[big]]?': '+DESC[imgs[big]]:'')} imgs={imgs} at={big} altOf={i=>'תמונה '+(i+1)+' מתוך '+imgs.length+(DESC[imgs[i]]?': '+DESC[imgs[i]]:'')} onClose={()=>setBig(null)}/>}
   <div className="dots" aria-hidden="true">{imgs.map((_,i)=><i key={i} className={i===at?'on':''}/>)}</div></div>;}
 function Thumb({p,big}:{p:Parcel;big?:boolean}){if(p.images&&p.images.length>1){
  // Card: the first item fills the square, the second sits as a small inset so neither is cut in half.
