@@ -320,3 +320,31 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
 .app.detailOn>.mailSheet{display:block}
 .zoomNav{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 20px);left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:24px;color:#fff;font-size:17px;font-weight:600}
 .zoomNav button{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;border:0;display:grid;place-items:center}
+/* Shared tracking page (/s/…) */
+.sp-page{max-width:560px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px calc(32px + env(safe-area-inset-bottom));-webkit-user-select:text;user-select:text}
+.sp-page h1{font-size:calc(28px*var(--fs));margin:0 0 18px}
+.sp-list{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.sp-card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px}
+.sp-top{display:flex;gap:14px;align-items:center}
+.sp-top img,.sp-ph{width:84px;height:84px;border-radius:16px;object-fit:cover;background:#fff;flex:none;display:grid;place-items:center;font-size:40px}
+.sp-top h2{font-size:calc(20px*var(--fs));margin:0 0 6px;line-height:1.3}
+.sp-status{display:inline-block;margin:0;padding:4px 12px;border-radius:999px;background:#163050;color:#9fd2ff;font-weight:700}
+.sp-status.pick{background:#0f3a37;color:#7ff0e6}.sp-status.done{background:#123d2c;color:#8ff0c2}
+.sp-steps{list-style:none;margin:16px 0 4px;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center;font-size:calc(13px*var(--fs));color:var(--mut)}
+.sp-steps li span{display:block;height:6px;border-radius:3px;background:#2a3542;margin-bottom:6px}
+.sp-steps li.on{color:var(--ink)}.sp-steps li.on span{background:var(--acc)}
+.sp-eta{margin:12px 0 0;font-size:calc(17px*var(--fs))}
+.sp-pick{margin-top:12px;padding:12px 14px;border-radius:16px;background:#0f2b2a;border:1px solid #1d4a47}.sp-pick p{margin:4px 0}
+.sp-nav{display:block;margin-top:10px;padding:14px;border-radius:14px;background:#2ed3c6;color:#04211f;text-align:center;font-weight:700;text-decoration:none}
+.sp-note{margin:10px 0 0;color:var(--mut);font-size:calc(15px*var(--fs))}
+.sp-foot{margin-top:22px;text-align:center;color:var(--mut);font-size:calc(14px*var(--fs))}
+/* Share sheet */
+.shareList{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:8px}
+.shareList label{display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 12px;border-radius:14px;background:var(--card2)}
+.shareList input{width:24px;height:24px;flex:none;accent-color:var(--acc)}
+.shareOld{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.shareOld li{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px}
+.field{display:grid;gap:6px;margin:10px 0 12px}.field span{color:var(--mut)}
+fieldset.plain{border:0;margin:0;padding:0;min-width:0}
+.shareBtn{width:100%;margin:12px 0 0;display:flex;align-items:center;justify-content:center;gap:8px}
+.phoneIn.shareWho{text-align:right}

@@ -4,6 +4,7 @@ import {GOOGLE_CLIENT_ID} from '@/lib/google';
 import {QUERY,gmailClient,pdfInfo} from '@/lib/gmail';
 import {parseMessage,mergeParcels,type Parcel,type Message} from '@/lib/parcels';
 import {trackAll} from '@/lib/track';
+import {refreshShares} from '@/lib/share';
 import {baldarByPhone} from '@/lib/tapuz';
 import {diff,withTrack,reminders,weekly,morning,nameOf,type State} from '@/lib/notify';
 import {daysLeft,pointKey,minutesToClose} from '@/lib/pickup';
@@ -50,6 +51,8 @@ export async function check(u:Row,sql:ReturnType<typeof db>['sql']){
  // Notifications use the same short Hebrew names the app shows, not the store's long title.
  if(allNotes.length){const ps=parcels.filter(p=>allNotes.some(n=>n.id===p.id)||(mo.note&&p.stage===3)).slice(0,30);const pretty=await prettyNames(ps,sql).catch(()=>new Map<string,string>());
   for(const n of allNotes)for(const p of (n.tag.startsWith('m:')?ps:ps.filter(x=>x.id===n.id))){const v=pretty.get(p.id);const old=nameOf(p);if(v&&old&&old!==v){n.body=n.body.split(old).join(v);n.title=n.title.split(old).join(v);}}}
+ // Tracking links the user sent to someone else follow this reading too, even while the app is closed.
+ await refreshShares(sql,u.user_id,parcels);
  let subs=u.subs;let sent=0;
  // Each update is its own notification (tapping it opens that parcel); only a flood of more than 10 becomes one summary.
  const batch=allNotes.length>10?[{title:'Unbox',body:allNotes.length+' עדכונים חדשים בחבילות',tag:'many',url:'/'}]:allNotes.map(n=>({title:n.title,body:n.body,tag:n.tag,url:'/?p='+encodeURIComponent(n.id)}));

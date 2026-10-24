@@ -176,6 +176,9 @@ const GUARD_RE=/בהמתנה לאישור|תסומן בקרוב כהזמנה ש�
 const guardOf=(p:Parcel)=>{if(p.stage>=4||p.cancelled||!/AliExpress/i.test(p.shop))return null;const e=[...p.events].reverse().find(e=>GUARD_RE.test(e.label));if(!e)return null;const age=(Date.now()-new Date(e.time).getTime())/864e5;return age<15?{since:e.time,age}:null;};
 // Customs is open while nothing later than the customs notice happened.
 // Text for whoever collects a parcel on the user's behalf: what, where, the code and the hours.
+// What a tracking link shows for a parcel: no store, price or tracking numbers; the pickup point only when the recipient collects it.
+function shareView(p:Parcel,withPickup:boolean){const k=p.pickup;return {k:p.keys.slice(0,12),name:nice(p.name).slice(0,200),image:(p.image||p.images?.[0]||'').slice(0,1000)||undefined,stage:Math.min(4,p.stage),status:statusText(p).slice(0,80),eta:p.stage<4&&p.eta?p.eta.slice(0,40):undefined,at:p.events.at(-1)?.time||new Date().toISOString(),
+ pickup:withPickup&&k&&(k.place||k.address)?{place:(k.place||'').slice(0,120),address:k.address?k.address.slice(0,200):undefined,code:k.code||undefined,hours:k.hours?k.hours.slice(0,120):undefined}:undefined};}
 function sharePickup(p:Parcel){const k=p.pickup;if(!k)return;const text=['חבילה לאיסוף: '+p.name,k.place?'איפה: '+k.place+(k.address?', '+k.address:''):'',k.code?'קוד איסוף: '+k.code:'',k.hours?'שעות: '+k.hours:'',p.tracking?'מספר מעקב: '+p.tracking:''].filter(Boolean).join('\n');
  const nav=navigator as Navigator&{share?:(d:{text:string})=>Promise<void>};if(nav.share)void nav.share({text}).catch(()=>{});else void navigator.clipboard?.writeText(text).catch(()=>{});}
 // Money: "₪49.95", "49.95₪", "$5" -> shekels (dollars are left out rather than guessed).
@@ -634,6 +637,22 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  othersRef.current=others;
  const isOther=(p:Parcel)=>others.includes(p.id)||p.keys.some(k=>others.includes(k));
  const toggleOther=(p:Parcel)=>{const on=!isOther(p);const next=on?[...others,p.id,...p.keys.slice(0,5)]:others.filter(k=>k!==p.id&&!p.keys.includes(k));const uniq=[...new Set(next)].slice(-500);setOthers(uniq);setPref('pd_others',JSON.stringify(uniq));};
+ // Tracking links for someone else: choose the parcels, optionally the pickup details, then share the link.
+ type MyShare={token:string;title:string;pickup:boolean;keys:string[][];names:string[]};
+ const [shares,setShares]=useState<MyShare[]>([]);const [shareOpen,setShareOpen]=useState(false);const [shareSel,setShareSel]=useState<string[]>([]);const [shareWho,setShareWho]=useState('');const [sharePick,setSharePick]=useState(false);const [shareMsg,setShareMsg]=useState('');const [shareBusy,setShareBusy]=useState(false);
+ useEffect(()=>{if(!user)return;fetch('/api/share',{cache:'no-store'}).then(r=>r.json()).then(d=>{if(Array.isArray(d?.shares))setShares(d.shares);}).catch(()=>{});},[user]);
+ const openShare=(p:Parcel)=>{setShareSel([p.id]);setShareWho('');setSharePick(false);setShareMsg('');setShareOpen(true);};
+ async function makeShare(){const ps=parcels.filter(p=>shareSel.includes(p.id));if(!ps.length)return;setShareBusy(true);setShareMsg('');
+  try{const r=await fetch('/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:shareWho.trim(),pickup:sharePick,parcels:ps.map(p=>shareView(p,sharePick))})});const d=await r.json();if(!r.ok)throw Error(d.error);
+   setShares(x=>[{token:d.token,title:shareWho.trim(),pickup:sharePick,keys:ps.map(p=>p.keys.slice(0,12)),names:ps.map(p=>nice(p.name))},...x]);
+   const text=(shareWho.trim()?'מעקב אחרי '+(ps.length>1?ps.length+' החבילות שלך':'החבילה שלך'):'מעקב חבילות')+': '+d.url;
+   if(navigator.share){try{await navigator.share({title:'מעקב חבילות',text,url:d.url});setShareMsg('הלינק נשלח.');}catch{await copy(d.url);setShareMsg('הלינק הועתק: '+d.url);}}else{await copy(d.url);setShareMsg('הלינק הועתק: '+d.url);}}
+  catch(e){setShareMsg(e instanceof Error&&e.message?e.message:'לא ניתן ליצור לינק. נסה שוב.');}finally{setShareBusy(false);}}
+ async function stopShare(t:string){try{await fetch('/api/share?t='+encodeURIComponent(t),{method:'DELETE'});setShares(x=>x.filter(s=>s.token!==t));}catch{}}
+ // Open links follow what the app shows: whenever the parcels change, their pages get the fresh step, date and pickup details.
+ const shareSent=useRef('');
+ useEffect(()=>{if(!shares.length||!parcels.length)return;const list=shares.map(sh=>({token:sh.token,parcels:sh.keys.map(ks=>parcels.find(p=>p.keys.some(k=>ks.includes(k)))).filter((p):p is Parcel=>!!p).map(p=>shareView(p,sh.pickup))})).filter(x=>x.parcels.length);
+  const body=JSON.stringify({update:list});if(!list.length||body===shareSent.current)return;const t=setTimeout(()=>{shareSent.current=body;fetch('/api/share',{method:'POST',headers:{'Content-Type':'application/json'},body}).catch(()=>{});},3000);return()=>clearTimeout(t);},[shares,parcels]);
  const stats=useMemo(()=>{const d=new Date();const ref=new Date(d.getFullYear(),d.getMonth()-month,1);const end=new Date(ref.getFullYear(),ref.getMonth()+1,1);
   const inMonth=(t:string)=>{const x=new Date(t);return x>=ref&&x<end;};const first=(p:Parcel)=>p.events[0]?.time||'';
   const all=parcels.filter(p=>!p.cancelled&&!isOther(p));const ordered=all.filter(p=>inMonth(first(p)));const delivered=all.filter(p=>p.stage===4&&!p.stale&&inMonth(p.events.at(-1)?.time||''));
@@ -793,6 +812,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
   {open.items&&open.items.length>1&&<section className="box items"><h3>מה בחבילה</h3><ul>{open.items.map(n=><li key={n}>{bidi(nice(n))}</li>)}</ul></section>}
   <section className="box"><div className="row"><span className={'pill '+tone(open)}>{statusText(open)}</span>{open.eta&&!open.cancelled?<span className="eta">צפי <b>{open.eta}</b></span>:showEst&&(()=>{const e=est(open);return e&&<span className="eta" title={'לפי '+e.n+' חבילות קודמות שלך, '+e.stage}>{e.late?<b>{estText(e)}</b>:<>הערכה <b>{estText(e)}</b></>}</span>;})()}</div>{open.refund&&<div className="guardTag refundTag"><Undo2 size={16}/> {refundText(open)}</div>}{open.missing?.length?<div className="guardTag"><ShieldAlert size={16}/> לפי מייל החבילה, אלה לא נשלחו בה: {open.missing.map(nice).join(', ')}. ייתכן שיגיעו בנפרד.</div>:null}
    {!open.cancelled&&<div className={'steps '+tone(open)} style={{'--p':step(open)/4} as React.CSSProperties}>{STEP.map((s,i)=><div key={s} className={'sp '+(i<step(open)?'d':i===step(open)?'c':'')}><span/>{i===3&&step(open)>=3&&!isPickup(open)?'במסירה':s}</div>)}</div>}</section>
+  {isOther(open)&&!open.cancelled&&<button type="button" className="primary shareBtn" onClick={()=>openShare(open)}><Share2 size={20}/> שליחת לינק מעקב</button>}
   {(()=>{const c=customsDue(open);if(!c)return null;return <section className="box guardBox customsBox"><h3><ShieldAlert size={18}/> לתשלום מכס ומסים</h3>
    <p className="setNote">החבילה מחכה לתשלום לפני שחרור{c.amount?': '+c.amount:''}. בלי תשלום היא לא תמשיך ועלולה לחזור לשולח.</p>
    <a className="primary" href={c.url||'https://doar.israelpost.co.il/'} target="_blank" rel="noopener noreferrer">{c.url?'לתשלום באתר הרשמי':'לאתר דואר ישראל'}</a>
@@ -833,12 +853,23 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {askMsgs.map((m,i)=><p key={i} className={'askMsg '+m.role}>{m.text}</p>)}{askBusy&&<p className="askMsg model" role="status">חושב…</p>}</div>
   <form className="askBar" onSubmit={e=>{e.preventDefault();void ask();}}><input aria-label="השאלה שלך" placeholder="שאל על החבילות שלך" value={askDraft} onChange={e=>setAskDraft(e.target.value)}/>{canListen&&<button type="button" className="micBtn" aria-label="לשאול בקול" onClick={askListen}><Mic size={20}/></button>}<button type="submit" className="micBtn" aria-label="שליחה" disabled={askBusy}><Send size={20}/></button></form>
   {askMsgs.length>0&&<button type="button" className="linkBtn" onClick={()=>{setAskMsgs([]);try{localStorage.removeItem('pd_ask');}catch{}}}>ניקוי השיחה</button>}</div></div>}
+ {shareOpen&&<div className="menuWrap" onClick={()=>setShareOpen(false)}><div className="menu" role="dialog" aria-modal="true" aria-label="שליחת לינק מעקב" onClick={e=>e.stopPropagation()} {...swipeClose(()=>setShareOpen(false))}><SheetTop close={()=>setShareOpen(false)}/>
+  <p className="menuTitle">שליחת לינק מעקב</p>
+  <p className="setNote">מי שמקבל את הלינק רואה את שם החבילה, התמונה, השלב והצפי, בלי להתחבר. לא רואים בו את החנות, המחיר או המייל שלך.</p>
+  <label className="field"><span>למי? (לא חובה)</span><input className="phoneIn shareWho" value={shareWho} maxLength={40} placeholder="למשל: רועי" onChange={e=>setShareWho(e.target.value)}/></label>
+  <fieldset className="plain"><legend className="setNote">אילו חבילות?</legend><ul className="shareList">{parcels.filter(p=>p.stage<4&&!p.cancelled&&(isOther(p)||shareSel.includes(p.id))).map(p=><li key={p.id}><label><input type="checkbox" checked={shareSel.includes(p.id)} onChange={e=>setShareSel(x=>e.target.checked?[...x,p.id]:x.filter(i=>i!==p.id))}/><span>{bidi(nice(p.name))}</span></label></li>)}</ul></fieldset>
+  <ul className="shareList"><li><label><input type="checkbox" checked={sharePick} onChange={e=>setSharePick(e.target.checked)}/><span>הוא אוסף בעצמו: להציג את נקודת האיסוף והקוד</span></label></li></ul>
+  <button type="button" className="primary" disabled={shareBusy||!shareSel.length} onClick={()=>void makeShare()}><Share2 size={20}/> {shareBusy?'יוצר לינק…':'יצירת לינק ושליחה'}</button>
+  {shareMsg&&<p className="setNote" role="status" aria-live="polite" dir="auto">{shareMsg}</p>}
+  {shares.length>0&&<div className="shareOld"><p className="setNote">לינקים פתוחים</p><ul className="shareList">{shares.map(sh=><li key={sh.token}><span>{(sh.title?sh.title+': ':'')+sh.names.join(', ')}</span><button type="button" className="ghost" onClick={()=>void stopShare(sh.token)} aria-label={'ביטול הלינק'+(sh.title?' של '+sh.title:'')}>ביטול</button></li>)}</ul><p className="setNote">לינק נסגר לבד 3 ימים אחרי שכל החבילות שבו נמסרו.</p></div>}
+ </div></div>}
  {menu&&<div className="menuWrap" onClick={()=>setMenu(null)}><div className="menu" role="dialog" aria-modal="true" aria-label={'פעולות: '+menu.name} onClick={e=>e.stopPropagation()} {...swipeClose(()=>setMenu(null))}><SheetTop close={()=>setMenu(null)}/>
   <p className="menuTitle">{bidi(menu.name)}</p>
   {menu.pickup?.code&&<button onClick={()=>{void copy(menu.pickup!.code);setMenu(null);}}><KeyRound size={20}/> העתק קוד איסוף <b dir="ltr">{menu.pickup.code}</b></button>}
   {menu.pickup&&(menu.pickup.address||menu.pickup.place)&&<div className="menuNav"><NavLinks pk={menu.pickup} geo={geo[placeQuery(menu.pickup)]}/></div>}
   {menu.tracking&&<button onClick={()=>{void copy(menu.tracking);setMenu(null);}}><Copy size={20}/> העתק מספר מעקב</button>}
   <button onClick={()=>{toggleOther(menu);setMenu(null);}}><Users size={20}/> {isOther(menu)?'זו הזמנה שלי':'הזמנתי בשביל מישהו אחר'}</button>
+  {isOther(menu)&&!menu.cancelled&&<button onClick={()=>{openShare(menu);setMenu(null);}}><Share2 size={20}/> שליחת לינק מעקב</button>}
   {menu.got?<button onClick={()=>mark(menu,null)}><Undo2 size={20}/> בטל "קיבלתי"</button>:menu.stage<4&&<button onClick={()=>mark(menu,'got')}><PackageCheck size={20}/> קיבלתי</button>}
   <button onClick={()=>mark(menu,'hide')}><EyeOff size={20}/> הסתר, זו לא חבילה</button></div></div>}
  {adding&&<div className="menuWrap" onClick={()=>setAdding(false)}><form className="menu addForm" role="dialog" aria-modal="true" aria-label="הוספת חבילה" onClick={e=>e.stopPropagation()} {...swipeClose(()=>setAdding(false))} onSubmit={e=>{e.preventDefault();addManual();}}>
