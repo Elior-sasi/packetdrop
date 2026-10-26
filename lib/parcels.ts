@@ -7,7 +7,7 @@ export const goodPlace=(p:string)=>p&&/^[\u05D0-\u05EAA-Za-z0-9"']/.test(p)&&!/�
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string;until?:string};
 export type Parcel={smsOrder?:boolean;id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[];orderItems?:Record<string,string[]>;pkgByOrder?:Record<string,string[]>;link?:string};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
-type Part={mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
+type Part={filename?:string;mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
 
 const shops:[RegExp,string][]=[[/aliexpress|עלי ?אקספרס/i,'AliExpress'],[/amazon\.|(?:משלוח מ-?|שנשלח מ)\s?amazon/i,'Amazon'],[/temu/i,'Temu'],[/shein/i,'SHEIN'],[/ebay/i,'eBay'],[/iherb/i,'iHerb'],[/asos/i,'ASOS'],[/zara\./i,'Zara'],[/next\.(?:co\.il|com)/i,'NEXT'],[/ksp\.co\.il/i,'KSP'],[/ivory\.co\.il/i,'Ivory'],[/shufersal/i,'שופרסל'],[/super-?pharm|סופר[- ]?פארם/i,'סופר-פארם'],[/terminalx/i,'Terminal X'],[/urbanica|אורבניקה/i,'Urbanica'],[/apple\.com/i,'Apple'],[/payngo|pay ?& ?go|פיי אנד גו|מחסני חשמל/i,'מחסני חשמל'],[/bug\.co\.il/i,'BUG'],[/castro\.com/i,'Castro'],[/foxhome|פוקס הום/i,'Fox Home']];
@@ -96,6 +96,9 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  if(orderText)orders.add(orderText.replace(/-/g,''));
  // Israeli stores often write just "#302834565" or "המספר שלה: #…".
  if(!orders.size&&knownSender){const h=text.match(/(?:המספר שלה|מספר(?:\s+ה)?הזמנה)\s*:?\s*#?\s*(\d{6,12})/)?.[1]||text.match(/#\s?(\d{6,12})\b/)?.[1];if(h)orders.add(h);}
+ // An invoice mail with no number in its text names the order in the attached file ("INVOICE_32349432_….pdf", Super-Pharm).
+ const files=(function names(x?:Part):string[]{return x?[x.filename||'',...(x.parts||[]).flatMap(names)].filter(Boolean):[];})(m.payload);
+ if(!orders.size&&knownSender)for(const f of files){const o=f.match(/(?:invoice|receipt|order|חשבונית|הזמנה)[_\- ]*0*(\d{6,12})/i)?.[1];if(o){orders.add(o);break;}}
  for(const href of hrefs){const a=href.match(/[?&](?:orderId|tradeOrderId)=(\d{8,})/i)?.[1];if(a)orders.add(a);const b=href.match(/[?&]o_ids=([\d,]+)/i)?.[1];if(b)b.split(',').filter(x=>x.length>=8).forEach(x=>orders.add(x));}
  // Summary mails about several packages at once would glue unrelated parcels together.
  if(orders.size>1&&/\d+\s*(?:ה?חבילות|packages|parcels)/i.test(subject))return null;
@@ -165,7 +168,8 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
 if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').replace(/[\u2066-\u2069\u200e\u200f]/g,'').replace(/^(?:shipped|ordered|delivered|out for delivery|arriving \w+)\s*:\s*(?:\d+\s+)?/i,'').replace(/\s+items?$/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
  const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
- let stage=stageOf(subject);if(stage<0)stage=stageOf(lead);
+ // "כאשר ההזמנה תהיה מוכנה לאיסוף…" is a promise of a later message, not news: such sentences don't set the stage.
+ let stage=stageOf(subject);if(stage<0)stage=stageOf(lead.split(/(?<=[.!])\s*/).filter(x=>!/^\s*(?:כאשר|כש|לאחר|ברגע ש|אם)/.test(x)).join(' '));
  // Israel Post's own wording, in plain words; "תודה שאספת" means the user already collected it.
  const postBody=post?text.slice(subject.length):'';
  const postSaid=!post?'':/תודה שאספת/.test(postBody)?'נאספה':postWait?'ממתינה לאיסוף ב'+postWait[1].trim():/יוחזר לשולח|הוחזר לשולח|לא נדרש בידי הנמען/.test(postBody)?'הוחזרה לשולח':/הגיע לארץ/.test(postBody)?'הגיעה לארץ ובדרך אליך':/בדרכו לארץ/.test(postBody)?'בדרך לארץ':'';
@@ -181,7 +185,8 @@ if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חביל
  const genericSubject=(/^הודעה (?:מ|ב)|notification/i.test(subject)&&!/\d{6,}/.test(subject))||/^הודעה על (?:ה?משלוח|דבר דואר|ה?חבילה)/.test(subject);
  // A notice whose subject says only "הודעה על משלוח …": the news is the sentence after the number in the body ("הגיע לארץ ובדרכו אליך").
  const said=genericSubject?(text.slice(subject.length).match(/\b[A-Z]{2}\d{8,}[A-Z]{0,2}\b\s*(?:מחו["״]ל\s*)?([\u0590-\u05FF][^.\n]{3,70})/)?.[1]||'').replace(/\s+/g,' ').trim():'';
- const label=postSaid?postSaid:/^(?:shipped|ordered|delivered|out for delivery)\s*:/i.test(subject)&&stage>=0?stages[stage]:!genericSubject?subject:said?said:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
+ const picked=/ליקוט ה?הזמנ\S*(?: שלך)? הסתיים/.test(text.slice(0,2000));
+ const label=picked?'ההזמנה לוקטה ונארזה':postSaid?postSaid:/^(?:shipped|ordered|delivered|out for delivery)\s*:/i.test(subject)&&stage>=0?stages[stage]:!genericSubject?subject:said?said:stage===3?('ממתינה לאיסוף'+(place?' ב'+place:'')):stage===2?'בדרך לישראל':stage===1?'יצאה לדרך':(lead.replace(/^.*?שלום[^,]*,\s*/,'').replace(/[A-Z]*\d{6,}[A-Z]?/gi,'').replace(/\s+/g,' ').split(/[.!]/)[0].trim().slice(0,90)||'עדכון מחברת השילוח');
  // Customs / VAT to pay before release. Only official payment links are kept (customs-payment scams are common).
  const due=/(?:תשלום|לתשלום|חיוב|לשלם)\s+(?:ה?מסים|ה?מיסים|ה?מכס|מע"?מ|דמי (?:ה)?מכס|דמי טיפול ומסים)|(?:customs|import) (?:duty|duties|tax|fees?|charges?)|duties (?:and|&) taxes|pay (?:the )?(?:customs|duty|vat)/i.test(subject+' '+text.slice(0,3000))&&(knownSender||/postil|israelpost|gov\.il|dhl|ups|fedex|hfd/i.test(from));
  const OFFICIAL=/^https:\/\/(?:[a-z0-9-]+\.)*(?:israelpost\.co\.il|gov\.il|dhl\.co\.il|dhl\.com|ups\.com|fedex\.com|hfd\.co\.il)\//i;
@@ -211,6 +216,8 @@ function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
  for(const x of sorted){if(x.p<999){seen.add(x.p);first.push(x.u);}else rest.push(x.u);}return [...first,...rest];}
 export function mergeParcels(rows:Parcel[]){
  // Old saves from before the Israel Post fix: the mail's accessibility icon was taken for the product.
+ const lt=(x:string)=>x.toLowerCase().replace(/[^a-z\u0590-\u05FF]/g,'');
+ rows=rows.map(p=>{const n=lt(p.name||''),b=lt((p.shop||'')+' '+(brandDomains[p.shop]||''));return p.shop&&n.length>2&&b.includes(n)?{...p,name:'הזמנה מ־'+p.shop,image:''}:p;});
  rows=rows.filter(p=>!/17track/i.test(p.shop||'')).map(p=>/תפריט נגישות|accessibility/i.test(p.name)||/inforu\.net/i.test(p.image||'')?{...p,name:/תפריט נגישות|accessibility/i.test(p.name)?'חבילה':p.name,image:/inforu\.net/i.test(p.image||'')?'':p.image}:p);
  const parent=new Map<string,string>();const find=(k:string):string=>{const p=parent.get(k)??k;if(p===k)return k;const r=find(p);parent.set(k,r);return r;};
  for(const p of rows){const keys=p.keys?.length?p.keys:[p.id];for(const k of keys)if(!parent.has(k))parent.set(k,k);for(const k of keys.slice(1))parent.set(find(k),find(keys[0]));}
