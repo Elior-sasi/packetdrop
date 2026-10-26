@@ -48,7 +48,7 @@ const statusText=(p:Parcel)=>p.ret?(p.stage>=4?'ההחזרה הגיעה לחנו
 // Mail subjects repeat the number before the status ("חבילה מס' RS…: במכס"); keep the status part.
 // Mail subjects are long ("הזמנתך 21327277 בחנות X - המוצר נשלח"); the history shows just what happened.
 const SHORT:[RegExp,string][]=[[/בוטל|cancel/i,'ההזמנה בוטלה'],[/נמסר|delivered/i,'נמסרה'],[/לאיסוף|ready for pick ?up/i,'מוכנה לאיסוף'],[/יצא[הו]? למסירה|בדרך למסירה|out for delivery/i,'יצאה למסירה'],
- [/במכס|customs/i,'במכס'],[/במדינה|באזור שלכם|הגיע[הו]? לארץ|arrived in/i,'הגיעה לארץ'],[/יצאה מאזור המוצא|בתעבורה|in transit/i,'בדרך לארץ'],[/עם חברת המשלוחים המקומית|local delivery/i,'בדרך למרכז המסירה'],
+ [/במכס|customs/i,'במכס'],[/במדינה|באזור שלכם|הגיע[הו]? לארץ|arrived in/i,'הגיעה לארץ'],[/יצאה מאזור המוצא|בתעבורה|in transit/i,'בדרך לארץ'],[/עם חברת המשלוחים המקומית|local delivery/i,'נאספה ע״י חברת המסירה בארץ'],
  [/נשלח|shipped|dispatched/i,'נשלחה'],[/נאספ|נארז|packed/i,'נארזה ויצאה'],[/אושר|מאושרת|התקבל|confirmed|received/i,'ההזמנה התקבלה']];
 const shortLabel=(s:string)=>{if(s.length<=22&&!/\d{5,}/.test(s))return s;for(const [r,t] of SHORT)if(r.test(s))return t;return s;};
 const cleanLabel=(s:string)=>s.replace(/^(?:ל?חבילה|הזמנה|your order|order)\s*(?:מס['׳]?|מספר|no\.?|#)?\s*[A-Z0-9-]{6,}\s*[:：-]?\s*/i,'').trim()||s;
@@ -64,7 +64,14 @@ const displayName=(p:Parcel)=>isGeneric(p.name)?(p.shop&&!/הזמנה מהדוא
 const PARSER=5;
 const keepOld=(list:MailParcel[])=>list.filter(p=>Date.now()-new Date(p.events.at(-1)?.time||0).getTime()>175*864e5);
 const NOISE=/(?:^|\s)יש עדכון\s*$|has an update|^עדכון$|איך הלך|בהמתנה לאישור|ביקורת|review|rate your|תסומן בקרוב|how was/i;
-const timeline=(evs:Event[])=>{const out:Event[]=[];for(const e of evs){if(NOISE.test(e.label))continue;const l=cleanLabel(e.label);if(out.length&&cleanLabel(out[out.length-1].label)===l)continue;out.push(e);}return out.length?out:evs.slice(-1);};
+// The same step told by two sources (the mail and Cainiao), or repeated by one, is shown once, at its latest time, with the mail link if a mail told it.
+const STEP_KEY:[RegExp,string][]=[[/שוחרר(?:ה)? (?:בהצלחה )?מ(?:ה)?מכס|released (?:from|by) customs|customs clearance (?:is )?complete/i,'cr'],[/חברת (?:המסירה|המשלוחים) המקומית|local (?:courier|delivery)|last[- ]mile/i,'lc'],[/הגיע(?:ה)? לארץ|במדינה\/באזור|באזור שלכם|arrived in (?:the )?destination/i,'ar']];
+const stepKey=(l:string)=>STEP_KEY.find(([r])=>r.test(l))?.[1]||'';
+const isMailEv=(e:Event)=>!e.src&&!/^(?:manual|bd|sms|t|trk):/.test(e.id);
+const timeline=(evs:Event[]):(Event&{mailId?:string})[]=>{const out:(Event&{mailId?:string})[]=[];for(const e of evs){if(NOISE.test(e.label))continue;const l=cleanLabel(e.label);if(out.length&&cleanLabel(out[out.length-1].label)===l)continue;
+  const k=stepKey(e.label);const same=k?out.findIndex(x=>stepKey(x.label)===k&&Math.abs(new Date(e.time).getTime()-new Date(x.time).getTime())<36*36e5):-1;
+  // The latest telling wins (it is where the parcel is now); a mail link from an earlier one is kept.
+  if(same>=0){const old=out.splice(same,1)[0];const mail=isMailEv(e)?undefined:isMailEv(old)?old.id:old.mailId;out.push(mail?{...e,mailId:mail}:e);continue;}out.push(e);}return out.length?out:evs.slice(-1);};
 const when=(iso:string)=>{const d=new Date(iso);return d.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'})+' · '+d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
 const ago=(iso:string)=>{const m=Math.floor((Date.now()-new Date(iso).getTime())/60000);return m<1?'עודכן עכשיו':m<60?'עודכן לפני '+m+' דק׳':'עודכן ב־'+new Date(iso).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});};
 
@@ -833,7 +840,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {(open.pickup.address||open.pickup.place)&&<NavLinks pk={open.pickup} geo={geo[placeQuery(open.pickup)]}/>}
    <div className="pickActions"><button className="ghost" onClick={()=>sharePickup(open)}><Share2 size={18}/> שליחה למי שיאסוף</button>{open.pickup.url&&<a className="ghost" href={open.pickup.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={18}/> שעות פתיחה</a>}</div></section>}
   {open.tracking&&trackState==='on'&&open.trackPending&&open.stage<4&&<p className="trackNote">מספר המעקב נרשם אצל חברת השילוח. העדכונים שלה יופיעו כאן בדקות הקרובות.</p>}
-  <section className="box"><h3>מסלול</h3>{[...timeline(open.events)].reverse().map((e,i)=><div key={e.id} className={'ev '+(!i?'l':'')}><span className="dot"/><div><strong dir="auto">{e.src?cleanLabel(e.label):shortLabel(cleanLabel(e.label))}</strong>{e.src?<span className="src">מ־{e.src}</span>:/^(?:manual|bd|sms|t|trk):/.test(e.id)?null:<button type="button" className="linkBtn mailLink" onClick={()=>openMail(e.id)}>המייל המקורי <Mail size={13}/></button>}</div><time dateTime={e.time}>{when(e.time)}</time></div>)}{upcoming(open).length>0&&<div className="ahead" aria-label={'השלבים הבאים: '+upcoming(open).join(', ')}>{upcoming(open).map((l,i)=><div key={l} className={'ev f'+(!i?' n':'')}><span className="dot"/><div><strong>{!i?'הבא: '+l:l}</strong></div></div>)}</div>}</section>
+  <section className="box"><h3>מסלול</h3>{[...timeline(open.events)].reverse().map((e,i)=><div key={e.id} className={'ev '+(!i?'l':'')}><span className="dot"/><div><strong dir="auto">{e.src?cleanLabel(e.label):shortLabel(cleanLabel(e.label))}</strong>{e.src&&<span className="src">מ־{e.src}</span>}{(e.mailId||isMailEv(e))&&<button type="button" className="linkBtn mailLink" onClick={()=>openMail(e.mailId||e.id)}>המייל המקורי <Mail size={13}/></button>}</div><time dateTime={e.time}>{when(e.time)}</time></div>)}{upcoming(open).length>0&&<div className="ahead" aria-label={'השלבים הבאים: '+upcoming(open).join(', ')}>{upcoming(open).map((l,i)=><div key={l} className={'ev f'+(!i?' n':'')}><span className="dot"/><div><strong>{!i?'הבא: '+l:l}</strong></div></div>)}</div>}</section>
   {(open.tracking||open.order||open.url)&&<section className="box">
    {open.tracking&&<div className="kv"><span>מספר מעקב</span><button className="copy" onClick={()=>copy(open.tracking)}><b dir="ltr">{open.tracking}</b>{copied===open.tracking?' ✓':<Copy size={15}/>}</button></div>}
    {open.order&&<div className="kv"><span>מספר הזמנה</span><button className="copy" onClick={()=>copy(open.order)}><b dir="ltr">{open.order}</b>{copied===open.order?' ✓':<Copy size={15}/>}</button></div>}
