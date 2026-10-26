@@ -356,3 +356,15 @@ fieldset.plain{border:0;margin:0;padding:0;min-width:0}
 .shareOpt span{display:grid;gap:2px}.shareOpt small{color:var(--mut);font-size:calc(15px*var(--fs))}
 .menu>button.primary{background:#4aa8ff;color:#05182b;border:0;justify-content:center;font-weight:700}
 .menu>button.primary:disabled{opacity:.5}
+/* Settings: one-time setups and advanced options fold away */
+.setGroup{font-size:calc(19px*var(--fs));margin:22px 4px 8px;color:var(--mut);font-weight:600}
+details.setFold>summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:52px;cursor:pointer}
+details.setFold>summary::-webkit-details-marker{display:none}
+details.setFold>summary h3{margin:0;flex:1}
+details.setFold>summary .bstate{flex:none}
+details.setFold .foldIc{flex:none;color:var(--mut);transition:transform .2s}
+details.setFold[open] .foldIc{transform:rotate(-90deg)}
+details.setFold[open]>summary{margin-bottom:8px}
+@media (prefers-reduced-motion:reduce){details.setFold .foldIc{transition:none}}
+details.setFold>summary h3{color:var(--ink);font-size:calc(17px*var(--fs))}
+.setAdv{margin-top:14px}

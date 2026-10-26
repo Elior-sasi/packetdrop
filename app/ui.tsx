@@ -639,6 +639,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  const toggleOther=(p:Parcel)=>{const on=!isOther(p);const next=on?[...others,p.id,...p.keys.slice(0,5)]:others.filter(k=>k!==p.id&&!p.keys.includes(k));const uniq=[...new Set(next)].slice(-500);setOthers(uniq);setPref('pd_others',JSON.stringify(uniq));};
  // Tracking links for someone else: choose the parcels, optionally the pickup details, then share the link.
  type MyShare={token:string;title:string;pickup:boolean;keys:string[][];names:string[]};
+ // Android (the installed app): iPhone-only setups (Shortcuts, Scriptable, Siri) are not shown.
+ const [android,setAndroid]=useState(false);useEffect(()=>{setAndroid(/Android/i.test(navigator.userAgent));},[]);
  const [shares,setShares]=useState<MyShare[]>([]);const [shareOpen,setShareOpen]=useState(false);const [shareSel,setShareSel]=useState<string[]>([]);const [shareWho,setShareWho]=useState('');const [sharePick,setSharePick]=useState(false);const [shareMsg,setShareMsg]=useState('');const [shareBusy,setShareBusy]=useState(false);
  useEffect(()=>{if(!user)return;fetch('/api/share',{cache:'no-store'}).then(r=>r.json()).then(d=>{if(Array.isArray(d?.shares))setShares(d.shares);}).catch(()=>{});},[user]);
  const openShare=(p:Parcel)=>{setShareSel([p.id]);setShareWho('');setSharePick(false);setShareMsg('');setShareOpen(true);};
@@ -681,28 +683,8 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
  {user&&view!=='account'&&section==='list'&&data&&!waiting&&<div className="tiles" role="tablist" aria-label="סינון חבילות" onTouchStart={e=>rowSlide(e,3,()=>{},false)} onTouchMove={e=>rowSlide(e,3,i=>{const [k,f]=([['active','all'],['active','pickup'],['done','all']] as const)[i];if(!(view===k&&(k==='done'||filter===f))){setFilter(f);go(k);}},true)}>{([['active','all','בדרך',active.length],['active','pickup','לאיסוף',pickup],['done','all','נמסרו',done.length]] as const).map(([key,f,label,n])=>{const on=view===key&&(key==='done'||filter===f);return <button key={label} role="tab" aria-selected={on} className={'tile'+(on?' on':'')+(f==='pickup'?' p':'')} onClick={()=>{setFilter(f);go(key);}}><b>{data?n:'–'}</b><span>{label}</span></button>;})}</div>}
 
  {view==='account'?<div className="settings">
-  <section className="set"><h3>תצוגה</h3>
-   <div className="setRow"><span>גודל טקסט</span></div>
-   <div className="seg" role="radiogroup" aria-label="גודל טקסט" style={{marginBottom:8}}>{['רגיל','גדול','גדול מאוד'].map((l,i)=><button key={i} role="radio" aria-checked={size===i} className={size===i?'on':''} onClick={()=>{setSize(i);setPref('pd_size',String(i));}}>{l}</button>)}</div>
-   <label className="setRow"><span>הערכה לפי חבילות קודמות</span><input type="checkbox" className="sw" checked={showEst} onChange={e=>{setShowEst(e.target.checked);setPref('pd_est',e.target.checked?'1':'0');}}/></label>
-   <label className="setRow"><span>צליל כשיש עדכון</span><input type="checkbox" className="sw" checked={sound} onChange={e=>{setSound(e.target.checked);setPref('pd_sound',e.target.checked?'1':'0');if(e.target.checked){try{audio.current??=new AudioContext();void audio.current.resume().then(chime);}catch{}}}}/></label>
-   <label className="setRow"><span>כרטיס "החבילה הבאה"</span><input type="checkbox" className="sw" checked={showNext} onChange={e=>{setShowNext(e.target.checked);setPref('pd_next',e.target.checked?'1':'0');}}/></label>
-   <label className="setRow"><span>לקפל הודעות שליח בלי שם ב"נמסרו"</span><input type="checkbox" className="sw" checked={foldCourier} onChange={e=>{setFoldCourier(e.target.checked);setPref('pd_fold',e.target.checked?'1':'0');}}/></label>
-   <label className="setRow"><span>מפת "איפה החבילה"</span><input type="checkbox" className="sw" checked={showMap} onChange={e=>{setShowMap(e.target.checked);setPref('pd_map',e.target.checked?'1':'0');}}/></label></section>
-  {user&&<section className="set"><h3>סנכרון</h3>
-   <label className="setRow"><span>רענון אוטומטי בכל כניסה</span><input type="checkbox" className="sw" checked={auto} onChange={e=>{setAuto(e.target.checked);setPref('pd_auto',e.target.checked?'1':'0');}}/></label>
-   <p className="setNote">{data?ago(data.updated):'עדיין לא נסרק'}. אפשר גם למשוך את הרשימה למטה.</p>
-   <button className="ghost" disabled={busy} onClick={()=>{seen.current=new Set();saved.current=[];setData(null);go('active');void sync();}}><RefreshCw size={18}/> סריקה מחדש של כל המיילים</button></section>}
-  {user&&<section className="set backupCard"><div className="row"><h3><Cloud size={20}/> גיבוי בענן</h3><span className={'bstate '+backup.state}>{backup.state==='on'?'פעיל ✓':backup.state==='saving'?'שומר…':backup.state==='error'?'שגיאה':'כבוי'}</span></div>
-   {backup.state==='off'?<><p className="setNote">החבילות והשמות שערכת יישמרו בתיקייה נסתרת ב־Google Drive שלך, ויחזרו בכל מכשיר.</p><form action={login}><GoogleButton label="הפעל גיבוי עם Google" disabled={!configured}/></form></>
-   :<><p className="setNote">{backup.msg||('נשמר בתיקייה נסתרת ב־Google Drive שלך.'+(backup.updated?' גיבוי אחרון: '+new Date(backup.updated).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''))}</p>
-    <button className="ghost" disabled={backup.state==='saving'||busy} onClick={()=>saveBackup(data?.parcels||[])}><CloudUpload size={18}/> גבה עכשיו</button></>}</section>}
-  {user&&<section className="set"><h3>מקורות מעקב</h3>
-   <div className="setRow"><span>17TRACK</span><span className={'bstate '+(sources?.t17?'on':'off')}>{sources?(sources.t17?'עובד ✓':'לא ענה'):'ייבדק ברענון'}</span></div>
-   <div className="setRow"><span>Cainiao</span><span className={'bstate '+(sources?.cainiao==='ok'?'on':'off')}>{!sources?'ייבדק ברענון':sources.cainiao==='ok'?'עובד ✓':sources.cainiao==='blocked'?'חסום':'אין חבילות לבדוק'}</span></div>
-   <p className="setNote">המידע מחברות השילוח משלים את מה שכתוב במיילים.</p></section>}
   {user&&<section className="set"><div className="row"><h3><Bell size={20}/> התראות</h3><span className={'bstate '+(push==='on'?'on':'off')}>{push==='on'?'פעיל ✓':push==='busy'||push==='checking'?'…':'כבוי'}</span></div>
-   <p className="setNote">הזמנה חדשה, נשלחה, יצאה מארץ המוצא, הגיעה לארץ, שוחררה מהמכס, אצל חברת המסירה, מוכנה לאיסוף עם הקוד, יצאה למסירה, ניסיון מסירה שנכשל, נמסרה, וחבילה בלי עדכון 10 ימים. מגיע כמה דקות אחרי המייל, גם כשהאפליקציה סגורה.</p>
+   <p className="setNote">עדכון על כל שלב בדרך, גם כשהאפליקציה סגורה.</p>
    {push==='install'?<p className="setNote">באייפון התראות עובדות רק מהאפליקציה במסך הבית. פתח את Unbox מהאייקון ונסה שוב.</p>
    :push==='unsupported'?<p className="setNote">המכשיר או הדפדפן לא תומכים בהתראות.</p>
    :push==='nodb'?<p className="setNote">ההתראות עוד לא הוגדרו בשרת.</p>
@@ -710,29 +692,12 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    :push==='on'?<><button className="ghost" onClick={testPush}><Bell size={18}/> שלח התראת בדיקה</button><button className="ghost" onClick={disablePush}>כבה התראות</button></>
    :<button className="primary wide" disabled={push!=='off'} onClick={enablePush}><Bell size={18}/> הפעל התראות</button>}
    {pushMsg&&<p className="setNote" role="status">{pushMsg}</p>}</section>}
-  {user&&smsLink&&<section className="set"><h3>SMS אוטומטי</h3>
-   <p className="setNote">הודעות מהדואר, HFD, צ'יטה, תפוז ושאר השליחים ייכנסו לבד, עם מספר המעקב וקוד האיסוף. מגדירים פעם אחת באפליקציית קיצורי הדרך:</p>
-   <ol className="steps2"><li>קיצורים ← אוטומציה ← אוטומציה חדשה ← <b>הודעה</b>.</li><li>"ההודעה מכילה": <b>חבילה</b>. בחר <b>הרץ מיד</b>. כדאי ליצור עוד שתיים, ל<b>משלוח</b> ול<b>שליח</b>, כדי שגם הודעות מתפוז, KSP ואורבניקה ייכנסו.</li><li>פעולה: <b>קבל תוכן של URL</b>. בכתובת הדבק את הקישור האישי, שיטה <b>POST</b>, גוף בקשה <b>טקסט</b> = תוכן ההודעה.</li></ol>
-   <button className="ghost" onClick={()=>copy(smsLink)}><Copy size={18}/> {copied===smsLink?'הקישור הועתק ✓':'העתקת הקישור האישי'}</button>
-   <p className="setNote" role="status">{smsLast?'הודעה אחרונה הגיעה ב־'+new Date(smsLast.at).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(smsLast.kind==='parcel'?' וזוהתה כחבילה ✓':smsLast.kind==='empty'?', אבל בלי טקסט':', אבל לא נמצא בה מספר מעקב'):'עדיין לא הגיעה אף הודעה מהקיצור.'}</p>
-   <p className="setNote">הקישור אישי. אל תשתף אותו.</p></section>}
-  {user&&widgetUrl&&<section className="set"><h3><Smartphone size={20}/> ווידג'ט למסך הבית ולמסך הנעילה</h3>
-   <p className="setNote">{push==='on'?'עובד דרך אפליקציית Scriptable, ומתעדכן עם ההתראות.':'עובד דרך Scriptable ומתעדכן מהשרת של ההתראות, אז צריך שההתראות יהיו פעילות.'}</p>
-   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox</b>.</li><li>במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← גודל קטן או בינוני. בהגדרות הווידג'ט בחר את הסקריפט <b>Unbox</b>.</li><li>גם למסך הנעילה: לחיצה ארוכה על מסך הנעילה ← <b>התאמה אישית</b> ← <b>מסך נעילה</b> ← הקש על השורה מתחת לשעה או על אזור הווידג'טים ← Scriptable. הקש על הווידג'ט שנוסף ובחר את הסקריפט <b>Unbox</b>. בשורה שמעל השעה מופיע הדבר הדחוף (או קוד האיסוף), במלבן 3 השורות הראשונות של הווידג'ט, ובעיגול - כמה חבילות בדרך.</li></ol>
-   <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></section>}
-  {user&&widgetUrl&&(()=>{const sc=aeLoader(widgetUrl.replace('/api/widget','/api/ae'));return <section className="set"><h3><CalendarCheck size={20}/> תאריכי הגעה מהחנויות</h3>
-   <p className="setNote">Scriptable נכנס לעמוד של כל הזמנה פתוחה, בעליאקספרס, באמזון ובחנויות נוספות, ומעתיק את תאריך ההגעה שהחנות נותנת. בפעם הראשונה בכל חנות הוא יבקש להתחבר אליה, וההתחברות נשמרת רק בטלפון שלך.</p>
-   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox Shops</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים צור קיצור עם הפעולה <b>Run Script</b>, בחר <b>Unbox Shops</b> והדלק <b>Run In App</b>. הוסף אירוע <b>שעה</b>, 8:00, כל יום, עם <b>פעולה אוטומטית</b> דלוקה.</li></ol>
-   <button className="ghost" onClick={()=>copy(sc)}><Copy size={18}/> {copied===sc?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button>
-   <a className="ghost btnLink" href="scriptable:///run/Unbox%20Shops"><RefreshCw size={18}/> בדוק עכשיו בחנויות</a>
-   <p className="setNote" role="status">{aeChecked?'עדכון אחרון: '+new Date(aeChecked).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+(Object.keys(aeEtas).length===1?'תאריך אחד':Object.keys(aeEtas).length+' תאריכים'):'עדיין לא התקבלו תאריכים.'}</p></section>;})()}
-  {user&&<section className="set"><h3>מעקב אצל חברות השליחויות</h3>
-   {phone&&!phoneEdit?<><div className="setRow"><span>טלפון <b dir="ltr">{phone.replace(/^(\d{3})(\d{3})(\d+)$/,'$1-$2$3')}</b></span><button className="linkBtn" onClick={()=>{setPhoneDraft(phone);setPhoneEdit(true);}}>עריכה</button></div>
-    <p className="setNote">השרת בודק לפי המספר משלוחים אצל חברות משלוחים בארץ.</p></>
-   :<><p className="setNote">עם מספר הטלפון שלך, השרת בודק בעצמו משלוחים אצל חברות משלוחים בארץ, גם כשלא הגיע עליהם מייל. המספר נשלח רק אליהן.</p>
-   <label className="setRow" htmlFor="phoneIn"><span>מספר טלפון</span></label>
-   <input id="phoneIn" className="phoneIn" type="tel" inputMode="tel" dir="ltr" autoComplete="tel" value={phoneDraft} onChange={e=>setPhoneDraft(e.target.value)}/>
-   <button className="ghost" onClick={()=>{const v=phoneDraft.replace(/\D/g,'');if(v&&!/^0\d{8,9}$/.test(v)){setToast('מספר לא תקין');return;}setPhoneEdit(false);if(v===phone)return;setPhone(v);phoneRef.current=v;setPref('pd_phone',v);if(!v){setPhoneParcels([]);setPref('pd_phone_parcels','[]');}if(pushOn.current)void pushPost({phone:v}).catch(()=>{});if(v)void loadByPhone();setToast(v?'נשמר ✓':'המספר הוסר');}}>{phone&&!phoneDraft.trim()?'הסרת המספר':'שמירה'}</button></>}</section>}
+  <section className="set"><h3>תצוגה</h3>
+   <div className="setRow"><span>גודל טקסט</span></div>
+   <div className="seg" role="radiogroup" aria-label="גודל טקסט" style={{marginBottom:8}}>{['רגיל','גדול','גדול מאוד'].map((l,i)=><button key={i} role="radio" aria-checked={size===i} className={size===i?'on':''} onClick={()=>{setSize(i);setPref('pd_size',String(i));}}>{l}</button>)}</div>
+   <label className="setRow"><span>צליל כשיש עדכון</span><input type="checkbox" className="sw" checked={sound} onChange={e=>{setSound(e.target.checked);setPref('pd_sound',e.target.checked?'1':'0');if(e.target.checked){try{audio.current??=new AudioContext();void audio.current.resume().then(chime);}catch{}}}}/></label>
+   <label className="setRow"><span>רענון אוטומטי בכל כניסה</span><input type="checkbox" className="sw" checked={auto} onChange={e=>{setAuto(e.target.checked);setPref('pd_auto',e.target.checked?'1':'0');}}/></label>
+  </section>
   {user&&(()=>{const allPts=[...new Map([...Object.keys(ptCity).filter(k=>goodPlace(k)).map(k=>[k,k] as const),...Object.entries(ptSeen),...parcels.filter(p=>p.pickup&&(p.pickup.place||p.pickup.address)&&!!goodPlace(p.pickup.place||p.pickup.address)).map(p=>[pointKey(p.pickup!),p.pickup!.place||p.pickup!.address] as const)]).entries()].map(([k,n])=>[k,n,ptCity[k]||''] as const);const pts=allPts.filter(([,n,c])=>!ptQ.trim()||(n+' '+c).includes(ptQ.trim()));return <section className="set"><h3><MapPin size={20}/> התראה ליד נקודת איסוף</h3>
    <p className="setNote">כשמחכה לך חבילה ואתה מגיע לנקודת האיסוף, הטלפון מזכיר לך מה מחכה שם ואת הקוד. נקודה חדשה נוספת לרשימה לבד, והתראה עליה פעילה עד שתכבה אותה.</p>
    <label className="setRow" htmlFor="homeIn"><span>כתובת הבית, לזמן ההגעה לנקודות</span></label>
@@ -741,18 +706,57 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
    {ptPref.enabled&&allPts.length>0&&<><p className="setNote">נקודות האיסוף שלי:</p><input className="phoneIn" type="search" placeholder="חיפוש נקודה או עיר" aria-label="חיפוש נקודת איסוף או עיר" value={ptQ} onChange={e=>setPtQ(e.target.value)}/>{pts.map(([k,name,city])=><label key={k} className="setRow"><span>{name}{city&&<small className="ptCity">{' · '+city}</small>}</span><input type="checkbox" className="sw" aria-label={'התראה בנקודה '+name+(city?', '+city:'')} checked={!ptPref.off.includes(k)} onChange={e=>setPt({key:k,off:!e.target.checked})}/></label>)}{!pts.length&&<p className="setNote" role="status">לא נמצאה נקודה בשם או בעיר האלה.</p>}</>}
    {ptPref.enabled&&!allPts.length&&<p className="setNote">עדיין לא היו לך חבילות בנקודות איסוף.</p>}
    {ptPref.enabled&&widgetUrl&&(()=>{const u=widgetUrl.replace('/api/widget','/api/points')+'&new=1&text=1';return <button className="ghost" onClick={()=>copy(u)}><Copy size={18}/> {copied===u?'הקישור הועתק ✓':'העתקת הקישור לקיצור'}</button>;})()}</section>;})()}
-  {user&&widgetUrl&&(()=>{const cal=widgetUrl.replace('/api/widget','/api/calendar');return <section className="set"><h3><CalendarCheck size={20}/> יומן חבילות</h3>
+  {user&&<section className="set"><h3>מעקב אצל חברות השליחויות</h3>
+   {phone&&!phoneEdit?<><div className="setRow"><span>טלפון <b dir="ltr">{phone.replace(/^(\d{3})(\d{3})(\d+)$/,'$1-$2$3')}</b></span><button className="linkBtn" onClick={()=>{setPhoneDraft(phone);setPhoneEdit(true);}}>עריכה</button></div>
+    <p className="setNote">השרת בודק לפי המספר משלוחים אצל חברות משלוחים בארץ.</p></>
+   :<><p className="setNote">עם מספר הטלפון שלך, השרת בודק בעצמו משלוחים אצל חברות משלוחים בארץ, גם כשלא הגיע עליהם מייל. המספר נשלח רק אליהן.</p>
+   <label className="setRow" htmlFor="phoneIn"><span>מספר טלפון</span></label>
+   <input id="phoneIn" className="phoneIn" type="tel" inputMode="tel" dir="ltr" autoComplete="tel" value={phoneDraft} onChange={e=>setPhoneDraft(e.target.value)}/>
+   <button className="ghost" onClick={()=>{const v=phoneDraft.replace(/\D/g,'');if(v&&!/^0\d{8,9}$/.test(v)){setToast('מספר לא תקין');return;}setPhoneEdit(false);if(v===phone)return;setPhone(v);phoneRef.current=v;setPref('pd_phone',v);if(!v){setPhoneParcels([]);setPref('pd_phone_parcels','[]');}if(pushOn.current)void pushPost({phone:v}).catch(()=>{});if(v)void loadByPhone();setToast(v?'נשמר ✓':'המספר הוסר');}}>{phone&&!phoneDraft.trim()?'הסרת המספר':'שמירה'}</button></>}</section>}
+  {user&&<h2 className="setGroup">הגדרות חד־פעמיות</h2>}
+  {user&&smsLink&&!android&&<details className="set setFold"><summary><h3>SMS אוטומטי</h3>{smsLast?.kind==='parcel'&&<span className="bstate on">מוגדר ✓</span>}<ChevronLeft className="foldIc" size={20} aria-hidden="true"/></summary>
+   <p className="setNote">הודעות מהדואר, HFD, צ'יטה, תפוז ושאר השליחים ייכנסו לבד, עם מספר המעקב וקוד האיסוף. מגדירים פעם אחת באפליקציית קיצורי הדרך:</p>
+   <ol className="steps2"><li>קיצורים ← אוטומציה ← אוטומציה חדשה ← <b>הודעה</b>.</li><li>"ההודעה מכילה": <b>חבילה</b>. בחר <b>הרץ מיד</b>. כדאי ליצור עוד שתיים, ל<b>משלוח</b> ול<b>שליח</b>, כדי שגם הודעות מתפוז, KSP ואורבניקה ייכנסו.</li><li>פעולה: <b>קבל תוכן של URL</b>. בכתובת הדבק את הקישור האישי, שיטה <b>POST</b>, גוף בקשה <b>טקסט</b> = תוכן ההודעה.</li></ol>
+   <button className="ghost" onClick={()=>copy(smsLink)}><Copy size={18}/> {copied===smsLink?'הקישור הועתק ✓':'העתקת הקישור האישי'}</button>
+   <p className="setNote" role="status">{smsLast?'הודעה אחרונה הגיעה ב־'+new Date(smsLast.at).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(smsLast.kind==='parcel'?' וזוהתה כחבילה ✓':smsLast.kind==='empty'?', אבל בלי טקסט':', אבל לא נמצא בה מספר מעקב'):'עדיין לא הגיעה אף הודעה מהקיצור.'}</p>
+   <p className="setNote">הקישור אישי. אל תשתף אותו.</p></details>}
+  {user&&widgetUrl&&!android&&<details className="set setFold"><summary><h3><Smartphone size={20}/> ווידג'ט למסך הבית ולמסך הנעילה</h3><ChevronLeft className="foldIc" size={20} aria-hidden="true"/></summary>
+   <p className="setNote">{push==='on'?'עובד דרך אפליקציית Scriptable, ומתעדכן עם ההתראות.':'עובד דרך Scriptable ומתעדכן מהשרת של ההתראות, אז צריך שההתראות יהיו פעילות.'}</p>
+   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox</b>.</li><li>במסך הבית: לחיצה ארוכה ← <b>+</b> ← Scriptable ← גודל קטן או בינוני. בהגדרות הווידג'ט בחר את הסקריפט <b>Unbox</b>.</li><li>גם למסך הנעילה: לחיצה ארוכה על מסך הנעילה ← <b>התאמה אישית</b> ← <b>מסך נעילה</b> ← הקש על השורה מתחת לשעה או על אזור הווידג'טים ← Scriptable. הקש על הווידג'ט שנוסף ובחר את הסקריפט <b>Unbox</b>. בשורה שמעל השעה מופיע הדבר הדחוף (או קוד האיסוף), במלבן 3 השורות הראשונות של הווידג'ט, ובעיגול - כמה חבילות בדרך.</li></ol>
+   <button className="ghost" onClick={()=>copy(widgetScript(widgetUrl))}><Copy size={18}/> {copied===widgetScript(widgetUrl)?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button></details>}
+  {user&&widgetUrl&&!android&&(()=>{const sc=aeLoader(widgetUrl.replace('/api/widget','/api/ae'));return <details className="set setFold"><summary><h3><CalendarCheck size={20}/> תאריכי הגעה מהחנויות</h3>{aeChecked&&<span className="bstate on">מוגדר ✓</span>}<ChevronLeft className="foldIc" size={20} aria-hidden="true"/></summary>
+   <p className="setNote">Scriptable נכנס לעמוד של כל הזמנה פתוחה, בעליאקספרס, באמזון ובחנויות נוספות, ומעתיק את תאריך ההגעה שהחנות נותנת. בפעם הראשונה בכל חנות הוא יבקש להתחבר אליה, וההתחברות נשמרת רק בטלפון שלך.</p>
+   <ol className="steps2"><li>העתק את הסקריפט.</li><li>ב־Scriptable: <b>+</b>, הדבק, ושמור בשם <b>Unbox Shops</b>.</li><li>הפעל אותו פעם אחת והתחבר לעליאקספרס. בסוף ההתחברות סגור את החלון עם <b>Close</b>.</li><li>כדי שיתעדכן לבד: באפליקציית קיצורים צור קיצור עם הפעולה <b>Run Script</b>, בחר <b>Unbox Shops</b> והדלק <b>Run In App</b>. הוסף אירוע <b>שעה</b>, 8:00, כל יום, עם <b>פעולה אוטומטית</b> דלוקה.</li></ol>
+   <button className="ghost" onClick={()=>copy(sc)}><Copy size={18}/> {copied===sc?'הסקריפט הועתק ✓':'העתקת הסקריפט'}</button>
+   <a className="ghost btnLink" href="scriptable:///run/Unbox%20Shops"><RefreshCw size={18}/> בדוק עכשיו בחנויות</a>
+   <p className="setNote" role="status">{aeChecked?'עדכון אחרון: '+new Date(aeChecked).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+' · '+(Object.keys(aeEtas).length===1?'תאריך אחד':Object.keys(aeEtas).length+' תאריכים'):'עדיין לא התקבלו תאריכים.'}</p></details>;})()}
+  {user&&widgetUrl&&(()=>{const cal=widgetUrl.replace('/api/widget','/api/calendar');return <details className="set setFold"><summary><h3><CalendarCheck size={20}/> יומן חבילות</h3><ChevronLeft className="foldIc" size={20} aria-hidden="true"/></summary>
    <p className="setNote">כל צפי הגעה וכל יום אחרון לאיסוף נכנסים ליומן שלך ומתעדכנים לבד כשמשהו משתנה. ביום האחרון לאיסוף תגיע תזכורת ב־9:00.</p>
-   <button className="primary" onClick={()=>{const w=cal.replace(/^https:/,'webcal:');let left=false;const h=()=>{if(document.visibilityState==='hidden')left=true;};document.addEventListener('visibilitychange',h);location.href=w;setTimeout(()=>{document.removeEventListener('visibilitychange',h);if(!left){void navigator.clipboard?.writeText(cal).catch(()=>{});setCalHelp(true);}},1800);}}><CalendarCheck size={18}/> הוספה ליומן של iPhone</button>
+   {!android&&<button className="primary" onClick={()=>{const w=cal.replace(/^https:/,'webcal:');let left=false;const h=()=>{if(document.visibilityState==='hidden')left=true;};document.addEventListener('visibilitychange',h);location.href=w;setTimeout(()=>{document.removeEventListener('visibilitychange',h);if(!left){void navigator.clipboard?.writeText(cal).catch(()=>{});setCalHelp(true);}},1800);}}><CalendarCheck size={18}/> הוספה ליומן של iPhone</button>}
    {calHelp&&<div className="setNote" role="status"><p>היומן לא נפתח מתוך האפליקציה, אז העתקתי את הקישור. להוספה ידנית:</p><ol className="steps2"><li>הגדרות ← <b>יומן</b> ← <b>חשבונות</b> ← <b>הוסף חשבון</b>.</li><li><b>אחר</b> ← <b>הוסף יומן מנוי</b>.</li><li>הדבק את הקישור ← <b>הבא</b> ← <b>שמור</b>.</li></ol></div>}
    <button className="ghost" onClick={()=>copy(cal)}><Copy size={18}/> {copied===cal?'הקישור הועתק ✓':'העתקת הקישור, ליומן Google'}</button>
-   <p className="setNote">ביומן Google: הגדרות ← הוספת יומן ← מכתובת URL, והדבק. Google מעדכן יומן כזה רק כמה פעמים ביום.</p></section>;})()}
-  {user&&widgetUrl&&<section className="set"><h3><Mic size={20}/> לשאול את Siri</h3>
+   <p className="setNote">ביומן Google: הגדרות ← הוספת יומן ← מכתובת URL, והדבק. Google מעדכן יומן כזה רק כמה פעמים ביום.</p></details>;})()}
+  {user&&widgetUrl&&!android&&<details className="set setFold"><summary><h3><Mic size={20}/> לשאול את Siri</h3><ChevronLeft className="foldIc" size={20} aria-hidden="true"/></summary>
    <p className="setNote">אומרים "היי Siri, איפה החבילות שלי" ושומעים מה מחכה לאיסוף ועם איזה קוד, מה מגיע היום ומה בדרך. {push==='on'?'':'צריך שההתראות יהיו פעילות.'}</p>
    <ol className="steps2"><li>העתק את הקישור האישי.</li><li>באפליקציית קיצורים: <b>+</b> ← הוסף פעולה <b>קבל תוכן של URL</b> והדבק את הקישור.</li><li>הוסף פעולה <b>דבר טקסט</b>.</li><li>שמור את הקיצור בשם <b>איפה החבילות שלי</b>.</li></ol>
    <button className="ghost" onClick={()=>copy(widgetUrl.replace('/api/widget','/api/speak'))}><Copy size={18}/> {copied===widgetUrl.replace('/api/widget','/api/speak')?'הקישור הועתק ✓':'העתקת הקישור האישי'}</button>
    <button className="ghost" onClick={async()=>{try{const t=await (await fetch(widgetUrl.replace('/api/widget','/api/speak'),{cache:'no-store'})).text();const u=new SpeechSynthesisUtterance(t);u.lang='he-IL';speechSynthesis.cancel();speechSynthesis.speak(u);setToast(t);}catch{setToast('לא הצלחתי להשמיע כרגע');}}}><Volume2 size={18}/> השמע עכשיו</button>
-   <p className="setNote">הקישור אישי. אל תשתף אותו.</p></section>}
+   <p className="setNote">הקישור אישי. אל תשתף אותו.</p></details>}
+  {user&&<details className="set setFold setAdv"><summary><h3>מתקדם</h3><ChevronLeft className="foldIc" size={20} aria-hidden="true"/></summary>
+   <label className="setRow"><span>הערכה לפי חבילות קודמות</span><input type="checkbox" className="sw" checked={showEst} onChange={e=>{setShowEst(e.target.checked);setPref('pd_est',e.target.checked?'1':'0');}}/></label>
+   <label className="setRow"><span>כרטיס "החבילה הבאה"</span><input type="checkbox" className="sw" checked={showNext} onChange={e=>{setShowNext(e.target.checked);setPref('pd_next',e.target.checked?'1':'0');}}/></label>
+   <label className="setRow"><span>לקפל הודעות שליח בלי שם ב"נמסרו"</span><input type="checkbox" className="sw" checked={foldCourier} onChange={e=>{setFoldCourier(e.target.checked);setPref('pd_fold',e.target.checked?'1':'0');}}/></label>
+   <label className="setRow"><span>מפת "איפה החבילה"</span><input type="checkbox" className="sw" checked={showMap} onChange={e=>{setShowMap(e.target.checked);setPref('pd_map',e.target.checked?'1':'0');}}/></label>
+   <p className="setNote">{data?ago(data.updated):'עדיין לא נסרק'}. אפשר גם למשוך את הרשימה למטה.</p>
+   <button className="ghost" disabled={busy} onClick={()=>{seen.current=new Set();saved.current=[];setData(null);go('active');void sync();}}><RefreshCw size={18}/> סריקה מחדש של כל המיילים</button>
+   <div className="setRow"><span>17TRACK</span><span className={'bstate '+(sources?.t17?'on':'off')}>{sources?(sources.t17?'עובד ✓':'לא ענה'):'ייבדק ברענון'}</span></div>
+   <div className="setRow"><span>Cainiao</span><span className={'bstate '+(sources?.cainiao==='ok'?'on':'off')}>{!sources?'ייבדק ברענון':sources.cainiao==='ok'?'עובד ✓':sources.cainiao==='blocked'?'חסום':'אין חבילות לבדוק'}</span></div>
+   <p className="setNote">המידע מחברות השילוח משלים את מה שכתוב במיילים.</p>
+  </details>}
+  {user&&<section className="set backupCard"><div className="row"><h3><Cloud size={20}/> גיבוי בענן</h3><span className={'bstate '+backup.state}>{backup.state==='on'?'פעיל ✓':backup.state==='saving'?'שומר…':backup.state==='error'?'שגיאה':'כבוי'}</span></div>
+   {backup.state==='off'?<><p className="setNote">החבילות והשמות שערכת יישמרו בתיקייה נסתרת ב־Google Drive שלך, ויחזרו בכל מכשיר.</p><form action={login}><GoogleButton label="הפעל גיבוי עם Google" disabled={!configured}/></form></>
+   :<><p className="setNote">{backup.msg||('נשמר בתיקייה נסתרת ב־Google Drive שלך.'+(backup.updated?' גיבוי אחרון: '+new Date(backup.updated).toLocaleString('he-IL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}):''))}</p>
+    <button className="ghost" disabled={backup.state==='saving'||busy} onClick={()=>saveBackup(data?.parcels||[])}><CloudUpload size={18}/> גבה עכשיו</button></>}</section>}
   {user&&hiddenCount>0&&<section className="set"><h3>חבילות מוסתרות</h3><p className="setNote">הסתרת {hiddenCount} פריטים שזוהו בטעות כחבילות.</p><button className="ghost" onClick={()=>{const next=Object.fromEntries(Object.entries(marks).filter(([,v])=>v!=='hide')) as Record<string,'got'|'hide'>;setMarks(next);persist(next,manual);}}><Undo2 size={18}/> החזר את כולם</button></section>}
   <section className="set"><h3>חשבון</h3>
    {user?<><div className="setRow"><span>{user.name||'Google'}</span></div><p className="setNote mono" dir="ltr">{user.email}</p>
@@ -760,7 +764,7 @@ export default function Dashboard({user,gmail,drive,configured,login}:{user:User
     <button className="ghost" onClick={()=>signOut({callbackUrl:'/'})}>יציאה מהחשבון</button></>
    :<form action={login}><GoogleButton label="התחבר עם Google" disabled={!configured}/></form>}</section>
   <section className="set"><h3>אודות</h3>
-   <p className="setNote">להתקנה: Safari ← שיתוף ← הוספה למסך הבית.</p>
+   {!android&&<p className="setNote">להתקנה: Safari ← שיתוף ← הוספה למסך הבית.</p>}
    <p className="setNote"><a href="/privacy">מדיניות פרטיות</a></p></section>
  </div>:<>
   {!configured&&<section className="notice"><h2>Unbox מוכנה לחיבור</h2><p>חיבור Google עדיין לא הוגדר. נתוני הדגמה אינם מוצגים.</p></section>}
