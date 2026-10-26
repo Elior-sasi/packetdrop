@@ -164,7 +164,7 @@ export function parseMessage(m:Message,pdf?:PdfInfo):Parcel|null{
  if(altImgs.length>1&&listedImgs.length<2)listedImgs.splice(0,listedImgs.length,...altImgs.slice(0,12));
  if(!name&&pdf?.items.length)name=pdf.items.slice(0,2).join(' + ')+(pdf.items.length>2?' ועוד '+(pdf.items.length-2):'');
  // A subject that only says the order arrived ("הזמנתך התקבלה באתר …") names the store, not a product.
- if(!name&&shop&&/^(?:הזמנת[ךה]|ההזמנה(?: שלך)?) (?:התקבלה|אושרה)|^אישור ה?הזמנה|^תודה על ה?הזמנ|^your order (?:has been )?(?:confirmed|received)|^order (?:confirmed|received)/i.test(subject.trim()))name='הזמנה מ־'+shop;
+ if(!name&&shop&&/^(?:הזמנת[ךה]|ההזמנה(?: שלך)?) (?:התקבלה|אושרה)|^אישור ה?הזמנה|^תודה על ה?הזמנ|^your order (?:has been )?(?:confirmed|received)|^order (?:confirmed|received)|^(?:ה?חשבונית|קבלה|invoice|receipt|tax invoice)(?=[\s:]|$)/i.test(subject.trim()))name='הזמנה מ־'+shop;
 if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חבילה':subject.replace(/^(re:|fw:)\s*/i,'').replace(/[\u2066-\u2069\u200e\u200f]/g,'').replace(/^(?:shipped|ordered|delivered|out for delivery|arriving \w+)\s*:\s*(?:\d+\s+)?/i,'').replace(/\s+items?$/i,'').trim()||'חבילה';
  const lead=text.slice(0,700);
  const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
@@ -217,7 +217,7 @@ function orderImgs(imgs:string[],items:string[],named:Record<string,string>){
 export function mergeParcels(rows:Parcel[]){
  // Old saves from before the Israel Post fix: the mail's accessibility icon was taken for the product.
  const lt=(x:string)=>x.toLowerCase().replace(/[^a-z\u0590-\u05FF]/g,'');
- rows=rows.map(p=>{const n=lt(p.name||''),b=lt((p.shop||'')+' '+(brandDomains[p.shop]||''));return p.shop&&n.length>2&&b.includes(n)?{...p,name:'הזמנה מ־'+p.shop,image:''}:p;});
+ rows=rows.map(p=>{const n=lt(p.name||''),b=lt((p.shop||'')+' '+(brandDomains[p.shop]||''));return p.shop&&n.length>2&&b.includes(n)?{...p,name:'הזמנה מ־'+p.shop,image:''}:p.shop&&/^(?:ה?חשבונית|קבלה|invoice|receipt)(?=[\s:]|$)/i.test(p.name||'')?{...p,name:'הזמנה מ־'+p.shop}:p;});
  rows=rows.filter(p=>!/17track/i.test(p.shop||'')).map(p=>/תפריט נגישות|accessibility/i.test(p.name)||/inforu\.net/i.test(p.image||'')?{...p,name:/תפריט נגישות|accessibility/i.test(p.name)?'חבילה':p.name,image:/inforu\.net/i.test(p.image||'')?'':p.image}:p);
  const parent=new Map<string,string>();const find=(k:string):string=>{const p=parent.get(k)??k;if(p===k)return k;const r=find(p);parent.set(k,r);return r;};
  for(const p of rows){const keys=p.keys?.length?p.keys:[p.id];for(const k of keys)if(!parent.has(k))parent.set(k,k);for(const k of keys.slice(1))parent.set(find(k),find(keys[0]));}
