@@ -28,3 +28,7 @@ test('store SMS: "ready and waiting at the branch" moves the order to pickup, wi
  assert.equal(a.id,'order:32349432');assert.equal(a.stage,3);assert.equal(a.pickup?.place,'סופר-פארם פסגת זאב');
  const b=parseSms('היי אליאור, הזמנתך 32349432 עדיין ממתינה לך לאיסוף בסניף סופר-פארם פסגת זאב. במידה ולא תיאסף בימים הקרובים תבוטל בהתאם לתקנון.')!;
  assert.equal(b.stage,3);assert.equal(b.pickup?.place,'סופר-פארם פסגת זאב');});
+import {pdfOrder} from '../lib/pdf';
+test('invoice PDF: a delivery-fee line and its warehouse column are not a product',()=>{
+ const t=['377815 ¦ HEAT PUMP EL896 מייבש כביסה אלקטרה 8 ¦ ראשי לוגיסטיקר- 11 מחסני ¦ יועץ ¦ 1 ¦ 1490.00 ¦ 1490.00','225500 ¦ הובלה ¦ ראשי תל אביב ¦ 3 פריטי שיווק ¦ 1 ¦ 99.00 ¦ 99.00','הערות : ת. משלוח: 473173421'].join('\n');
+ const o=pdfOrder(t);assert.deepEqual(o.items,['HEAT PUMP EL896 מייבש כביסה אלקטרה 8']);assert.deepEqual(o.ship,['473173421']);});

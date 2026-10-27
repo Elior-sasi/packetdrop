@@ -26,10 +26,12 @@ export function pdfOrder(text:string){
  const order=text.match(/(?:מס['׳]?\s*הזמנה|הזמנה\s*מספר)[\s¦:-]*(?:מס['׳]?[\s¦]*)?(\d{8,12})/)?.[1]||'';
  const ship=[...new Set([...text.matchAll(/ת\.?\s?משלוח[\s¦:]*(\d{7,12})/g)].map(m=>m[1]))];
  // Product rows: a 5-7 digit item code and a price; the description is the longest Hebrew cell that is not a warehouse/agent/payment column.
- const NOISE=/סוכן|אינטרנט|מחסן|הובל|שילוח|אשראי|בנק|התאמות|ספק|שיווק|החזרה|BTB|מבוטל|תשלומים|הטבת|מקט השלמה|התקנה|אחריות|סה"?כ|מע"?מ|^הערות|קמפיין|מבצע|תודה שבחרתם|חשבוני|הזמנה מספר|קופון|הנחה|GIFTPACK/i;
+ const NOISE=/סוכן|אינטרנט|מחסן|הובל|שילוח|אשראי|בנק|התאמות|ספק|שיווק|החזרה|BTB|מבוטל|תשלומים|הטבת|מקט השלמה|התקנה|אחריות|סה"?כ|מע"?מ|^הערות|קמפיין|מבצע|תודה שבחרתם|חשבוני|הזמנה מספר|קופון|הנחה|GIFTPACK|^ראשי(?:\s|$)|לוגיסטיק|מרלו"?ג/i;
+ // A delivery or installation fee line ("225500 ¦ הובלה ¦ ראשי תל אביב ¦ 99.00") is not a product.
+ const FEE=/^(?:הובלה|משלוח|דמי משלוח|התקנה|הרכבה|פירוק|שינוע|איסוף מוצר ישן)$/;
  const items:string[]=[];
  for(const line of text.split('\n')){const cells=line.split(' ¦ ').map(c=>c.trim()).filter(Boolean);const flat=cells.join(' ');
-  if(!/\b\d{5,7}\b/.test(flat)||!/\d+\.\d{2}/.test(flat))continue;
+  if(!/\b\d{5,7}\b/.test(flat)||!/\d+\.\d{2}/.test(flat)||cells.some(c=>FEE.test(c)))continue;
   const desc=cells.filter(c=>HEB.test(c)&&c.length>=6&&!NOISE.test(c)&&!/^\d/.test(c)).sort((a,b)=>b.length-a.length)[0];
   const fixed=desc&&runOrder(desc);if(fixed&&!items.includes(fixed))items.push(fixed);}
  return {order,ship,items:items.slice(0,4)};}
