@@ -368,3 +368,4 @@ details.setFold[open]>summary{margin-bottom:8px}
 @media (prefers-reduced-motion:reduce){details.setFold .foldIc{transition:none}}
 details.setFold>summary h3{color:var(--ink);font-size:calc(17px*var(--fs))}
 .setAdv{margin-top:14px}
+.mailFile{margin:8px 0}.mailFile img{display:block;width:100%;height:auto;border-radius:12px;background:#fff;margin:6px 0}
