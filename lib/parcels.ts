@@ -36,7 +36,7 @@ const NOT_PARCEL=/17track|eventbuzz|smarticket|go-out|goout|tickchak|cinema|yesp
 const SHIPPING=/משלוח|שליח|חבילה|איסוף|נשלח|נארז|נקודת (?:ה)?חלוקה|כתובת למשלוח|shipping|shipped|shipment|delivery|tracking|מעקב|parcel|package/i;
 const STAGE_RULES:[number,RegExp][]=[
  [4,/^delivered\s*:|איך הלך|לכתוב ביקורת|חוויתכם חשובה|שלחו את דעתכם|דרגו את החוויה|write a review|leave a review|how was your order|נמסרה|נמסר לנמען|נמסר בהצלחה|has been delivered|was delivered|delivered successfully|successfully delivered|delivery complete/i],
- [3,/^out for delivery\s*:|מוכנה לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|ממתין ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|ממתינה ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|טרם נאסף|בדרכו לכתובת|בדרכה לכתובת|השליח יצור קשר|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
+ [3,/^out for delivery\s*:|מוכנה לאיסוף|מוכנה ו?ממתינה|ממתינה לך (?:ל?איסוף )?ב|ממתינה לך לאיסוף|ממתינה לאיסוף|ממתין לאיסוף|ממתי[ןנ]? לאיסופך|ממתין ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|ממתינה ב(?!מכס|שחרור|תור)[\u0590-\u05FF]|טרם נאסף|בדרכו לכתובת|בדרכה לכתובת|השליח יצור קשר|יצאה למסירה|יצא למסירה|יצא לחלוקה|השליח בדרך|בדרך למסירה|out for delivery|ready for (?:pickup|collection)/i],
  [2,/שוחרר(?:ה)? (?:בהצלחה )?מהמכס|עם חברת המשלוחים המקומית|על ידי חברת המשלוחים המקומית|למרכז המסירה|נקלט במחסני|נקלטה במחסני|במכס|השחרור מהמכס|במדינה|באזור שלכם|בתעבורה|הגיעה לארץ|הגיע לארץ|בדרכה לישראל|בדרכו לישראל|בדרכ[ןוה] לארץ|בדרך לארץ|במרכז המיון|in transit|customs|arrived at/i],
  [1,/^shipped\s*:|נשלחה(?! לאימות)|נשלח(?! SMS| לאימות| קוד| אליך קוד| את| לך)|נאספה|נארזה|יצאה למשלוח|בדרך אליך|יצאה מאזור המוצא|עדכון ממדינת המוצא|יצא לדרך|יוצ[אר] לדרך|has shipped|order shipped|dispatched|shipment sent|picked up by/i],
  [0,/^ordered\s*:|אושרה|מאושרת|התקבלה|תטופל בהקדם|order confirmed|order placed|thanks for your order|תודה על הזמנתך/i]];
@@ -287,11 +287,13 @@ export function parseSms(raw:string,now=new Date()):Parcel|null{
 // A store's own SMS about an order (Super-Pharm "הזמנת איסוף עצמי מספר 32349432 … תסופק לך עד ליום שני 26/10"): kept by order number,
  // so it joins the order mail, with the day the store promised.
  const due=etaOf(text.match(/(?:תסופק|יסופק|תגיע|יגיע|תהיה מוכנה|יהיה מוכן|צפוי\S*|מועד אספקה)[^.\d]{0,30}?(\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)/)?.[1]||'');
- if(!tracking){const no=text.match(/הזמנ\S*\s+(?:[\u0590-\u05FF]+\s+){0,2}(?:(?:מס['׳]?|מספר)\s*:?)?\s*#?\s*0*(\d{6,12})\b/)?.[1];if(!no)return null;
+ if(!tracking){const no=text.match(/הזמנ\S*\s+(?:[\u0590-\u05FF-]+\s+){0,3}(?:(?:מס['׳]?|מספר)\s*:?)?\s*#?\s*0*(\d{6,12})\b/)?.[1];if(!no)return null;
   const id='order:'+no;const shop=shops.find(([r])=>r.test(text))?.[1]||'';// "כאשר ההזמנה תהיה מוכנה לאיסוף…" is a promise, not news: those sentences don't set the stage.
   let st=stageOf(text.split(/[.!]/).filter(x=>!/^\s*(?:כאשר|כש|לאחר|ברגע ש|אם)/.test(x)).join('.'));if(st<0)st=0;
-  const lbl=st>=4?'נמסרה':st===3?'מוכנה לאיסוף':due?'ההזמנה בטיפול, תסופק עד '+due:'עדכון מ־SMS';
-  return {id,keys:[id],name:shop?'הזמנה מ־'+shop:'הזמנה '+no,shop,carrier:'',image:'',url:'',tracking:'',order:no,eta:due,stage:st,cancelled:false,pickup:null,smsOrder:true,events:[{id:'sms:'+id+':'+st+':'+now.toISOString().slice(0,13),label:lbl,time:now.toISOString()}]};}
+  // "ממתינה לך בסניף סופר-פארם פסגת זאב": where to collect it.
+  const at=st===3?(text.match(/(?:בסניף|בנקודת(?: האיסוף)?|בחנות)\s+([^.,\n]{3,40}?)(?=[.,]|\s+(?:מספר|במידה|בהגיעך|עד|קוד)|$)/)?.[1]||'').trim():'';
+  const lbl=st>=4?'נמסרה':st===3?'מוכנה לאיסוף'+(at?' ב'+at:''):due?'ההזמנה בטיפול, תסופק עד '+due:'עדכון מ־SMS';
+  return {id,keys:[id],name:shop?'הזמנה מ־'+shop:'הזמנה '+no,shop,carrier:'',image:'',url:'',tracking:'',order:no,eta:due,stage:st,cancelled:false,pickup:at?{place:at,address:'',code:'',url:''}:null,smsOrder:true,events:[{id:'sms:'+id+':'+st+':'+now.toISOString().slice(0,13),label:lbl,time:now.toISOString()}]};}
  const code=text.match(/(?:קוד(?:\s*(?:ה?איסוף|ה?משיכה|לקבלת\s*ה?חבילה|אישור|סודי))?|code)\s*[:\-]?\s*(\d{4,8})\b/i)?.[1]||'';
  const place=(text.match(/(?:לאיסוף|ממתינה|ממתין|מחכה)[^.]{0,30}?\s(?:בנקודת איסוף|בנקודת|בסניף|בחנות|ב)\s*([^.,\n]{3,40}?)(?=[,.]|\s+(?:ב?כתובת|ברחוב|עד|קוד|לפרטים|שעות)|$)/)?.[1]||'').trim();
  const address=(text.match(/(?:בכתובת|כתובת:?|ברחוב)\s*([^.\n]{4,60}?)(?=[.]|\s+(?:עד|קוד|לפרטים|שעות)|$)/)?.[1]||'').trim();

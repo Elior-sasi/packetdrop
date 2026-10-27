@@ -23,3 +23,8 @@ test('an invoice mail whose order number is only in the attached file joins the 
 test('a parcel saved before the logo fix (named after its store, logo as photo) is shown as an order from that store',()=>{
  const old={id:'order:32349432',keys:['order:32349432'],name:'Super-Pharm',shop:'סופר-פארם',carrier:'',image:'https://media.prod.super-pharm.co.il/sp_online_130.png',url:'',tracking:'',order:'032349432',eta:'',stage:0,cancelled:false,pickup:null,events:[{id:'a',label:'ההזמנה התקבלה',time:'2026-10-23T14:16:50Z'}]};
  const [m]=mergeParcels([old as never]);assert.equal(m.name,'הזמנה מ־סופר-פארם');assert.equal(m.image,'');});
+test('store SMS: "ready and waiting at the branch" moves the order to pickup, with the branch',()=>{
+ const a=parseSms('היי אליאור סאסי, הזמנתך מסופר-פארם אונליין מספר 32349432 מוכנה וממתינה לך בסניף סופר-פארם פסגת זאב. מספר החבילות בהזמנה: 1 . בהגיעך לסניף יש לסרוק את קוד ה-QR שממוקם ליד הקופה הראשית')!;
+ assert.equal(a.id,'order:32349432');assert.equal(a.stage,3);assert.equal(a.pickup?.place,'סופר-פארם פסגת זאב');
+ const b=parseSms('היי אליאור, הזמנתך 32349432 עדיין ממתינה לך לאיסוף בסניף סופר-פארם פסגת זאב. במידה ולא תיאסף בימים הקרובים תבוטל בהתאם לתקנון.')!;
+ assert.equal(b.stage,3);assert.equal(b.pickup?.place,'סופר-פארם פסגת זאב');});
