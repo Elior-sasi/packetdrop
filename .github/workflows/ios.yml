@@ -4,6 +4,8 @@ on:
   push:
     paths: ['ios/**', '.github/workflows/ios.yml']
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: macos-15
@@ -33,3 +35,17 @@ jobs:
         with:
           name: screenshot
           path: ios/launch.png
+      - name: Build for iPhone (installed with Sideloadly, which signs it)
+        run: |
+          cd ios
+          xcodebuild -project Unbox.xcodeproj -scheme Unbox -sdk iphoneos -configuration Release -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build | tail -5
+          APP=build/Build/Products/Release-iphoneos/Unbox.app
+          # Ad-hoc signature that carries the app-group entitlement, so Sideloadly keeps it when it signs.
+          codesign -f -s - --entitlements UnboxWidget/UnboxWidget.entitlements "$APP/PlugIns/UnboxWidget.appex"
+          codesign -f -s - --entitlements Unbox/Unbox.entitlements "$APP"
+          mkdir -p Payload && cp -R "$APP" Payload/ && zip -qry Unbox.ipa Payload && ls -la Unbox.ipa
+      - name: Publish the .ipa
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "ios-build-${{ github.run_number }}" ios/Unbox.ipa --title "Unbox for iPhone, build ${{ github.run_number }}" --notes "Install with Sideloadly." --latest=false
