@@ -14,9 +14,9 @@ let GROUP = "group.com.eliorsasi.unbox"
 struct UnboxApp: App {
     var body: some Scene {
         WindowGroup {
+            // The page sits between the status bar and the home indicator; the dark background fills behind both.
             WebScreen()
-                .ignoresSafeArea()
-                .background(Color(red: 10/255, green: 15/255, blue: 20/255))
+                .background(Color(red: 10/255, green: 15/255, blue: 20/255).ignoresSafeArea())
                 .preferredColorScheme(.dark)
                 // unbox://open?p=… from a widget
                 .onOpenURL { NotificationCenter.default.post(name: .unboxOpenURL, object: $0) }
