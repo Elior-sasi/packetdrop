@@ -32,3 +32,11 @@ import {pdfOrder} from '../lib/pdf';
 test('invoice PDF: a delivery-fee line and its warehouse column are not a product',()=>{
  const t=['377815 ¦ HEAT PUMP EL896 מייבש כביסה אלקטרה 8 ¦ ראשי לוגיסטיקר- 11 מחסני ¦ יועץ ¦ 1 ¦ 1490.00 ¦ 1490.00','225500 ¦ הובלה ¦ ראשי תל אביב ¦ 3 פריטי שיווק ¦ 1 ¦ 99.00 ¦ 99.00','הערות : ת. משלוח: 473173421'].join('\n');
  const o=pdfOrder(t);assert.deepEqual(o.items,['HEAT PUMP EL896 מייבש כביסה אלקטרה 8']);assert.deepEqual(o.ship,['473173421']);});
+test('a review request ("איך הלך?") sent while the parcel is still moving does not mark it delivered',()=>{
+ const ev=(id:string,label:string,t:string)=>({id,label,time:t});
+ const base={name:'x',shop:'AliExpress',carrier:'',image:'',url:'',tracking:'RS1Y',order:'1',eta:'',cancelled:false,pickup:null};
+ const review={...base,id:'order:1',keys:['order:1'],stage:4,reviewAsk:true,events:[ev('r','הזמנה מס\' 1: איך הלך?','2026-11-06T18:42:00Z')]};
+ const moving={...base,id:'tracking:RS1Y',keys:['tracking:RS1Y','order:1'],stage:2,events:[ev('a','במכס','2026-11-07T06:57:00Z'),ev('b','שוחררה ממכס הייצוא','2026-11-07T08:57:00Z')]};
+ assert.equal(mergeParcels([review,moving] as never)[0].stage,2);
+ const quiet={...moving,events:[ev('a','במכס','2026-11-01T06:57:00Z')]};
+ assert.equal(mergeParcels([review,quiet] as never)[0].stage,4);});

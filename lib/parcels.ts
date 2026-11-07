@@ -5,7 +5,7 @@ export type Event={id:string;label:string;time:string};
 // A pickup place must read like a name: starts with a letter, no message fragments ("(183-381)-הגיע ל...").
 export const goodPlace=(p:string)=>p&&/^[\u05D0-\u05EAA-Za-z0-9"']/.test(p)&&!/הגיע|\d{3}-\d{3}|^\d+$/.test(p)?p:'';
 export type Pickup={place:string;address:string;code:string;url:string;hours?:string;until?:string};
-export type Parcel={smsOrder?:boolean;id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[];orderItems?:Record<string,string[]>;pkgByOrder?:Record<string,string[]>;link?:string};
+export type Parcel={reviewAsk?:boolean;smsOrder?:boolean;id:string;keys:string[];name:string;shop:string;carrier:string;image:string;url:string;tracking:string;order:string;eta:string;stage:number;cancelled:boolean;pickup:Pickup|null;events:Event[];price?:string;qty?:number;via?:string[];images?:string[];items?:string[];named?:Record<string,string>;customs?:{amount:string;url:string;at:string};refund?:{amount:string;at:string;bonus?:boolean};ret?:boolean;pkgItems?:string[];missing?:string[];orderItems?:Record<string,string[]>;pkgByOrder?:Record<string,string[]>;link?:string};
 export type Message={id:string;threadId?:string;internalDate?:string;snippet?:string;labelIds?:string[];payload?:Part};
 type Part={filename?:string;mimeType?:string;body?:{data?:string};parts?:Part[];headers?:{name:string;value:string}[]};
 export const stages=['ההזמנה התקבלה','נשלחה','בדרך ליעד','במסירה / איסוף','נמסרה'];
@@ -170,6 +170,8 @@ if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חביל
  const cancelled=CANCEL.test(subject)||/הזמנתך זוכתה|your order (?:has been|was) (?:cancel+ed|refunded)/i.test(lead);
  // "כאשר ההזמנה תהיה מוכנה לאיסוף…" is a promise of a later message, not news: such sentences don't set the stage.
  let stage=stageOf(subject);if(stage<0)stage=stageOf(lead.split(/(?<=[.!])\s*/).filter(x=>!/^\s*(?:כאשר|כש|לאחר|ברגע ש|אם)/.test(x)).join(' '));
+ // A review request ("איך הלך?") usually means it arrived, but AliExpress also sends it while the parcel is still on its way: it is marked so newer news wins.
+ const reviewAsk=stage===4&&/איך הלך|לכתוב ביקורת|חוויתכם חשובה|שלחו את דעתכם|דרגו את החוויה|write a review|leave a review|how was your order/i.test(subject+' '+lead)&&!/נמסר|delivered/i.test(subject);
  // Israel Post's own wording, in plain words; "תודה שאספת" means the user already collected it.
  const postBody=post?text.slice(subject.length):'';
  const postSaid=!post?'':/תודה שאספת/.test(postBody)?'נאספה':postWait?'ממתינה לאיסוף ב'+postWait[1].trim():/יוחזר לשולח|הוחזר לשולח|לא נדרש בידי הנמען/.test(postBody)?'הוחזרה לשולח':/הגיע לארץ/.test(postBody)?'הגיעה לארץ ובדרך אליך':/בדרכו לארץ/.test(postBody)?'בדרך לארץ':'';
@@ -197,7 +199,7 @@ if(!name)name=/^הודעה (?:מ|ב|על)|notification/i.test(subject)?'חביל
  // Money back: the amount and when, attached to the order (also store credit, "bonus").
  const refund=REFUND.test(subject)||REFUND.test(lead)?(()=>{const mm=text.slice(0,3000).match(/(?:₪|ILS)\s?(\d[\d,]*(?:\.\d{1,2})?)|(\d[\d,]*(?:\.\d{1,2})?)\s?(?:₪|ILS|ש"ח)/);const amount=mm?'₪'+(mm[1]||mm[2]).replace(/,/g,''):'';return {amount,at:time,...(/bonus|בונוס/i.test(subject)?{bonus:true}:{})};})():undefined;
  const refundLabel=refund?(refund.bonus?'הוחזר כבונוס באתר'+(refund.amount?' '+refund.amount:''):refund.amount?'הוחזרו '+refund.amount:'בוצע החזר כספי'):'';
- return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,...(pickupUrl?{link:pickupUrl}:{}),via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:cellImgs.length>1?{images:cellImgs}:{}),...(Object.keys(named).length?{named}:{}),customs,...(refund?{refund}:{}),...(/aliexpress/i.test(shop)&&!refund?(()=>{const got=(listed.length?listed:/^(?:הזמנה|חבילה|לחבילה|your order|הודעה)/i.test(name)?[]:[name]).slice(0,20);if(!got.length||!orders.size)return {};
+ return {id:keys[0],keys,name:name.slice(0,180),shop,carrier,image,url,tracking:shownTracking,order,eta:etaAll,stage,cancelled,pickup,price,qty,...(reviewAsk?{reviewAsk:true}:{}),...(pickupUrl?{link:pickupUrl}:{}),via:via.length?via:undefined,...(listed.length>1?{items:listed}:{}),...(listedImgs.length>1?{images:listedImgs}:cellImgs.length>1?{images:cellImgs}:{}),...(Object.keys(named).length?{named}:{}),customs,...(refund?{refund}:{}),...(/aliexpress/i.test(shop)&&!refund?(()=>{const got=(listed.length?listed:/^(?:הזמנה|חבילה|לחבילה|your order|הודעה)/i.test(name)?[]:[name]).slice(0,20);if(!got.length||!orders.size)return {};
   // What each order contained (order mails) and what each package carried (shipping mails), kept per order so merges can compare them.
   return shownTracking?{pkgItems:got,pkgByOrder:Object.fromEntries([...orders].map(o=>[o,got]))}:orders.size===1?{orderItems:{[[...orders][0]]:got}}:{};})():{}),events:[{id:m.id,label:refundLabel||label||(stage>=0?stages[stage]:'עדכון'),time}]};
 }
@@ -250,7 +252,9 @@ export function mergeParcels(rows:Parcel[]){
   // Every order in the package, so each one can be found and listed (unnamed ones by their order number).
   const contents=orderCount>1||items.length>1?[...items,...keys.filter(k=>k.startsWith('order:')).map(k=>k.slice(6)).filter(o=>!perOrder.has(o)).slice(0,unnamed).map(o=>'הזמנה …'+o.slice(-6))]:[];
   const title=items.length>1||unnamed?items.slice(0,4).join(' + ')+(more?' ועוד '+more:''):(JUNK_ITEM.test(named.name)?(items[0]||'הזמנה'):named.name);
-  const stage=Math.max(0,...list.map(p=>p.stage));
+  // A review request counts as "arrived" only when nothing newer came after it (tracking or another mail still moving it along).
+  const at=(p:Parcel)=>Math.max(0,...p.events.map(e=>Date.parse(e.time)||0));
+  const stage=Math.max(0,...list.filter(p=>!p.reviewAsk||!list.some(q=>!q.reviewAsk&&q.stage<4&&at(q)>at(p))).map(p=>p.stage));
   // Cancelled only if the cancellation is the newest news (a later shipping mail means it went out after all).
   const cancelled=latest.cancelled||(list.some(p=>p.cancelled)&&stage<1);
   // The shop comes from the order mails, not from a carrier's notice (Israel Post writes as itself).
