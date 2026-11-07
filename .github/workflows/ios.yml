@@ -28,6 +28,7 @@ jobs:
           xcrun simctl launch "$DEV" com.eliorsasi.unbox
           sleep 25
           xcrun simctl io "$DEV" screenshot launch.png
+          sips -Z 500 -s format jpeg launch.png --out small.jpg >/dev/null; echo SHOT_BEGIN; base64 -i small.jpg; echo SHOT_END
       - uses: actions/upload-artifact@v4
         with:
           name: screenshot
