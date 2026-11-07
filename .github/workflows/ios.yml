@@ -18,3 +18,17 @@ jobs:
           xcodebuild -project Unbox.xcodeproj -scheme Unbox -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -configuration Debug CODE_SIGNING_ALLOWED=NO build | tail -40
           exit ${PIPESTATUS[0]}
+      - name: Run in the simulator and take a screenshot
+        run: |
+          cd ios
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -path '*Debug-iphonesimulator/Unbox.app' -maxdepth 6 | head -1)
+          DEV=$(xcrun simctl list devices available | grep -m1 -E 'iPhone 1[5-9]( Pro)? \(' | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+          xcrun simctl boot "$DEV"; xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install "$DEV" "$APP"
+          xcrun simctl launch "$DEV" com.eliorsasi.unbox
+          sleep 25
+          xcrun simctl io "$DEV" screenshot launch.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshot
+          path: ios/launch.png
